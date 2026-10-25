@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CHART_LOCAL = path.join(RAIZ, 'node_modules', 'chart.js', 'dist', 'chart.umd.js');
-const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.mp4': 'video/mp4', '.json': 'application/json' };
+const TIPOS = { '.png': 'image/png', '.jpg': 'image/jpeg', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.mp4': 'video/mp4', '.json': 'application/json' };
 
 const servidor = http.createServer((req, res) => {
   const ruta = path.join(RAIZ, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -86,6 +86,9 @@ await verificar('barra superior limpia', async (page) => {
 await verificar('marca Kinemo', async (page) => {
   afirmar((await page.textContent('.brand-title')).trim() === 'Kinemo', 'la marca no es Kinemo');
   afirmar((await page.title()).startsWith('Kinemo'), `título: ${await page.title()}`);
+  const logo = await page.$eval('.brand-mark img', (i) => ({ src: i.getAttribute('src'), ancho: i.naturalWidth }));
+  afirmar(logo.src === 'img/kinemo-simbolo.png' && logo.ancho > 0, `logo: ${JSON.stringify(logo)}`);
+  afirmar(await page.$eval('link[rel=icon]', (l) => l.getAttribute('href')) === 'img/favicon.png', 'sin icono de pestaña');
 });
 
 /* ---------- Seguimiento ---------- */
