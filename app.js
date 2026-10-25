@@ -684,7 +684,9 @@ function importarJSON(texto) {
   });
   guardarDB();
   seleccionarPaciente(p.id);
+  // Seleccionar la sesión importada y redibujar: así la nota y el detalle apuntan a ella.
   estado.sesionId = sesiones[sesiones.length - 1].id;
+  renderSeccion();
   toast(`${sesiones.length} sesión(es) importada(s) para ${p.nombre}.`);
 }
 

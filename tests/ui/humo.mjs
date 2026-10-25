@@ -206,6 +206,21 @@ await verificar('csv descarga', async (page) => {
   afirmar(descarga.suggestedFilename().endsWith('_sesiones.csv'), `archivo: ${descarga.suggestedFilename()}`);
 });
 
+await verificar('nota tras importar va a la sesión importada', async (page) => {
+  await irReporte(page);
+  const sesion = { sesion: { fecha: '2020-01-01', ejercicios: [{ tipo: 'flexion', repeticiones: 10, repeticionesObjetivo: 10, anguloMax: 40 }] } };
+  await page.setInputFiles('#file-input', { name: 'sesion.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sesion)) });
+  await page.waitForTimeout(300);
+  afirmar((await page.textContent('#nota-sesion-label')).includes('2020'), `etiqueta: ${await page.textContent('#nota-sesion-label')}`);
+  await page.fill('#nota', 'HOLA');
+  await page.waitForTimeout(700);
+  const r = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    return p.sesiones.filter((x) => x.notas === 'HOLA').map((x) => x.fecha);
+  });
+  afirmar(JSON.stringify(r) === '["2020-01-01"]', `nota guardada en: ${r}`);
+});
+
 /* ---------- Pulido ---------- */
 const SECCIONES = ['ejercicios', 'seguimiento', 'reporte'];
 
