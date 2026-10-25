@@ -1,4 +1,4 @@
-# Interfaz del profesional — Seguimiento de rehabilitación (túnel del carpo)
+# Kinemo — Interfaz del profesional para el seguimiento de la rehabilitación (túnel del carpo)
 
 Panel web local en el que el fisioterapeuta, terapeuta o médico revisa y analiza la evolución del paciente entre sesiones (brief DMR103-PBL-001, objetivo específico 4).
 

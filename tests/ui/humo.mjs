@@ -83,6 +83,11 @@ await verificar('barra superior limpia', async (page) => {
   afirmar(await page.locator('.topbar button').count() === 0, 'hay botones en la barra superior');
 });
 
+await verificar('marca Kinemo', async (page) => {
+  afirmar((await page.textContent('.brand-title')).trim() === 'Kinemo', 'la marca no es Kinemo');
+  afirmar((await page.title()).startsWith('Kinemo'), `título: ${await page.title()}`);
+});
+
 /* ---------- Seguimiento ---------- */
 await verificar('encabezado compacto', async (page) => {
   const txt = await page.textContent('#encabezado');

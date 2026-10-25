@@ -1,5 +1,6 @@
-/* Panel del profesional — seguimiento de rehabilitación post túnel del carpo. */
+/* Kinemo — panel del profesional: seguimiento de rehabilitación post túnel del carpo. */
 
+// Clave anterior al cambio de nombre a Kinemo: se conserva para no perder los datos guardados.
 const STORAGE_KEY = 'rehabcarpo.db.v1';
 
 const estado = {
@@ -767,7 +768,7 @@ function init() {
   });
 
   $('#btn-csv').addEventListener('click', () => paciente() && exportarCSV(paciente()));
-  $('#btn-exportar').addEventListener('click', () => descargar(`rehab_carpo_${hoyISO()}.json`, JSON.stringify(estado.db, null, 2), 'application/json'));
+  $('#btn-exportar').addEventListener('click', () => descargar(`kinemo_${hoyISO()}.json`, JSON.stringify(estado.db, null, 2), 'application/json'));
   $('#btn-importar').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', async (e) => {
     const f = e.target.files[0];
