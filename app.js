@@ -6,7 +6,8 @@ const estado = {
   db: null,
   pacienteId: null,
   sesionId: null,
-  tab: 'evolucion',
+  seccion: 'seguimiento',
+  vista: 'resumen',
   romModo: 'grados',
   indicador: 'cumplimiento',
   ejercicio: 'flexion',
@@ -172,8 +173,7 @@ function renderPaciente() {
   $('#vista-paciente').hidden = !p;
   if (!p) return;
   renderEncabezado(p);
-  renderKPIs(p);
-  renderTab();
+  renderSeccion();
 }
 
 function renderEncabezado(p) {
@@ -264,17 +264,30 @@ function renderKPIs(p) {
     </div>`;
 }
 
-/* ======================= Pestañas ======================= */
-function renderTab() {
-  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === estado.tab));
-  document.querySelectorAll('.tab-panel').forEach((pn) => (pn.hidden = pn.dataset.panel !== estado.tab));
+/* ======================= Secciones ======================= */
+/* Todo cambio de sección o vista pasa por aquí. */
+function irA(seccion, vista = estado.vista) {
+  Object.assign(estado, normalizarRuta({ seccion, vista }));
+  renderSeccion();
+}
+
+function renderSeccion() {
+  document.querySelectorAll('.nav-seccion').forEach((b) => {
+    if (b.dataset.seccion === estado.seccion) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('section.seccion').forEach((s) => (s.hidden = s.dataset.seccion !== estado.seccion));
+  document.querySelectorAll('#seg-vistas .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.vista === estado.vista));
+  document.querySelectorAll('.vista').forEach((v) => (v.hidden = v.dataset.vista !== estado.vista));
   const p = paciente();
   if (!p) return;
-  if (estado.tab === 'evolucion') renderEvolucion(p);
-  if (estado.tab === 'sesion') renderSesion(p);
-  if (estado.tab === 'comparar') renderComparar(p);
-  if (estado.tab === 'historial') renderHistorial(p);
-  if (estado.tab === 'vivo') renderMonitor();
+  if (estado.seccion === 'seguimiento') {
+    if (estado.vista === 'resumen') renderEvolucion(p);
+    if (estado.vista === 'sesion') renderSesion(p);
+    if (estado.vista === 'comparar') renderComparar(p);
+  }
+  if (estado.seccion === 'reporte') renderHistorial(p);
+  if (estado.seccion === 'ejercicios') renderMonitor();
 }
 
 /* ---------- Evolución ---------- */
@@ -727,7 +740,8 @@ function init() {
   });
   $('#buscar').addEventListener('input', (e) => { estado.busqueda = e.target.value; renderLista(); });
 
-  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => { estado.tab = t.dataset.tab; renderTab(); }));
+  document.querySelectorAll('.nav-seccion').forEach((b) => b.addEventListener('click', () => irA(b.dataset.seccion)));
+  document.querySelectorAll('#seg-vistas .seg-btn').forEach((b) => b.addEventListener('click', () => irA('seguimiento', b.dataset.vista)));
   document.querySelectorAll('#rom-modo .seg-btn').forEach((b) => b.addEventListener('click', () => {
     estado.romModo = b.dataset.modo;
     document.querySelectorAll('#rom-modo .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
@@ -741,7 +755,7 @@ function init() {
 
   $('#tabla-historial').addEventListener('click', (e) => {
     const ver = e.target.closest('.btn-ver');
-    if (ver) { estado.sesionId = ver.dataset.id; estado.tab = 'sesion'; renderTab(); return; }
+    if (ver) { estado.sesionId = ver.dataset.id; irA('seguimiento', 'sesion'); return; }
     const tr = e.target.closest('tr[data-id]');
     if (tr) { estado.sesionId = tr.dataset.id; renderHistorial(paciente()); }
   });
@@ -791,13 +805,14 @@ function init() {
     toast(`Paciente ${p.id} creado.`);
   });
 
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { aplicarTemaCharts(); renderTab(); });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { aplicarTemaCharts(); renderSeccion(); });
   // Redibuja las gráficas cuando termine de cargar la tipografía web
-  document.fonts?.ready.then(() => { aplicarTemaCharts(); renderTab(); });
+  document.fonts?.ready.then(() => { aplicarTemaCharts(); renderSeccion(); });
   window.addEventListener('beforeunload', guardarDB);
 
   renderLista();
   const primero = [...estado.db.pacientes].sort((a, b) => a.nombre.localeCompare(b.nombre))[0];
+  estado.seccion = seccionInicial(primero?.sesiones.length);
   if (primero) seleccionarPaciente(primero.id); else renderPaciente();
 }
 

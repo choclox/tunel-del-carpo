@@ -448,7 +448,8 @@ function guardarSesionRutina({ dolor = null, notas = '', manuales = {} } = {}) {
   toast(`Sesión guardada para ${p.nombre}.`);
   if (p.id === estado.pacienteId) {
     estado.sesionId = s.id;
-    estado.tab = 'sesion';
+    estado.seccion = 'seguimiento';
+    estado.vista = 'sesion';
     renderLista();
     renderPaciente();
   }
@@ -572,7 +573,7 @@ function renderMonitorControles() {
 
   const est = estadoConexion();
   $('#mv-estado').innerHTML = `<span class="dot ${est.dot}"></span>${est.txt}`;
-  $('#tab-vivo-dot').hidden = !mv.ej && !mv.paso;
+  $('#nav-ejercicios-dot').hidden = !mv.ej && !mv.paso;
 
   // Calibración
   const calBtn = $('#mv-calibrar');
@@ -602,7 +603,7 @@ function refrescar() {
     mv.calInicio = null;
     renderMonitorControles();
   }
-  if (estado.tab !== 'vivo') return;
+  if (estado.seccion !== 'ejercicios') return;
 
   // Estadísticas de comunicación
   if (mv.conectado && st) {

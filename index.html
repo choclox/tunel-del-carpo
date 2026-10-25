@@ -57,16 +57,6 @@
         <div class="brand-sub">Seguimiento clínico</div>
       </div>
     </div>
-    <div class="topbar-note">
-      <svg class="ic" aria-hidden="true"><use href="#i-stetho"/></svg>
-      <span>Panel del profesional<br><small>Prototipo académico DMR103</small></span>
-    </div>
-    <div class="topbar-actions">
-      <button class="btn btn-ghost" id="btn-importar" title="Importar archivo de sesión generado por el dispositivo (.json)"><svg class="ic"><use href="#i-upload"/></svg>Importar sesión</button>
-      <button class="btn btn-ghost" id="btn-exportar" title="Exportar toda la base de datos (.json)"><svg class="ic"><use href="#i-download"/></svg>Exportar datos</button>
-      <button class="btn btn-ghost" id="btn-reset" title="Restaurar los datos de demostración"><svg class="ic"><use href="#i-refresh"/></svg>Restablecer demo</button>
-      <input type="file" id="file-input" accept=".json,application/json" hidden>
-    </div>
   </header>
 
   <div class="layout">
@@ -94,20 +84,33 @@
         <!-- Encabezado del paciente -->
         <section class="hero" id="encabezado"></section>
 
-        <!-- Indicadores clave -->
-        <section class="kpis" id="kpis"></section>
-
-        <!-- Pestañas -->
-        <nav class="tabs" role="tablist">
-          <button role="tab" class="tab active" data-tab="evolucion"><svg class="ic"><use href="#i-trend"/></svg>Evolución</button>
-          <button role="tab" class="tab" data-tab="sesion"><svg class="ic"><use href="#i-activity"/></svg>Detalle de sesión</button>
-          <button role="tab" class="tab" data-tab="comparar"><svg class="ic"><use href="#i-bars"/></svg>Comparar sesiones</button>
-          <button role="tab" class="tab" data-tab="historial"><svg class="ic"><use href="#i-file"/></svg>Historial y notas</button>
-          <button role="tab" class="tab" data-tab="vivo"><span class="live-dot" id="tab-vivo-dot" hidden></span><svg class="ic"><use href="#i-radio"/></svg>Monitoreo en vivo</button>
+        <!-- Secciones -->
+        <nav class="nav-secciones" aria-label="Secciones">
+          <button class="nav-seccion" data-seccion="ejercicios">
+            <span class="icon-bubble"><svg class="ic"><use href="#i-play"/></svg></span>
+            <span><span class="nav-titulo">Ejercicios</span><span class="live-dot" id="nav-ejercicios-dot" hidden></span>
+              <small>Hacer la rutina con el paciente</small></span>
+          </button>
+          <button class="nav-seccion" data-seccion="seguimiento">
+            <span class="icon-bubble"><svg class="ic"><use href="#i-trend"/></svg></span>
+            <span><span class="nav-titulo">Seguimiento</span><small>Ver cómo avanza</small></span>
+          </button>
+          <button class="nav-seccion" data-seccion="reporte">
+            <span class="icon-bubble"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span><span class="nav-titulo">Reporte</span><small>Historial, notas y archivos</small></span>
+          </button>
         </nav>
 
-        <!-- EVOLUCIÓN -->
-        <section class="tab-panel" data-panel="evolucion">
+        <!-- ===== SEGUIMIENTO ===== -->
+        <section class="seccion" data-seccion="seguimiento" hidden>
+        <div class="seg seg-vistas" id="seg-vistas" role="group" aria-label="Vista">
+          <button class="seg-btn" data-vista="resumen">Resumen</button>
+          <button class="seg-btn" data-vista="sesion">Una sesión</button>
+          <button class="seg-btn" data-vista="comparar">Comparar</button>
+        </div>
+
+        <!-- RESUMEN -->
+        <div class="vista tab-panel" data-vista="resumen">
           <div class="card">
             <div class="card-head">
               <div>
@@ -153,10 +156,10 @@
               <ul class="obs-list" id="observaciones"></ul>
             </div>
           </div>
-        </section>
+        </div>
 
-        <!-- DETALLE DE SESIÓN -->
-        <section class="tab-panel" data-panel="sesion" hidden>
+        <!-- UNA SESIÓN -->
+        <div class="vista tab-panel" data-vista="sesion" hidden>
           <div class="card">
             <div class="card-head">
               <div>
@@ -195,10 +198,10 @@
             </div>
             <div class="chart-box tall"><canvas id="chart-senal"></canvas></div>
           </div>
-        </section>
+        </div>
 
         <!-- COMPARAR -->
-        <section class="tab-panel" data-panel="comparar" hidden>
+        <div class="vista tab-panel" data-vista="comparar" hidden>
           <div class="card">
             <div class="card-head">
               <div>
@@ -214,10 +217,11 @@
             <div class="chart-box tall"><canvas id="chart-cmp"></canvas></div>
             <div class="table-wrap"><table class="table" id="tabla-cmp"></table></div>
           </div>
+        </div>
         </section>
 
-        <!-- HISTORIAL -->
-        <section class="tab-panel" data-panel="historial" hidden>
+        <!-- ===== REPORTE ===== -->
+        <section class="seccion tab-panel" data-seccion="reporte" hidden>
           <div class="card">
             <div class="card-head">
               <div>
@@ -237,10 +241,18 @@
             <textarea id="nota" rows="5" placeholder="Observaciones del profesional para esta sesión…"></textarea>
             <div class="note-foot muted" id="nota-estado"></div>
           </div>
+          <div class="card">
+            <div class="dlg-actions">
+              <button class="btn" id="btn-importar" title="Importar archivo de sesión generado por el dispositivo (.json)"><svg class="ic"><use href="#i-upload"/></svg>Importar sesión</button>
+              <button class="btn" id="btn-exportar" title="Exportar toda la base de datos (.json)"><svg class="ic"><use href="#i-download"/></svg>Exportar datos</button>
+              <button class="btn btn-ghost" id="btn-reset" title="Restaurar los datos de demostración"><svg class="ic"><use href="#i-refresh"/></svg>Restablecer demo</button>
+              <input type="file" id="file-input" accept=".json,application/json" hidden>
+            </div>
+          </div>
         </section>
 
-        <!-- MONITOREO EN VIVO -->
-        <section class="tab-panel" data-panel="vivo" hidden>
+        <!-- ===== EJERCICIOS ===== -->
+        <section class="seccion tab-panel" data-seccion="ejercicios" hidden>
           <div class="live-top">
             <div class="card">
               <div class="card-head">
@@ -325,12 +337,6 @@
       </div>
 
       <footer class="footer">
-        <div class="values">
-          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-activity"/></svg></span><span>Datos objetivos<br>de cada sesión</span></div>
-          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-users"/></svg></span><span>Seguimiento<br>individualizado</span></div>
-          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-shield"/></svg></span><span>Seguridad<br>del paciente</span></div>
-          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-heart"/></svg></span><span>Apoyo al<br>criterio clínico</span></div>
-        </div>
         <p class="disclaimer">
           Prototipo académico. No es un dispositivo médico certificado. La información presentada complementa,
           y no sustituye, la valoración y el criterio clínico del profesional responsable.
@@ -454,6 +460,7 @@
 
   <script src="data.js"></script>
   <script src="rutinas.js"></script>
+  <script src="navegacion.js"></script>
   <script src="app.js"></script>
   <script src="monitoreo.js"></script>
   <script src="rutina.js"></script>
