@@ -252,6 +252,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .compare-pickers { display: flex; gap: 10px; flex-wrap: wrap; }
 .compare-pickers label { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: var(--brand-text); }
 .note-foot { min-height: 18px; }
+.archivos { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.archivo { display: grid; gap: 6px; justify-items: start; }
+.aviso-fila { color: var(--bad-text); cursor: help; }
 
 /* ===== Monitoreo en vivo ===== */
 /* Pasos guiados de Ejercicios */

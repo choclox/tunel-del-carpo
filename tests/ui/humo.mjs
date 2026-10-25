@@ -177,6 +177,35 @@ await verificar('rutina completa con simulador', async (page) => {
   afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
 
+/* ---------- Reporte ---------- */
+const irReporte = (page) => page.click('.nav-seccion[data-seccion="reporte"]');
+
+await verificar('historial corto', async (page) => {
+  await irReporte(page);
+  const ths = await page.$$eval('#tabla-historial thead th', (t) => t.map((x) => x.textContent.trim()));
+  afirmar(JSON.stringify(ths) === JSON.stringify(['#', 'Fecha', 'Días desde la cirugía', 'Cumplimiento', 'Dolor', 'Nota', '']), `columnas: ${ths}`);
+});
+
+await verificar('archivos en reporte', async (page) => {
+  await irReporte(page);
+  for (const id of ['#btn-csv', '#btn-exportar', '#btn-importar']) afirmar(await page.isVisible(id), `${id} no visible`);
+  const reset = await page.$eval('#btn-reset', (b) => { const d = b.closest('details'); return !!d && !d.open; });
+  afirmar(reset, '#btn-reset no está en un <details> cerrado');
+});
+
+await verificar('ver detalle', async (page) => {
+  await irReporte(page);
+  await page.click('.btn-ver >> nth=0');
+  afirmar(await seccionActiva(page) === 'seguimiento', 'no fue a Seguimiento');
+  afirmar(await page.evaluate(() => estado.vista) === 'sesion', 'la vista no es Una sesión');
+});
+
+await verificar('csv descarga', async (page) => {
+  await irReporte(page);
+  const [descarga] = await Promise.all([page.waitForEvent('download'), page.click('#btn-csv')]);
+  afirmar(descarga.suggestedFilename().endsWith('_sesiones.csv'), `archivo: ${descarga.suggestedFilename()}`);
+});
+
 await navegador.close();
 servidor.close();
 console.log(fallas ? `\n${fallas} comprobación(es) fallida(s)` : '\nTodo correcto');

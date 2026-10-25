@@ -16,19 +16,19 @@ Luego abra `http://localhost:8765` en **Google Chrome o Microsoft Edge**. Son lo
 
 ## Qué incluye
 
-| Pestaña | Contenido |
-|---|---|
-| **Evolución** | Rango de movimiento máximo por sesión para 5 ejercicios, en grados o como % del valor de referencia. Indicador seleccionable: cumplimiento, dolor EVA, velocidad, variabilidad o duración. Observaciones automáticas informativas. |
-| **Detalle de sesión** | Tabla por ejercicio (repeticiones, ángulo máximo, cambio frente a la sesión anterior, velocidad, variabilidad). Calidad de la sesión (calibración ≤ 30 s, pérdida de datos < 1 %) y señal angular con las repeticiones detectadas. Si la sesión se grabó desde la rutina, muestra la tarjeta **Rutina: Fase N** con cada ejercicio grabado (objetivo, repeticiones detectadas, conteo manual, duración y la marca *Medido*). |
-| **Comparar sesiones** | Dos sesiones cualesquiera lado a lado, con gráfica y tabla de diferencias. |
-| **Historial y notas** | Todas las sesiones, notas clínicas por sesión y exportación a CSV. |
-| **Monitoreo en vivo** | Rutina de ejercicios por etapa del tratamiento (Fase 1, 2 o 3), sugerida según las semanas desde la cirugía y modificable por el profesional. **Revisar rutina** muestra cada ejercicio con su video (o "Video no adjuntado"), repeticiones y mensajes de cuidado. **Iniciar rutina** abre "¿Listos para empezar?" (conexión y calibración) y luego graba ejercicio por ejercicio, con los datos del dispositivo asociados al ejercicio en curso. Si no hay dispositivo conectado se usa el simulador y la sesión queda marcada como simulada. Al terminar, la ventana "Rutina terminada" pide dolor EVA, notas y conteos manuales, y guarda la sesión en el historial. También muestra la conexión, la calibración y la señal en tiempo real. |
+La pantalla tiene tres secciones. Lo técnico o secundario queda plegado ("Ver ficha", "Más indicadores", "Datos técnicos del dispositivo"…) para no saturar.
 
-Los datos se guardan en el navegador (`localStorage`). Use **Exportar datos** para respaldarlos.
+| Sección | Contenido |
+|---|---|
+| **Ejercicios** (hacer la rutina) | Tres pasos: **1 Conecte el dispositivo**, **2 Elija la fase** (Fase 1, 2 o 3, sugerida según los días desde la cirugía; "Ver los ejercicios de esta fase" muestra la lista, los cuidados y **Ver videos**) y **3 Empiece la rutina**. "Empezar rutina" abre "¿Listos para empezar?" (conexión y calibración automáticas) y luego graba ejercicio por ejercicio. Si no hay dispositivo conectado se usa el simulador y la sesión queda marcada como simulada. Al terminar, "Rutina terminada" pide dolor EVA, notas y conteos manuales, guarda la sesión y abre su detalle en Seguimiento. **Datos técnicos del dispositivo** (plegado) tiene el origen, la velocidad, la calibración manual, los indicadores de comunicación y la señal en tiempo real. |
+| **Seguimiento** (cómo avanza) | **Resumen**: tres tarjetas (Avance, Dolor, Última sesión), la gráfica del ángulo máximo por sesión (en grados o % de lo normal), los 3 avisos automáticos más importantes ("Ver N más") y, plegado, **Más indicadores** (cumplimiento, dolor, velocidad, variabilidad o duración). **Una sesión**: tabla por ejercicio (con "Mostrar todas las columnas"), una insignia de calidad ("✓ Datos confiables" o los avisos que fallen), la tarjeta **Rutina: Fase N** si se grabó desde la rutina y, plegada, **Ver señal del sensor**. **Comparar**: dos sesiones lado a lado. Si el paciente no tiene sesiones, se ofrece "Ir a Ejercicios". |
+| **Reporte** (historial y archivos) | Historial de sesiones (⚠ marca las que tienen pérdida de datos o calibración fallida), notas por sesión y **Archivos**: tabla para Excel (CSV), copia de seguridad de todos los pacientes y cargar archivo de sesión. "Restablecer datos de demostración" está en **Opciones de prueba**. |
+
+Los datos se guardan en el navegador (`localStorage`). Use **Reporte › Copia de seguridad** para respaldarlos.
 
 ## Formato de archivo de sesión (lo que debe generar el dispositivo o el software de adquisición)
 
-**Importar sesión** acepta un `.json` con esta estructura:
+**Reporte › Cargar archivo de sesión** acepta un `.json` con esta estructura:
 
 ```json
 {
@@ -63,13 +63,13 @@ Los datos se guardan en el navegador (`localStorage`). Use **Exportar datos** pa
 - `rutina` (opcional, lo agrega el panel al guardar desde la rutina): `{ "etapa": 1, "pasos": [ ... ] }`. `etapa` es 1, 2 o 3 y `pasos` debe ser una lista (al importar se rechaza si no). Cada paso grabado tiene `id`, `nombre`, `tipo` (clave de `EJERCICIOS` o `null` si no se mide), `repeticionesObjetivo`, `repeticiones` (detectadas; `null` si no se midió), `repeticionesManual` (o `null`) y `duracionS`. Los pasos sin medición incluyen `senal: { fs, fe, rc, mcf }` con la señal cruda de los 3 canales reducida a ~10 Hz (`fs` indica la frecuencia efectiva). Los pasos medidos aparecen además en `ejercicios`. Las sesiones sin `rutina` se muestran igual que antes.
 - También se aceptan `"sesiones": [ ... ]` para importar varias sesiones a la vez, o un respaldo completo con `"pacientes": [ ... ]`.
 
-## Monitoreo en vivo
+## Ejercicios y monitoreo en vivo
 
-Flujo: **Elegir etapa → Iniciar rutina → ¿Listos para empezar? (conexión y calibración) → ejercicio por ejercicio → Rutina terminada → Guardar sesión**.
+Flujo: **Conectar (opcional) → Elegir fase → Empezar rutina → ¿Listos para empezar? (conexión y calibración) → ejercicio por ejercicio → Rutina terminada → Guardar sesión**.
 
 La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio siguiente con un botón; con "Anterior" se puede volver a grabar un ejercicio, y el nuevo registro reemplaza al anterior. Si se cierra la ventana durante la grabación, se pregunta si terminar la rutina; lo ya grabado se puede guardar.
 
-- **Origen.** Elija *Dispositivo USB* para el prototipo real: el navegador pedirá elegir el puerto COM. Elija *Simulador* para probar sin hardware. Las sesiones del simulador quedan marcadas como tales.
+- **Origen** (en *Datos técnicos del dispositivo*). Elija *Dispositivo USB* para el prototipo real: el navegador pedirá elegir el puerto COM. Elija *Simulador* para probar sin hardware. Las sesiones del simulador quedan marcadas como tales.
 - **Indicadores de comunicación.** Muestran la frecuencia de muestreo, la pérdida de datos (criterio < 1 %, calculada con el número de secuencia) y el tiempo desde el último dato (criterio ≤ 0,5 s). La pantalla se actualiza cada 100 ms.
 - **Calibración.** Se mide desde que la PC envía `CAL` hasta que el dispositivo responde `CAL,OK`. Si pasa de 30 s, se marca como fallida. No se puede iniciar un ejercicio sin calibración válida.
 - **Conteo automático.** Detecta cada repetición con umbrales con histéresis, relativos a la posición de reposo al iniciar el ejercicio. Los umbrales se adaptan a la amplitud de las repeticiones anteriores. La línea punteada de la gráfica muestra el umbral.
@@ -116,11 +116,15 @@ Si sus sensores miden otros ejes, ajuste `canal` y `signo` de cada ejercicio en 
 - `monitoreo.js`: monitoreo en vivo (puerto serie, simulador, conteo de repeticiones).
 - `rutinas.js`: contenido de las rutinas por etapa (ejercicios, repeticiones, cuidados) y funciones puras con pruebas.
 - `rutina.js`: ventanas de la rutina (revisión y grabación), "¿Listos para empezar?" y "Rutina terminada".
+- `navegacion.js`: secciones (Ejercicios, Seguimiento, Reporte), vistas de Seguimiento y recorte de avisos; funciones puras con pruebas.
+- `tests/ui/humo.mjs`: prueba de humo de la interfaz en Chromium.
 - `videos/`: un `.mp4` por ejercicio de la rutina (ver [videos/LEEME.md](videos/LEEME.md)).
 - `firmware/plantilla_protocolo/`: plantilla de firmware con el protocolo.
 - `firmware/carpo_esp32/`: firmware real para ESP32 + GY-85 (`carpo_esp32.ino`, `config.h`, `gy85.*` y `src/nucleo/`).
 - `firmware/pruebas/`: pruebas del núcleo del firmware en el PC (`correr.py`, `test_*.cpp`).
 
 Pruebas (necesita Node): desde esta carpeta, `node --test`.
+
+Prueba de humo de la interfaz en el navegador (necesita Playwright con Chromium): `node tests/ui/humo.mjs`. Recorre las tres secciones y graba una rutina completa con el simulador. Sin acceso al CDN de Chart.js, copie el paquete `chart.js@4.4.1` en `node_modules/chart.js` (por ejemplo `npm pack chart.js@4.4.1` y descomprímalo ahí) y la prueba usa esa copia.
 
 > Prototipo académico. No es un dispositivo médico certificado. Complementa, pero no sustituye, el criterio clínico del profesional.

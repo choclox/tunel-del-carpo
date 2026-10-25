@@ -590,32 +590,31 @@ function renderComparar(p) {
 }
 
 /* ---------- Historial y notas ---------- */
-const grados = (v) => (v == null ? '—' : fmt(v, 1) + '°');
 
 function renderHistorial(p) {
   const ses = sesionesOrdenadas(p);
   if (!ses.some((s) => s.id === estado.sesionId) && ses.length) estado.sesionId = ses[ses.length - 1].id;
   const filas = ses.map((s, i) => {
     const m = metricas(s);
-    const okDatos = s.perdidaDatosPct < 1;
+    // Solo se marca lo que hay que revisar: pérdida de datos o calibración fallida.
+    const problemas = [];
+    if (s.perdidaDatosPct >= 1) problemas.push(`se perdió el ${fmt(s.perdidaDatosPct, 1)} % de los datos`);
+    if (s.calibracion && (!s.calibracion.ok || s.calibracion.tiempoS > 30)) problemas.push('la calibración falló o fue lenta');
+    const aviso = problemas.length ? ` <span class="aviso-fila" title="Revisar: ${problemas.join(' y ')}">⚠</span>` : '';
     return `<tr data-id="${esc(s.id)}" class="${s.id === estado.sesionId ? 'selected' : ''}">
       <td>${i + 1}</td>
-      <td>${fmtFecha(s.fecha)}</td>
+      <td>${fmtFecha(s.fecha)}${aviso}</td>
       <td class="num">${dias(p.fechaCirugia, s.fecha)}</td>
-      <td class="num">${s.duracionMin} min</td>
       <td class="num">${m.cumplimiento == null ? '—' : fmt(m.cumplimiento) + ' %'}</td>
-      <td class="num">${grados(ejercicioDe(s, 'flexion')?.anguloMax)}</td>
-      <td class="num">${grados(ejercicioDe(s, 'extension')?.anguloMax)}</td>
       <td class="num">${s.dolorEVA ?? '—'}</td>
-      <td><span class="dot ${okDatos ? 'good' : 'critical'}" style="display:inline-block"></span> ${okDatos ? 'OK' : 'Revisar'}</td>
-      <td>${s.notas ? '📝' : ''}</td>
-      <td><button class="btn btn-ghost btn-ver" data-id="${esc(s.id)}">Ver detalle</button></td>
+      <td>${s.notas ? 'Sí' : ''}</td>
+      <td><button class="btn btn-ghost btn-ver" data-id="${esc(s.id)}">Ver</button></td>
     </tr>`;
   }).reverse().join('');
   $('#tabla-historial').innerHTML = `<thead><tr>
-      <th>#</th><th>Fecha</th><th class="num">Días post-op</th><th class="num">Duración</th><th class="num">Cumplimiento</th>
-      <th class="num">Flexión</th><th class="num">Extensión</th><th class="num">EVA</th><th>Datos</th><th>Nota</th><th></th>
-    </tr></thead><tbody>${filas || '<tr><td colspan="11" class="muted">Sin sesiones</td></tr>'}</tbody>`;
+      <th>#</th><th>Fecha</th><th class="num">Días desde la cirugía</th><th class="num">Cumplimiento</th>
+      <th class="num">Dolor</th><th>Nota</th><th></th>
+    </tr></thead><tbody>${filas || '<tr><td colspan="7" class="muted">Sin sesiones</td></tr>'}</tbody>`;
 
   const s = ses.find((x) => x.id === estado.sesionId);
   $('#nota').disabled = !s;
@@ -760,8 +759,8 @@ function init() {
     clearTimeout(notaTimer);
     notaTimer = setTimeout(() => {
       $('#nota-estado').textContent = guardarDB() ? 'Nota guardada.' : 'No se pudo guardar en este navegador.';
-      const fila = document.querySelector(`#tabla-historial tr[data-id="${CSS.escape(s.id)}"] td:nth-child(10)`);
-      if (fila) fila.textContent = s.notas ? '📝' : '';
+      const fila = document.querySelector(`#tabla-historial tr[data-id="${CSS.escape(s.id)}"] td:nth-child(6)`);
+      if (fila) fila.textContent = s.notas ? 'Sí' : '';
     }, 500);
   });
 

@@ -223,31 +223,44 @@
         <!-- ===== REPORTE ===== -->
         <section class="seccion tab-panel" data-seccion="reporte" hidden>
           <div class="card">
-            <div class="card-head">
-              <div>
-                <div class="eyebrow">Historial</div>
-                <h2>Historial de sesiones</h2>
-                <p class="muted">Seleccione una fila para ver el detalle. Las notas se guardan automáticamente en este equipo.</p>
-              </div>
-              <button class="btn" id="btn-csv"><svg class="ic"><use href="#i-download"/></svg>Exportar CSV del paciente</button>
+            <div>
+              <h2>Historial</h2>
+              <p class="muted">Toque una fila para escribir su nota. "Ver" abre el detalle.</p>
             </div>
             <div class="table-wrap"><table class="table table-hover" id="tabla-historial"></table></div>
           </div>
           <div class="card">
-            <div>
-              <div class="eyebrow">Notas clínicas</div>
-              <h2>Notas de la sesión <span id="nota-sesion-label" class="muted"></span></h2>
-            </div>
+            <h2>Notas de la sesión <span id="nota-sesion-label" class="muted"></span></h2>
             <textarea id="nota" rows="5" placeholder="Observaciones del profesional para esta sesión…"></textarea>
             <div class="note-foot muted" id="nota-estado"></div>
           </div>
           <div class="card">
-            <div class="dlg-actions">
-              <button class="btn" id="btn-importar" title="Importar archivo de sesión generado por el dispositivo (.json)"><svg class="ic"><use href="#i-upload"/></svg>Importar sesión</button>
-              <button class="btn" id="btn-exportar" title="Exportar toda la base de datos (.json)"><svg class="ic"><use href="#i-download"/></svg>Exportar datos</button>
-              <button class="btn btn-ghost" id="btn-reset" title="Restaurar los datos de demostración"><svg class="ic"><use href="#i-refresh"/></svg>Restablecer demo</button>
-              <input type="file" id="file-input" accept=".json,application/json" hidden>
+            <div>
+              <h2>Archivos</h2>
+              <p class="muted">Todo se guarda en este navegador. Descargue una copia de seguridad de vez en cuando.</p>
             </div>
+            <div class="archivos">
+              <div class="archivo">
+                <button class="btn" id="btn-csv"><svg class="ic"><use href="#i-download"/></svg>Tabla para Excel (este paciente)</button>
+                <p class="muted">Un archivo .csv con todas las sesiones del paciente.</p>
+              </div>
+              <div class="archivo">
+                <button class="btn" id="btn-exportar"><svg class="ic"><use href="#i-save"/></svg>Copia de seguridad (todos los pacientes)</button>
+                <p class="muted">Guarde este archivo para no perder los datos.</p>
+              </div>
+              <div class="archivo">
+                <button class="btn" id="btn-importar"><svg class="ic"><use href="#i-upload"/></svg>Cargar archivo de sesión</button>
+                <p class="muted">Un .json del dispositivo o una copia de seguridad.</p>
+              </div>
+            </div>
+            <input type="file" id="file-input" accept=".json,application/json" hidden>
+            <details class="plegable">
+              <summary>Opciones de prueba</summary>
+              <div class="archivo">
+                <button class="btn btn-ghost" id="btn-reset"><svg class="ic"><use href="#i-refresh"/></svg>Restablecer datos de demostración</button>
+                <p class="muted">Borra todo y vuelve a cargar los pacientes de ejemplo.</p>
+              </div>
+            </details>
           </div>
         </section>
 

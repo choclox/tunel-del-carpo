@@ -1,6 +1,6 @@
 # Videos de la rutina de ejercicios
 
-Esta carpeta guarda un video por ejercicio. La interfaz los muestra en bucle en la ventana de la rutina, que se abre desde la tarjeta **Rutina de rehabilitación** de la pestaña "Monitoreo en vivo" (botones **Revisar rutina** e **Iniciar rutina**).
+Esta carpeta guarda un video por ejercicio. La interfaz los muestra en bucle en la ventana de la rutina, que se abre desde la sección **Ejercicios** (botones **Ver videos**, dentro de "Ver los ejercicios de esta fase", y **Empezar rutina**).
 
 El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificador del paso en la rutina. Si el archivo no existe, la ventana muestra "Video no adjuntado". Un mismo ejercicio puede aparecer en varias etapas y usa el mismo video.
 
