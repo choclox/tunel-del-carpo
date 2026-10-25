@@ -9,3 +9,7 @@ firmware/pruebas/build/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Espacio de trabajo de los planes
+.superpowers/
+node_modules/
