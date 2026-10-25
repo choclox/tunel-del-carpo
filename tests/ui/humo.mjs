@@ -206,6 +206,48 @@ await verificar('csv descarga', async (page) => {
   afirmar(descarga.suggestedFilename().endsWith('_sesiones.csv'), `archivo: ${descarga.suggestedFilename()}`);
 });
 
+/* ---------- Pulido ---------- */
+const SECCIONES = ['ejercicios', 'seguimiento', 'reporte'];
+
+await verificar('móvil sin scroll horizontal', async (page) => {
+  for (const sec of SECCIONES) {
+    await page.click(`.nav-seccion[data-seccion="${sec}"]`);
+    const ancho = await page.evaluate(() => document.documentElement.scrollWidth);
+    afirmar(ancho <= 390, `${sec}: ancho ${ancho}`);
+  }
+}, { viewport: { width: 390, height: 844 } });
+
+await verificar('un primario por sección', async (page) => {
+  for (const sec of SECCIONES) {
+    await page.click(`.nav-seccion[data-seccion="${sec}"]`);
+    const n = await page.locator('main .btn-primary:visible').count();
+    afirmar(n <= 1, `${sec}: ${n} botones primarios`);
+  }
+});
+
+await verificar('modo oscuro', async (page) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  const fondo = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  afirmar(fondo !== 'rgb(255, 255, 255)', `fondo: ${fondo}`);
+});
+
+// --capturas <carpeta>: una captura por sección en escritorio y móvil.
+const iCap = process.argv.indexOf('--capturas');
+if (iCap > 0) {
+  const carpeta = path.resolve(process.argv[iCap + 1]);
+  fs.mkdirSync(carpeta, { recursive: true });
+  for (const [ancho, alto, tag] of [[1366, 900, 'escritorio'], [390, 844, 'movil']]) {
+    const page = await nuevaPagina({ viewport: { width: ancho, height: alto } });
+    for (const sec of SECCIONES) {
+      await page.click(`.nav-seccion[data-seccion="${sec}"]`);
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: path.join(carpeta, `${tag}-${sec}.png`), fullPage: true });
+    }
+    await page.context().close();
+  }
+  console.log('Capturas en', carpeta);
+}
+
 await navegador.close();
 servidor.close();
 console.log(fallas ? `\n${fallas} comprobación(es) fallida(s)` : '\nTodo correcto');
