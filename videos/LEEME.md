@@ -6,11 +6,11 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 
 | Archivo | Ejercicio | Fase | Video |
 |---|---|---|---|
-| `tendon_recto.mp4` | Deslizamiento tendinoso: mano recta | 1 | No adjuntado |
+| `tendon_recto.mp4` | Deslizamiento tendinoso: mano recta | 1 | Adjunto |
 | `puno_gancho.mp4` | Deslizamiento tendinoso: puño en gancho | 1 | Adjunto |
-| `puno_completo.mp4` | Deslizamiento tendinoso: puño completo (Fase 2: Puño completo) | 1, 2 | No adjuntado |
-| `mesa.mp4` | Deslizamiento tendinoso: posición de mesa | 1 | No adjuntado |
-| `puno_recto.mp4` | Deslizamiento tendinoso: puño recto | 1 | No adjuntado |
+| `puno_completo.mp4` | Deslizamiento tendinoso: puño completo (Fase 2: Puño completo) | 1, 2 | Adjunto |
+| `mesa.mp4` | Deslizamiento tendinoso: posición de mesa | 1 | Adjunto |
+| `puno_recto.mp4` | Deslizamiento tendinoso: puño recto | 1 | Adjunto |
 | `pulgar_oposicion.mp4` | Oposición del pulgar | 1 | No adjuntado |
 | `nervio_mediano.mp4` | Deslizamiento del nervio mediano | 1 | No adjuntado |
 | `flexion.mp4` | Flexión de muñeca | 2 | No adjuntado |

@@ -185,6 +185,20 @@ await verificar('rutina completa con simulador', async (page) => {
   afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
 
+await verificar('videos nuevos de la fase 1', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-etapas [data-etapa="1"]');
+  await page.click('.rt-detalle summary');
+  await page.click('#rt-revisar');
+  for (const id of ['tendon_recto', 'puno_gancho', 'puno_completo', 'mesa', 'puno_recto']) {
+    await page.waitForFunction((id) => document.querySelector('#rt-video').getAttribute('src') === `videos/${id}.mp4`, id);
+    await page.waitForFunction(() => document.querySelector('#rt-video').readyState >= 2 || !document.querySelector('#rt-falta').hidden);
+    afirmar(await page.isHidden('#rt-falta'), `${id}: "Video no adjuntado"`);
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(700);
+  }
+});
+
 /* ---------- Reporte ---------- */
 const irReporte = (page) => page.click('.nav-seccion[data-seccion="reporte"]');
 
