@@ -19,6 +19,9 @@
  *     STOP                             Dejar de transmitir.
  *     CAL                              Ejecutar calibración (posición neutra = 0°).
  *     EJ,<tipo>,<objetivo> | EJ,-      Ejercicio en curso / ninguno (informativo para el dispositivo).
+ *     PR,<musculo> | PR,-              Contracción de la prueba de fuerza EMG (informativo).
+ *
+ *   La línea D puede traer 3 campos más: ,<emg1>,<emg2>,<emg3> (tenar, flexores, extensores; 0–1000).
  */
 
 const VENTANA_S = 15;        // segundos visibles en la gráfica
@@ -39,7 +42,8 @@ const mv = {
   calInicio: null,       // performance.now() al pedir la calibración
   bateria: null,
   stats: null,
-  buffer: [],            // [{ t (s, reloj del dispositivo), fe, rc, mcf }]
+  buffer: [],            // [{ t (s, reloj del dispositivo), fe, rc, mcf, emg: {tenar, flexores, extensores} | null }]
+  conEmg: false,         // llegó al menos una línea D con EMG en esta conexión
   ej: null,              // ejercicio en curso
   paso: null,            // paso de rutina en curso: { paso, muestras, registro? }
   sesion: null,          // { pacienteId, inicio, ejercicios, calibracion, origen, base, rutina }
@@ -115,6 +119,8 @@ class TransporteSimulado {
     this.transmitiendo = false;
     this.ejercicio = null;
     this.cal = null;
+    this.contraccion = null; // músculo pedido con PR en la prueba de fuerza
+    this.emg = !(typeof window !== 'undefined' && window.SIMULADOR_SIN_EMG === true);
     this.timer = setInterval(() => this._tick(), 20);
     setTimeout(() => { this.onLinea?.('#Simulador listo'); this.onLinea?.('BAT,87'); }, 50);
   }
@@ -126,6 +132,7 @@ class TransporteSimulado {
     if (c === 'START') this.transmitiendo = true;
     if (c === 'STOP') this.transmitiendo = false;
     if (c === 'CAL') this.cal = { inicio: performance.now(), dur: 3000 + this.rand() * 5000 };
+    if (c === 'PR') this.contraccion = MUSCULOS.includes(tipo) ? { musculo: tipo, amp: 400 + this.rand() * 100 } : null;
     if (c === 'EJ') {
       if (!EJERCICIOS[tipo]) { this.ejercicio = null; return; }
       const reps = Math.max(1, Number(objetivo) - (this.rand() < 0.3 ? 1 : 0));
@@ -153,7 +160,8 @@ class TransporteSimulado {
       this.seq++;
       if (this.rand() < 0.003) continue; // pérdida simulada de ~0,3 %
       const a = this._angulos(t);
-      this.onLinea?.(`D,${this.seq},${t},${a.fe.toFixed(1)},${a.rc.toFixed(1)},${a.mcf.toFixed(1)}`);
+      const emg = this.emg ? ',' + this._emg(t).join(',') : '';
+      this.onLinea?.(`D,${this.seq},${t},${a.fe.toFixed(1)},${a.rc.toFixed(1)},${a.mcf.toFixed(1)}${emg}`);
     }
   }
 
@@ -173,6 +181,22 @@ class TransporteSimulado {
     return a;
   }
 
+  // EMG simulado (0–1000): reposo ~20; en la prueba, el músculo pedido ~400–500 y los otros ~60–100;
+  // en la rutina, flexión/puño activan los flexores y extensión los extensores (~150).
+  _emg(t) {
+    const v = { tenar: 20, flexores: 20, extensores: 20 };
+    const c = this.contraccion;
+    if (c) {
+      MUSCULOS.forEach((k) => { v[k] = k === c.musculo ? c.amp : 60 + this.rand() * 40; });
+    } else if (this.ejercicio) {
+      const ej = this.ejercicio;
+      const musculo = ej.tipo === 'extension' ? 'extensores' : ['flexion', 'puno'].includes(ej.tipo) ? 'flexores' : null;
+      const s = (t - ej.t0) / 1000 - 1.5;
+      if (musculo && s > 0) v[musculo] += 130 * (0.5 - 0.5 * Math.cos(2 * Math.PI * ((s % ej.periodo) / ej.periodo)));
+    }
+    return MUSCULOS.map((k) => Math.max(0, Math.min(1000, Math.round(v[k] + (this.rand() - 0.5) * 10))));
+  }
+
   async desconectar() { clearInterval(this.timer); }
 }
 
@@ -183,13 +207,19 @@ function procesarLinea(linea) {
   const partes = linea.split(',');
   switch (partes[0]) {
     case 'D': {
-      const [seq, tms, fe, rc, mcf] = partes.slice(1).map(Number);
-      if (partes.length < 6 || [seq, tms, fe, rc, mcf].some((x) => !isFinite(x))) { st.malformadas++; return; }
+      const d = parsearMuestra(partes);
+      if (!d) { st.malformadas++; return; }
+      const { seq, t, fe, rc, mcf, emg } = d;
       if (st.ultimoSeq != null && seq > st.ultimoSeq + 1) st.perdidas += seq - st.ultimoSeq - 1;
       st.ultimoSeq = seq;
       st.recibidas++;
       st.ultimaRx = performance.now();
-      const m = { t: tms / 1000, fe, rc, mcf };
+      const m = { t, fe, rc, mcf, emg };
+      if (emg) {
+        mv.conEmg = true;
+        if (mv.sesion) mv.sesion.conEmg = true;
+        if (mv.paso && mv.sesion && mv.sesion.emgCuenta++ % 5 === 0) MUSCULOS.forEach((k) => mv.sesion.emgSenal[k].push(emg[k]));
+      }
       const ult = mv.buffer[mv.buffer.length - 1];
       if (ult && m.t < ult.t) mv.buffer = []; // el dispositivo se reinició
       mv.buffer.push(m);
@@ -242,6 +272,10 @@ function nuevaSesion() {
     calibracion: mv.cal,
     origen: mv.origen,
     base: { recibidas: mv.stats?.recibidas ?? 0, perdidas: mv.stats?.perdidas ?? 0 },
+    conEmg: mv.conEmg,
+    emgSenal: { fs: 10, tenar: [], flexores: [], extensores: [] }, // 1 de cada 5 muestras de los pasos
+    emgCuenta: 0,
+    emgPrueba: null,       // la llena la prueba de fuerza muscular
   };
 }
 
@@ -390,6 +424,7 @@ function estadoDispositivo() {
     calOk: !!cal?.ok,
     calMotivo: cal && !cal.ok ? cal.motivo || `tardó ${fmt(cal.tiempoS, 1)} s (> ${CAL_TIMEOUT_S} s)` : null,
     calTiempoS: cal ? cal.tiempoS : null,
+    conEmg: mv.conEmg,
   };
 }
 
@@ -438,6 +473,7 @@ function guardarSesionRutina({ dolor = null, notas = '', manuales = {} } = {}) {
     ejercicios,
   };
   if (mv.sesion.rutina) s.rutina = { etapa: mv.sesion.rutina.etapa, pasos };
+  if (mv.sesion.conEmg) s.emg = { prueba: mv.sesion.emgPrueba ?? null, senal: mv.sesion.emgSenal };
   p.sesiones.push(s);
   if (!guardarDB()) {
     p.sesiones.pop();
@@ -503,6 +539,7 @@ async function conectarCon(t, origen) {
   mv.buffer = [];
   mv.cal = null;
   mv.bateria = null;
+  mv.conEmg = false;
   await t.enviar('START');
   clearInterval(mv.timer);
   mv.timer = setInterval(refrescar, REFRESCO_MS);

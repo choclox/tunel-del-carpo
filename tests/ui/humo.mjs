@@ -290,6 +290,53 @@ await verificar('sin web serial', async (page) => {
   afirmar(txt.includes('se usará el simulador'), `paso 1: ${txt.trim().slice(0, 120)}`);
 }, { init: () => { delete Navigator.prototype.serial; } });
 
+// Graba una rutina con el simulador hasta pulsar "Terminar rutina" (etapa: 1–3 o null = la sugerida).
+async function grabarRutina(page, etapa = null) {
+  await irEjercicios(page);
+  if (etapa) await page.click(`#rt-etapas [data-etapa="${etapa}"]`);
+  await page.click('#rt-iniciar');
+  await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
+  await page.click('#ls-empezar');
+  await page.waitForSelector('#dlg-rutina[open]');
+  await page.waitForTimeout(2500); // un paso necesita ≥ 1 s y ≥ 25 muestras para guardarse
+  for (let i = 0; i < 20 && (await page.textContent('#rt-siguiente-txt')).trim() !== 'Terminar rutina'; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(700);
+  }
+  await page.click('#rt-siguiente');
+}
+const ultimaSesion = (page) => page.evaluate(() => {
+  const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+  return p.sesiones[p.sesiones.length - 1];
+});
+async function conectarSimulador(page) {
+  await irEjercicios(page);
+  await page.click('#det-tecnicos summary');
+  await page.selectOption('#mv-origen', 'simulador');
+  await page.click('#mv-conectar');
+  await page.waitForTimeout(600);
+}
+
+await verificar('simulador con EMG', async (page) => {
+  await conectarSimulador(page);
+  const r = await page.evaluate(() => ({ con: mv.conEmg, emg: mv.buffer[mv.buffer.length - 1]?.emg }));
+  afirmar(r.con === true && r.emg && r.emg.tenar >= 0 && r.emg.tenar <= 1000, JSON.stringify(r));
+});
+
+await verificar('simulador sin EMG', async (page) => {
+  await conectarSimulador(page);
+  afirmar(await page.evaluate(() => mv.conEmg) === false, 'conEmg debería ser false');
+}, { init: () => { window.SIMULADOR_SIN_EMG = true; } });
+
+await verificar('rutina guarda señal EMG', async (page) => {
+  await grabarRutina(page, 2);
+  if (await page.isVisible('#pr-omitir')) await page.click('#pr-omitir');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  const s = await ultimaSesion(page);
+  afirmar(s.emg && s.emg.senal.tenar.length > 0 && s.emg.prueba === null, JSON.stringify(s.emg ?? null).slice(0, 120));
+});
+
 await verificar('rutina completa con simulador', async (page) => {
   await irEjercicios(page);
   await page.click('#rt-iniciar');
