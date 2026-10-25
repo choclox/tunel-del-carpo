@@ -344,6 +344,27 @@ dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px)
 .fin-campos input[type=number] { width: 130px; }
 .fin-campos .grow { flex: 1 1 260px; }
 
+/* ===== Login y registro ===== */
+.pagina-acceso { min-height: 100%; }
+.acceso { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.acceso-marca { background: #fff; display: grid; place-items: center; padding: 32px; border-right: 1px solid var(--border); }
+
+.acceso-marca img { width: min(560px, 100%); height: auto; }
+.acceso-panel { display: grid; align-content: center; justify-items: center; gap: 20px; padding: 40px 24px; }
+.acceso-tabs { width: min(400px, 100%); }
+.acceso-tabs .seg-btn { flex: 1; padding: 9px 12px; font-size: 14px; }
+.acceso-form { width: min(400px, 100%); display: grid; gap: 14px; }
+.acceso-form h1 { font-size: 26px; font-weight: 700; margin: 0 0 2px; letter-spacing: -0.01em; }
+.acceso-form label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.acceso-form input, .acceso-form select { font-size: 15px; padding: 11px 13px; }
+.acceso-form input[aria-invalid="true"] { border-color: var(--bad-text); }
+.campo-error { min-height: 1em; color: var(--bad-text); font-size: 13px; font-weight: 600; }
+.campo-error:empty { display: none; }
+.acceso-form .btn-grande { margin-top: 4px; width: 100%; }
+.acceso-cambio { text-align: center; color: var(--ink-2); font-size: 14px; }
+.acceso-cambio a { color: var(--brand-text); font-weight: 700; }
+.aviso-demo { width: min(400px, 100%); padding: 10px 14px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--ink-2); font-size: 13px; text-align: center; }
+
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
   background: var(--brand); color: var(--brand-ink); padding: 11px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
@@ -365,6 +386,10 @@ dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px)
   .rt-info { overflow: visible; }
 }
 @media (max-width: 760px) {
+  .acceso { grid-template-columns: 1fr; min-height: auto; }
+  .acceso-marca { padding: 16px; border-right: none; border-bottom: 1px solid var(--border); }
+  .acceso-marca img { width: min(260px, 70%); }
+  .acceso-panel { padding: 24px 16px 32px; }
   .layout { grid-template-columns: 1fr; }
   .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
   .patient-list { max-height: 240px; }

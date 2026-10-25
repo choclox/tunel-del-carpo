@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kinemo · Iniciar sesión</title>
+  <script src="acceso.js"></script>
+  <script>if (leerSesion()) location.replace('index.html');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="pagina-acceso">
+  <main class="acceso">
+    <section class="acceso-marca">
+      <img src="img/kinemo-logo.jpg" alt="Kinemo — Monitoreo y rehabilitación del túnel del carpo" width="768" height="512">
+    </section>
+
+    <section class="acceso-panel">
+      <div class="seg acceso-tabs" role="tablist" aria-label="Acceso">
+        <button class="seg-btn" id="tab-login" role="tab" aria-controls="form-login" type="button">Iniciar sesión</button>
+        <button class="seg-btn" id="tab-registro" role="tab" aria-controls="form-registro" type="button">Crear cuenta</button>
+      </div>
+
+      <form id="form-login" class="acceso-form" role="tabpanel" aria-labelledby="tab-login" novalidate>
+        <div>
+          <h1>Bienvenido de nuevo</h1>
+          <p class="muted">Entre para ver a sus pacientes.</p>
+        </div>
+        <label>Correo
+          <input name="correo" type="email" autocomplete="email" inputmode="email" aria-describedby="err-login-correo">
+          <span class="campo-error" id="err-login-correo" data-error="correo" aria-live="polite"></span>
+        </label>
+        <label>Contraseña
+          <input name="clave" type="password" autocomplete="current-password" aria-describedby="err-login-clave">
+          <span class="campo-error" id="err-login-clave" data-error="clave" aria-live="polite"></span>
+        </label>
+        <button class="btn btn-primary btn-grande" type="submit">Entrar</button>
+        <p class="acceso-cambio">¿No tiene cuenta? <a href="#registro" data-ir="registro">Créela aquí</a></p>
+      </form>
+
+      <form id="form-registro" class="acceso-form" role="tabpanel" aria-labelledby="tab-registro" novalidate hidden>
+        <div>
+          <h1>Cree su cuenta</h1>
+          <p class="muted">Para fisioterapeutas, terapeutas y médicos.</p>
+        </div>
+        <label>Nombre completo
+          <input name="nombre" autocomplete="name" aria-describedby="err-reg-nombre">
+          <span class="campo-error" id="err-reg-nombre" data-error="nombre" aria-live="polite"></span>
+        </label>
+        <label>Profesión
+          <select name="profesion" aria-describedby="err-reg-profesion"></select>
+          <span class="campo-error" id="err-reg-profesion" data-error="profesion" aria-live="polite"></span>
+        </label>
+        <label>Correo
+          <input name="correo" type="email" autocomplete="email" inputmode="email" aria-describedby="err-reg-correo">
+          <span class="campo-error" id="err-reg-correo" data-error="correo" aria-live="polite"></span>
+        </label>
+        <label>Contraseña
+          <input name="clave" type="password" autocomplete="new-password" aria-describedby="err-reg-clave">
+          <span class="campo-error" id="err-reg-clave" data-error="clave" aria-live="polite"></span>
+        </label>
+        <label>Repita la contraseña
+          <input name="clave2" type="password" autocomplete="new-password" aria-describedby="err-reg-clave2">
+          <span class="campo-error" id="err-reg-clave2" data-error="clave2" aria-live="polite"></span>
+        </label>
+        <button class="btn btn-primary btn-grande" type="submit">Crear cuenta</button>
+        <p class="acceso-cambio">¿Ya tiene cuenta? <a href="#login" data-ir="login">Inicie sesión</a></p>
+      </form>
+
+      <p class="aviso-demo">Versión de demostración: no se crean cuentas reales y cualquier contraseña funciona.</p>
+    </section>
+  </main>
+  <script src="login.js"></script>
+</body>
+</html>

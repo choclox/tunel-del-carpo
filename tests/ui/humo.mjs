@@ -26,8 +26,18 @@ const URL_APP = `http://127.0.0.1:${servidor.address().port}/`;
 const navegador = await chromium.launch();
 let fallas = 0;
 
-async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init } = {}) {
+const SESION_PRUEBA = { nombre: 'Prueba', profesion: 'Fisioterapeuta', correo: 'prueba@kinemo.co' };
+
+// ruta: '' es el panel. sesion: la que se siembra una sola vez por pestaña (null = sin sesión).
+async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA } = {}) {
   const ctx = await navegador.newContext({ viewport, acceptDownloads: true });
+  if (sesion) {
+    await ctx.addInitScript((s) => {
+      if (sessionStorage.getItem('humo.sembrada')) return;
+      localStorage.setItem('kinemo.sesion', JSON.stringify(s));
+      sessionStorage.setItem('humo.sembrada', '1');
+    }, sesion);
+  }
   if (init) await ctx.addInitScript(init);
   await ctx.route('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/**', (r) =>
     fs.existsSync(CHART_LOCAL) ? r.fulfill({ path: CHART_LOCAL, contentType: 'text/javascript' }) : r.continue());
@@ -40,8 +50,8 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init } = {
   page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('.mp4')) page.errores.push(`${r.status()} ${r.url()}`); });
   page.on('dialog', (d) => d.accept());
   page.setDefaultTimeout(10000);
-  await page.goto(URL_APP);
-  await page.waitForSelector('.patient-item');
+  await page.goto(URL_APP + ruta);
+  if (!ruta || ruta === 'index.html') await page.waitForSelector('.patient-item');
   return page;
 }
 
@@ -92,6 +102,62 @@ await verificar('marca Kinemo', async (page) => {
   const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim());
   afirmar(brand === '#1e6895', `--brand: ${brand} (debe ser el azul del logo)`);
 });
+
+/* ---------- Login y registro ---------- */
+const sesionGuardada = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('kinemo.sesion')));
+const SIN_SESION = { ruta: 'login.html', sesion: null };
+
+await verificar('login: validación', async (page) => {
+  await page.click('#form-login button[type=submit]');
+  afirmar((await page.textContent('[data-error=correo]')).trim() === 'Escriba un correo válido.', 'sin error de correo');
+}, SIN_SESION);
+
+await verificar('login: entrar', async (page) => {
+  await page.fill('#form-login [name=correo]', 'ana.perez@x.com');
+  await page.fill('#form-login [name=clave]', 'x');
+  await Promise.all([page.waitForURL(/index\.html$/), page.click('#form-login button[type=submit]')]);
+  afirmar((await sesionGuardada(page)).nombre === 'ana.perez', 'nombre de sesión');
+}, SIN_SESION);
+
+await verificar('registro: contraseñas distintas', async (page) => {
+  await page.click('#tab-registro');
+  await page.fill('#form-registro [name=nombre]', 'Ana Pérez');
+  await page.fill('#form-registro [name=correo]', 'ana@x.com');
+  await page.fill('#form-registro [name=clave]', '12345678');
+  await page.fill('#form-registro [name=clave2]', '87654321');
+  await page.click('#form-registro button[type=submit]');
+  afirmar((await page.textContent('[data-error=clave2]')).trim() === 'Las contraseñas no coinciden.', 'sin error de claves');
+  afirmar(page.url().endsWith('login.html'), `salió del login: ${page.url()}`);
+}, SIN_SESION);
+
+await verificar('registro: crear cuenta', async (page) => {
+  await page.click('#tab-registro');
+  await page.fill('#form-registro [name=nombre]', 'Ana Pérez');
+  await page.selectOption('#form-registro [name=profesion]', 'Médico');
+  await page.fill('#form-registro [name=correo]', 'ana@x.com');
+  await page.fill('#form-registro [name=clave]', 'clave-secreta-9');
+  await page.fill('#form-registro [name=clave2]', 'clave-secreta-9');
+  await Promise.all([page.waitForURL(/index\.html$/), page.click('#form-registro button[type=submit]')]);
+  const s = await sesionGuardada(page);
+  afirmar(s.nombre === 'Ana Pérez' && s.profesion === 'Médico', JSON.stringify(s));
+  const todo = await page.evaluate(() => Object.values(localStorage).join('|'));
+  afirmar(!todo.includes('clave-secreta-9'), 'la contraseña quedó guardada');
+}, SIN_SESION);
+
+await verificar('login.html#registro abre Crear cuenta', async (page) => {
+  afirmar(await page.getAttribute('#tab-registro', 'aria-selected') === 'true', 'no abrió Crear cuenta');
+  afirmar(await page.isVisible('#form-registro') && !(await page.isVisible('#form-login')), 'formulario equivocado');
+}, { ruta: 'login.html#registro', sesion: null });
+
+await verificar('con sesión salta el login', async (page) => {
+  await page.waitForURL(/index\.html$/);
+}, { ruta: 'login.html' });
+
+await verificar('aviso de demostración', async (page) => {
+  afirmar(await page.isVisible('.aviso-demo'), 'sin aviso en Iniciar sesión');
+  await page.click('#tab-registro');
+  afirmar(await page.isVisible('.aviso-demo'), 'sin aviso en Crear cuenta');
+}, SIN_SESION);
 
 /* ---------- Seguimiento ---------- */
 await verificar('encabezado compacto', async (page) => {
