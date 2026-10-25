@@ -177,39 +177,23 @@ function renderPaciente() {
 }
 
 function renderEncabezado(p) {
-  const ses = sesionesOrdenadas(p);
-  const prog = progresoGlobal(ses[ses.length - 1]);
-  const prog0 = progresoGlobal(ses[0]);
-  const C = 2 * Math.PI * 42;
   const dpo = dias(p.fechaCirugia, hoyISO());
+  const fila = (k, v) => (v ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : '');
   $('#encabezado').innerHTML = `
-    <div>
-      <div class="eyebrow">Paciente en seguimiento</div>
-      <div class="ph-name">${esc(p.nombre)}</div>
-      <p class="ph-sub">Rehabilitación post liberación del túnel del carpo · mano ${esc(p.mano.toLowerCase())}</p>
-      <div class="chips">
-        <span class="chip">${ic('id')}ID <b>${esc(p.id)}</b></span>
-        <span class="chip">${ic('user')}<b>${esc(p.edad)}</b> años · ${esc(p.sexo)} · Doc. ${esc(p.documento)}</span>
-        <span class="chip">${ic('hand')}Mano <b>${esc(p.mano)}</b></span>
-        <span class="chip">${ic('calendar')}Cirugía <b>${fmtFecha(p.fechaCirugia)}</b></span>
-        ${p.ocupacion ? `<span class="chip">${ic('briefcase')}<b>${esc(p.ocupacion)}</b></span>` : ''}
-        ${p.profesional ? `<span class="chip">${ic('stetho')}<b>${esc(p.profesional)}</b></span>` : ''}
+    <div class="enc-linea">
+      <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
+      <div>
+        <h1 class="enc-nombre">${esc(p.nombre)}</h1>
+        <p class="enc-sub">Mano ${esc(p.mano.toLowerCase())} · ${dpo} días desde la cirugía · Fase ${etapaSugerida(p.fechaCirugia, hoyISO())} sugerida</p>
       </div>
     </div>
-    <div class="hero-card">
-      <div class="ring" role="img" aria-label="Progreso global ${prog == null ? 'sin datos' : fmt(prog) + ' %'}">
-        <svg viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="42"/>
-          <circle class="ring-fg" cx="50" cy="50" r="42" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - (prog ?? 0) / 100)}"/></svg>
-        <span class="ring-txt">${prog == null ? '—' : fmt(prog) + '%'}</span>
-      </div>
-      <div>
-        <div class="hero-card-label">Progreso global</div>
-        <div class="hero-card-small">del rango de referencia${prog != null && prog0 != null && ses.length > 1 ? ` · ${prog - prog0 >= 0 ? '+' : ''}${fmt(prog - prog0)} pp desde el inicio` : ''}</div>
-        <hr>
-        <div class="hero-card-big">${dpo} días</div>
-        <div class="hero-card-small">post-operatorio · ${ses.length} sesiones</div>
-      </div>
-    </div>`;
+    <details class="enc-ficha">
+      <summary>Ver ficha</summary>
+      <dl>
+        ${fila('ID', p.id)}${fila('Documento', p.documento)}${fila('Edad', p.edad ? p.edad + ' años' : '')}${fila('Sexo', p.sexo)}
+        ${fila('Fecha de cirugía', fmtFecha(p.fechaCirugia))}${fila('Ocupación', p.ocupacion)}${fila('Profesional', p.profesional)}
+      </dl>
+    </details>`;
 }
 
 function deltaHTML(valor, mejorSube, unidad, d = 0, ref = 'vs. sesión anterior') {
@@ -220,48 +204,23 @@ function deltaHTML(valor, mejorSube, unidad, d = 0, ref = 'vs. sesión anterior'
   return `<span class="${cls}">${signo}${fmt(valor, d)}${unidad}</span> <span class="muted">${ref}</span>`;
 }
 
-function renderKPIs(p) {
+function renderResumen(p) {
   const ses = sesionesOrdenadas(p);
-  if (!ses.length) { $('#kpis').innerHTML = '<div class="kpi muted">El paciente aún no tiene sesiones registradas.</div>'; return; }
-  const ult = ses[ses.length - 1];
-  const prev = ses[ses.length - 2];
-  const primera = ses[0];
-
-  const romTile = (tipo) => {
-    const e = EJERCICIOS[tipo];
-    const v = ejercicioDe(ult, tipo)?.anguloMax;
-    const v0 = ejercicioDe(primera, tipo)?.anguloMax;
-    const pct = v == null ? null : Math.min(100, (v / e.ref) * 100);
-    return `<div class="kpi">
-      <span class="icon-bubble">${ic('angle', tipo === 'extension' ? 'flip' : '')}</span>
-      <div class="kpi-label">${e.nombre} (último)</div>
-      <div class="kpi-value">${v == null ? '— <small>sin dato</small>' : `${fmt(v, 0)}° <small>${fmt(pct, 0)}% ref.</small>`}</div>
-      <div class="kpi-delta">${deltaHTML(ses.length > 1 && v != null && v0 != null ? v - v0 : null, true, '°', 0, 'desde la 1.ª sesión')}</div>
-      <div class="bar-track" title="${v == null ? 'Sin dato en la última sesión' : `${fmt(v, 0)}° de ${e.ref}° de referencia`}"><div class="bar-fill" style="width:${pct ?? 0}%;background:var(${e.color})"></div></div>
+  const ult = ses[ses.length - 1], prev = ses[ses.length - 2], primera = ses[0];
+  const prog = progresoGlobal(ult), prog0 = progresoGlobal(primera);
+  const tarjeta = (icono, titulo, valor, pie) => `<div class="kpi">
+      <span class="icon-bubble">${ic(icono)}</span>
+      <div class="kpi-label">${titulo}</div>
+      <div class="kpi-value">${valor}</div>
+      <div class="kpi-delta">${pie}</div>
     </div>`;
-  };
-  const m = metricas(ult), mp = prev ? metricas(prev) : null;
-  $('#kpis').innerHTML = `
-    ${romTile('flexion')}
-    ${romTile('extension')}
-    <div class="kpi">
-      <span class="icon-bubble">${ic('check')}</span>
-      <div class="kpi-label">Cumplimiento de repeticiones</div>
-      <div class="kpi-value">${m.cumplimiento == null ? '—' : fmt(m.cumplimiento) + '%'}</div>
-      <div class="kpi-delta">${deltaHTML(mp && m.cumplimiento != null && mp.cumplimiento != null ? m.cumplimiento - mp.cumplimiento : null, true, ' pp')}</div>
-    </div>
-    <div class="kpi">
-      <span class="icon-bubble">${ic('heart')}</span>
-      <div class="kpi-label">Dolor reportado (EVA)</div>
-      <div class="kpi-value">${m.dolor ?? '—'} <small>/ 10</small></div>
-      <div class="kpi-delta">${deltaHTML(mp && m.dolor != null && mp.dolor != null ? m.dolor - mp.dolor : null, false, '')}</div>
-    </div>
-    <div class="kpi">
-      <span class="icon-bubble">${ic('calendar')}</span>
-      <div class="kpi-label">Última sesión</div>
-      <div class="kpi-value">${fmtFecha(ult.fecha, true)}</div>
-      <div class="kpi-delta muted">hace ${dias(ult.fecha, hoyISO())} días · ${ult.duracionMin} min</div>
-    </div>`;
+  $('#resumen-tarjetas').innerHTML =
+    tarjeta('trend', 'Avance', prog == null ? '—' : `${fmt(prog)} %`,
+      deltaHTML(ses.length > 1 && prog != null && prog0 != null ? prog - prog0 : null, true, ' puntos', 0, 'desde la primera sesión')) +
+    tarjeta('heart', 'Dolor', `${ult.dolorEVA ?? '—'} <small>/ 10</small>`,
+      deltaHTML(prev && ult.dolorEVA != null && prev.dolorEVA != null ? ult.dolorEVA - prev.dolorEVA : null, false, '', 0, 'vs. sesión anterior')) +
+    tarjeta('calendar', 'Última sesión', fmtFecha(ult.fecha, true),
+      `<span class="muted">hace ${plural(dias(ult.fecha, hoyISO()), 'día', 'días')}</span>`);
 }
 
 /* ======================= Secciones ======================= */
@@ -282,6 +241,11 @@ function renderSeccion() {
   const p = paciente();
   if (!p) return;
   if (estado.seccion === 'seguimiento') {
+    // Sin sesiones: un solo mensaje con el camino a Ejercicios, sin gráficas vacías.
+    const vacio = !p.sesiones.length;
+    $('.vacio-seguimiento').hidden = !vacio;
+    $('#seg-vistas').hidden = vacio;
+    if (vacio) { document.querySelectorAll('.vista').forEach((v) => (v.hidden = true)); return; }
     if (estado.vista === 'resumen') renderEvolucion(p);
     if (estado.vista === 'sesion') renderSesion(p);
     if (estado.vista === 'comparar') renderComparar(p);
@@ -292,6 +256,7 @@ function renderSeccion() {
 
 /* ---------- Evolución ---------- */
 function renderEvolucion(p) {
+  renderResumen(p);
   const ses = sesionesOrdenadas(p);
   const labels = ses.map((s) => fmtFecha(s.fecha, true));
   const pct = estado.romModo === 'pct';
@@ -344,7 +309,14 @@ function renderEvolucion(p) {
     },
   });
 
-  // Indicador seleccionable
+  if ($('#mas-indicadores').open) renderIndicador(p);
+  renderObservaciones(p, ses);
+}
+
+/* Gráfica del indicador elegido; vive en un <details> y se dibuja solo cuando está abierto. */
+function renderIndicador(p) {
+  const ses = sesionesOrdenadas(p);
+  const labels = ses.map((s) => fmtFecha(s.fecha, true));
   const ind = INDICADORES[estado.indicador];
   $('#ind-titulo').textContent = ind.titulo;
   $('#ind-desc').textContent = ind.desc;
@@ -386,8 +358,6 @@ function renderEvolucion(p) {
       scales: { x: ejeX(), y: ejeY(ind.unidad, { min: ind.min, max: ind.max, beginAtZero: true }) },
     },
   });
-
-  renderObservaciones(p, ses);
 }
 
 function renderObservaciones(p, ses) {
@@ -437,13 +407,15 @@ function renderObservaciones(p, ses) {
   if (sinSesion > 10) obs.push({ nivel: 'info', texto: `<b>Seguimiento:</b> han pasado ${sinSesion} días desde la última sesión registrada.` });
   if (!obs.length) obs.push({ nivel: 'info', texto: 'No se detectaron cambios relevantes en la última sesión.' });
 
-  const orden = { critical: 0, warning: 1, info: 2, good: 3 };
   const icono = { critical: '!', warning: '!', info: 'i', good: '✓' };
   const etiqueta = { critical: 'Crítico', warning: 'Atención', info: 'Información', good: 'Favorable' };
-  $('#observaciones').innerHTML = obs
-    .sort((a, b) => orden[a.nivel] - orden[b.nivel])
-    .map((o) => `<li class="obs obs-${o.nivel}"><span class="obs-icon" role="img" aria-label="${etiqueta[o.nivel]}" title="${etiqueta[o.nivel]}">${icono[o.nivel]}</span><span>${o.texto}</span></li>`)
-    .join('');
+  const { visibles, ocultas } = recortarObservaciones(obs, 3);
+  const item = (o) => `<li class="obs obs-${o.nivel}"><span class="obs-icon" role="img" aria-label="${etiqueta[o.nivel]}" title="${etiqueta[o.nivel]}">${icono[o.nivel]}</span><span>${o.texto}</span></li>`;
+  $('#observaciones').innerHTML = visibles.map(item).join('') +
+    ocultas.map((o) => item(o).replace('<li class="obs', '<li hidden class="obs obs-extra')).join('');
+  const mas = $('#obs-mas');
+  mas.hidden = !ocultas.length;
+  mas.textContent = `Ver ${ocultas.length} más`;
 }
 
 /* ---------- Detalle de sesión ---------- */
@@ -463,12 +435,14 @@ function renderSesion(p) {
 
   const perdidaOk = s.perdidaDatosPct < 1;
   const calOk = s.calibracion?.ok && s.calibracion.tiempoS <= 30;
-  $('#sesion-calidad').innerHTML = `
-    <span class="badge"><span class="dot ${calOk ? 'good' : 'warning'}"></span>Calibración: ${s.calibracion ? fmt(s.calibracion.tiempoS, 1) + ' s' : '—'} ${calOk ? '(OK)' : '(revisar)'}</span>
-    <span class="badge"><span class="dot ${perdidaOk ? 'good' : 'critical'}"></span>Pérdida de datos: ${fmt(s.perdidaDatosPct, 2)} % ${perdidaOk ? '(OK)' : '(&gt; 1 %)'}</span>
-    <span class="badge">Dolor EVA: ${s.dolorEVA ?? '—'} / 10</span>
-    <span class="badge">Cumplimiento: ${metricas(s).cumplimiento == null ? '—' : fmt(metricas(s).cumplimiento) + ' %'}</span>
-    ${s.origen === 'simulador' ? '<span class="badge"><span class="dot warning"></span>Datos generados con el simulador</span>' : ''}`;
+  // Una sola insignia si todo está bien; si no, solo los avisos que fallan.
+  const avisos = [];
+  if (!calOk) avisos.push(['warning', s.calibracion?.ok ? `Calibración lenta (${fmt(s.calibracion.tiempoS, 1)} s)` : 'Calibración con errores']);
+  if (!perdidaOk) avisos.push(['critical', `Se perdieron datos (${fmt(s.perdidaDatosPct, 2)} %)`]);
+  if (s.origen === 'simulador') avisos.push(['warning', 'Datos del simulador']);
+  $('#sesion-calidad').innerHTML = avisos.length
+    ? avisos.map(([dot, txt]) => `<span class="badge"><span class="dot ${dot}"></span>${txt}</span>`).join('')
+    : '<span class="badge"><span class="dot good"></span>✓ Datos confiables</span>';
 
   const filas = ORDEN_EJERCICIOS.map((tipo) => {
     const e = ejercicioDe(s, tipo);
@@ -481,23 +455,26 @@ function renderSesion(p) {
       <td class="num">${e.repeticiones} / ${e.repeticionesObjetivo}${e.repeticionesManual != null ? ` <span class="muted">(manual ${e.repeticionesManual})</span>` : ''}</td>
       <td class="num">${fmt(e.anguloMax, 1)}°</td>
       <td class="num ${dcls}">${d == null ? '—' : (d > 0 ? '+' : '') + fmt(d, 1) + '°'}</td>
-      <td class="num">${fmt((e.anguloMax / EJERCICIOS[tipo].ref) * 100)} %</td>
-      <td class="num">${fmt(e.velocidadMedia, 1)} °/s</td>
-      <td class="num">${fmt(e.variabilidadPct, 1)} %</td>
-      <td class="num">${e.duracionS} s</td>
+      <td class="num col-extra">${fmt((e.anguloMax / EJERCICIOS[tipo].ref) * 100)} %</td>
+      <td class="num col-extra">${fmt(e.velocidadMedia, 1)} °/s</td>
+      <td class="num col-extra">${fmt(e.variabilidadPct, 1)} %</td>
+      <td class="num col-extra">${e.duracionS} s</td>
     </tr>`;
   }).join('');
   $('#tabla-ejercicios').innerHTML = `<thead><tr>
-      <th>Ejercicio</th><th class="num">Repeticiones</th><th class="num">Ángulo máx.</th><th class="num">Δ vs. anterior</th>
-      <th class="num">% referencia</th><th class="num">Vel. media</th><th class="num">Variabilidad</th><th class="num">Duración</th>
+      <th>Ejercicio</th><th class="num">Repeticiones</th><th class="num">Ángulo máx.</th><th class="num">Cambio</th>
+      <th class="num col-extra">% de lo normal</th><th class="num col-extra">Vel. media</th><th class="num col-extra">Variabilidad</th><th class="num col-extra">Duración</th>
     </tr></thead><tbody>${filas || '<tr><td colspan="8" class="muted">Sin ejercicios medidos por el dispositivo en esta sesión.</td></tr>'}</tbody>`;
 
   renderRutinaSesion(s);
+  // Señal del ejercicio (oculta si la sesión no tiene ejercicios medidos; se dibuja al abrir el <details>)
+  $('#sesion-senal').hidden = !s.ejercicios.length;
+  renderSenal(s);
+}
 
-  // Señal del ejercicio (oculta si la sesión no tiene ejercicios medidos)
+function renderSenal(s) {
   const disponibles = s.ejercicios.map((e) => e.tipo);
-  $('#sesion-senal').hidden = !disponibles.length;
-  if (!disponibles.length) { charts['chart-senal']?.destroy(); delete charts['chart-senal']; return; }
+  if (!disponibles.length || !$('#sesion-senal').open) { charts['chart-senal']?.destroy(); delete charts['chart-senal']; return; }
   if (!disponibles.includes(estado.ejercicio)) estado.ejercicio = disponibles[0];
   $('#ejercicio-select').innerHTML = disponibles.map((t) => `<option value="${t}" ${t === estado.ejercicio ? 'selected' : ''}>${EJERCICIOS[t]?.nombre ?? t}</option>`).join('');
   const ej = ejercicioDe(s, estado.ejercicio);
@@ -747,7 +724,21 @@ function init() {
     document.querySelectorAll('#rom-modo .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
     renderEvolucion(paciente());
   }));
-  $('#ind-select').addEventListener('change', (e) => { estado.indicador = e.target.value; renderEvolucion(paciente()); });
+  $('#ind-select').addEventListener('change', (e) => { estado.indicador = e.target.value; renderIndicador(paciente()); });
+  $('#mas-indicadores').addEventListener('toggle', (e) => { if (e.target.open && paciente()) renderIndicador(paciente()); });
+  $('#obs-mas').addEventListener('click', () => {
+    document.querySelectorAll('#observaciones .obs-extra').forEach((li) => (li.hidden = false));
+    $('#obs-mas').hidden = true;
+  });
+  $('#btn-ir-ejercicios').addEventListener('click', () => irA('ejercicios'));
+  $('#btn-columnas').addEventListener('click', () => {
+    const completa = $('#tabla-ejercicios').classList.toggle('tabla-completa');
+    $('#btn-columnas').textContent = completa ? 'Mostrar menos' : 'Mostrar todas las columnas';
+  });
+  $('#sesion-senal').addEventListener('toggle', () => {
+    const s = paciente()?.sesiones.find((x) => x.id === estado.sesionId);
+    if (s) renderSenal(s);
+  });
   $('#sesion-select').addEventListener('change', (e) => { estado.sesionId = e.target.value; renderSesion(paciente()); });
   $('#ejercicio-select').addEventListener('change', (e) => { estado.ejercicio = e.target.value; renderSesion(paciente()); });
   $('#cmp-a').addEventListener('change', (e) => { estado.cmpA = e.target.value; renderComparar(paciente()); });

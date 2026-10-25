@@ -82,7 +82,7 @@
 
       <div id="vista-paciente" hidden>
         <!-- Encabezado del paciente -->
-        <section class="hero" id="encabezado"></section>
+        <section class="encabezado" id="encabezado"></section>
 
         <!-- Secciones -->
         <nav class="nav-secciones" aria-label="Secciones">
@@ -109,53 +109,56 @@
           <button class="seg-btn" data-vista="comparar">Comparar</button>
         </div>
 
+        <div class="vacio vacio-seguimiento" hidden>
+          <h2>Aún no hay sesiones</h2>
+          <p class="muted">Haga la primera rutina en Ejercicios.</p>
+          <button class="btn btn-primary" id="btn-ir-ejercicios"><svg class="ic"><use href="#i-play"/></svg>Ir a Ejercicios</button>
+        </div>
+
         <!-- RESUMEN -->
         <div class="vista tab-panel" data-vista="resumen">
+          <div class="kpis" id="resumen-tarjetas"></div>
+
           <div class="card">
             <div class="card-head">
               <div>
-                <div class="eyebrow">Evolución funcional</div>
-                <h2>Rango de movimiento máximo por sesión</h2>
-                <p class="muted">Ángulo máximo alcanzado (°) en cada ejercicio. Haga clic en la leyenda para ocultar/mostrar series.</p>
+                <h2>¿Cuánto mueve la muñeca?</h2>
+                <p class="muted">Ángulo máximo de cada ejercicio en cada sesión.</p>
               </div>
               <div class="seg" id="rom-modo" role="group" aria-label="Unidad">
                 <button class="seg-btn active" data-modo="grados">Grados</button>
-                <button class="seg-btn" data-modo="pct">% del valor de referencia</button>
+                <button class="seg-btn" data-modo="pct">% de lo normal</button>
               </div>
             </div>
             <div class="chart-box tall"><canvas id="chart-rom"></canvas></div>
           </div>
 
-          <div class="grid-2">
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <div class="eyebrow">Indicadores</div>
-                  <h2 id="ind-titulo">Indicador por sesión</h2>
-                  <p class="muted" id="ind-desc"></p>
-                </div>
-                <select id="ind-select" aria-label="Indicador">
-                  <option value="cumplimiento">Cumplimiento de repeticiones (%)</option>
-                  <option value="dolor">Dolor reportado (EVA 0–10)</option>
-                  <option value="velocidad">Velocidad angular media (°/s)</option>
-                  <option value="variabilidad">Variabilidad entre repeticiones (%)</option>
-                  <option value="duracion">Duración de la sesión (min)</option>
-                </select>
-              </div>
-              <div class="chart-box"><canvas id="chart-ind"></canvas></div>
+          <div class="card">
+            <div>
+              <h2>Avisos</h2>
+              <p class="muted">Avisos automáticos. No son un diagnóstico.</p>
             </div>
-
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <div class="eyebrow">Análisis</div>
-                  <h2>Observaciones automáticas</h2>
-                  <p class="muted">Señales informativas calculadas a partir de los datos. No constituyen diagnóstico ni recomendación terapéutica.</p>
-                </div>
-              </div>
-              <ul class="obs-list" id="observaciones"></ul>
-            </div>
+            <ul class="obs-list" id="observaciones"></ul>
+            <button class="btn btn-ghost obs-mas" id="obs-mas" hidden></button>
           </div>
+
+          <details class="card plegable" id="mas-indicadores">
+            <summary>Más indicadores</summary>
+            <div class="card-head">
+              <div>
+                <h2 id="ind-titulo">Indicador por sesión</h2>
+                <p class="muted" id="ind-desc"></p>
+              </div>
+              <select id="ind-select" aria-label="Indicador">
+                <option value="cumplimiento">Cumplimiento de repeticiones (%)</option>
+                <option value="dolor">Dolor reportado (EVA 0–10)</option>
+                <option value="velocidad">Velocidad angular media (°/s)</option>
+                <option value="variabilidad">Variabilidad entre repeticiones (%)</option>
+                <option value="duracion">Duración de la sesión (min)</option>
+              </select>
+            </div>
+            <div class="chart-box"><canvas id="chart-ind"></canvas></div>
+          </details>
         </div>
 
         <!-- UNA SESIÓN -->
@@ -163,7 +166,6 @@
           <div class="card">
             <div class="card-head">
               <div>
-                <div class="eyebrow">Detalle</div>
                 <h2>Sesión</h2>
                 <p class="muted" id="sesion-meta"></p>
               </div>
@@ -173,6 +175,7 @@
             <div class="table-wrap">
               <table class="table" id="tabla-ejercicios"></table>
             </div>
+            <button class="btn btn-ghost btn-columnas" id="btn-columnas">Mostrar todas las columnas</button>
           </div>
 
           <div class="card" id="sesion-rutina" hidden>
@@ -187,17 +190,14 @@
             </div>
           </div>
 
-          <div class="card" id="sesion-senal">
+          <details class="card plegable" id="sesion-senal">
+            <summary>Ver señal del sensor</summary>
             <div class="card-head">
-              <div>
-                <div class="eyebrow">Señal del sensor</div>
-                <h2>Señal angular registrada</h2>
-                <p class="muted">Ángulo (°) en el tiempo durante el ejercicio seleccionado. Los puntos marcan las repeticiones detectadas.</p>
-              </div>
+              <p class="muted">Ángulo en el tiempo. Los puntos marcan las repeticiones detectadas.</p>
               <select id="ejercicio-select" aria-label="Ejercicio"></select>
             </div>
             <div class="chart-box tall"><canvas id="chart-senal"></canvas></div>
-          </div>
+          </details>
         </div>
 
         <!-- COMPARAR -->

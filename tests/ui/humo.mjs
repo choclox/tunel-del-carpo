@@ -37,6 +37,7 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init } = {
   page.on('pageerror', (e) => page.errores.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|net::/.test(m.text())) page.errores.push(m.text()); });
   page.on('dialog', (d) => d.accept());
+  page.setDefaultTimeout(10000);
   await page.goto(URL_APP);
   await page.waitForSelector('.patient-item');
   return page;
@@ -78,6 +79,54 @@ await verificar('cambiar a reporte', async (page) => {
 
 await verificar('barra superior limpia', async (page) => {
   afirmar(await page.locator('.topbar button').count() === 0, 'hay botones en la barra superior');
+});
+
+/* ---------- Seguimiento ---------- */
+await verificar('encabezado compacto', async (page) => {
+  const txt = await page.textContent('#encabezado');
+  afirmar(txt.includes('días desde la cirugía') && /Fase \d/.test(txt), `encabezado: ${txt.trim().slice(0, 80)}`);
+  afirmar((await page.textContent('#encabezado details summary')).trim() === 'Ver ficha', 'sin "Ver ficha"');
+  afirmar(await page.locator('.ring').count() === 0, 'sigue el anillo');
+});
+
+await verificar('tres tarjetas', async (page) => {
+  const titulos = await page.$$eval('#resumen-tarjetas > *', (ts) => ts.map((t) => t.querySelector('.kpi-label').textContent.trim()));
+  afirmar(JSON.stringify(titulos) === JSON.stringify(['Avance', 'Dolor', 'Última sesión']), `tarjetas: ${titulos}`);
+});
+
+await verificar('máximo 3 observaciones', async (page) => {
+  const n = await page.locator('#observaciones > li.obs:visible').count();
+  afirmar(n >= 1 && n <= 3, `observaciones visibles: ${n}`);
+});
+
+await verificar('paciente sin sesiones', async (page) => {
+  await page.click('#btn-nuevo');
+  await page.fill('#form-paciente [name=nombre]', 'Paciente Prueba');
+  await page.fill('#form-paciente [name=documento]', '123');
+  await page.fill('#form-paciente [name=edad]', '40');
+  await page.fill('#form-paciente [name=fechaCirugia]', '2026-10-01');
+  await page.click('#form-paciente button[value=ok]');
+  await page.click('.nav-seccion[data-seccion="seguimiento"]');
+  const vacio = page.locator('section.seccion[data-seccion="seguimiento"] .vacio-seguimiento:visible');
+  afirmar((await vacio.textContent()).includes('Aún no hay sesiones'), 'sin mensaje de vacío');
+  await vacio.getByRole('button', { name: 'Ir a Ejercicios' }).click();
+  afirmar(await seccionActiva(page) === 'ejercicios', 'no fue a Ejercicios');
+});
+
+await verificar('gráfica plegada con tamaño', async (page) => {
+  await page.click('#mas-indicadores summary');
+  await page.waitForTimeout(300);
+  const alto = await page.$eval('#chart-ind', (c) => c.getBoundingClientRect().height);
+  afirmar(alto > 100, `alto de la gráfica: ${alto}`);
+});
+
+await verificar('tabla de sesión corta', async (page) => {
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  const n = await page.locator('#tabla-ejercicios thead th:not(.col-extra)').count();
+  afirmar(n === 4, `columnas visibles: ${n}`);
+  afirmar(!(await page.locator('#tabla-ejercicios thead th.col-extra').first().isVisible()), 'columnas extra visibles');
+  await page.click('#btn-columnas');
+  afirmar(await page.locator('#tabla-ejercicios thead th.col-extra').first().isVisible(), 'no se muestran las columnas extra');
 });
 
 await navegador.close();
