@@ -1,0 +1,11 @@
+# Binarios de compilación de las pruebas del firmware
+firmware/pruebas/build/
+*.exe
+*.pdb
+*.obj
+*.o
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store

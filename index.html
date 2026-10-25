@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seguimiento Rehabilitación Carpo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Iconos de línea (se usan con <svg><use href="#i-..."/></svg>) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-cross" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M9 2.5h6a1 1 0 0 1 1 1V8h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H16v4.5a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V16H3.5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1H8V3.5a1 1 0 0 1 1-1z"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-4-6"/></symbol>
+      <symbol id="i-id" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="12" r="2"/><path d="M14 10h4M14 14h4"/></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.3l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></symbol>
+      <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="14" rx="2.5"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+      <symbol id="i-stetho" viewBox="0 0 24 24"><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/></symbol>
+      <symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-7"/></symbol>
+      <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+      <symbol id="i-bars" viewBox="0 0 24 24"><path d="M3 3v18h18M8 17V10M13 17V6M18 17v-4"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8"/></symbol>
+      <symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 9.5"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></symbol>
+      <symbol id="i-angle" viewBox="0 0 24 24"><path d="M3 20h18M3 20L15 5M10 20a7 7 0 0 0-2.3-5.2"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></symbol>
+      <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10z"/><path d="M2 21c0-3 1.9-5.4 5.1-6"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    </defs>
+  </svg>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg class="ic"><use href="#i-cross"/></svg></span>
+      <div>
+        <div class="brand-title">RehabCarpo</div>
+        <div class="brand-sub">Seguimiento clínico</div>
+      </div>
+    </div>
+    <div class="topbar-note">
+      <svg class="ic" aria-hidden="true"><use href="#i-stetho"/></svg>
+      <span>Panel del profesional<br><small>Prototipo académico DMR103</small></span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="btn-importar" title="Importar archivo de sesión generado por el dispositivo (.json)"><svg class="ic"><use href="#i-upload"/></svg>Importar sesión</button>
+      <button class="btn btn-ghost" id="btn-exportar" title="Exportar toda la base de datos (.json)"><svg class="ic"><use href="#i-download"/></svg>Exportar datos</button>
+      <button class="btn btn-ghost" id="btn-reset" title="Restaurar los datos de demostración"><svg class="ic"><use href="#i-refresh"/></svg>Restablecer demo</button>
+      <input type="file" id="file-input" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Lista de pacientes -->
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="eyebrow">Mis pacientes</div>
+        <div class="search">
+          <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+          <input type="search" id="buscar" placeholder="Buscar paciente o documento…" aria-label="Buscar paciente">
+        </div>
+        <button class="btn btn-primary btn-block" id="btn-nuevo"><svg class="ic"><use href="#i-plus"/></svg>Nuevo paciente</button>
+      </div>
+      <ul class="patient-list" id="lista-pacientes"></ul>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="empty" id="vacio">
+        <span class="empty-icon"><svg class="ic"><use href="#i-users"/></svg></span>
+        <h2>Seleccione un paciente</h2>
+        <p class="muted">Elija un paciente de la lista para ver su evolución.</p>
+      </div>
+
+      <div id="vista-paciente" hidden>
+        <!-- Encabezado del paciente -->
+        <section class="hero" id="encabezado"></section>
+
+        <!-- Indicadores clave -->
+        <section class="kpis" id="kpis"></section>
+
+        <!-- Pestañas -->
+        <nav class="tabs" role="tablist">
+          <button role="tab" class="tab active" data-tab="evolucion"><svg class="ic"><use href="#i-trend"/></svg>Evolución</button>
+          <button role="tab" class="tab" data-tab="sesion"><svg class="ic"><use href="#i-activity"/></svg>Detalle de sesión</button>
+          <button role="tab" class="tab" data-tab="comparar"><svg class="ic"><use href="#i-bars"/></svg>Comparar sesiones</button>
+          <button role="tab" class="tab" data-tab="historial"><svg class="ic"><use href="#i-file"/></svg>Historial y notas</button>
+          <button role="tab" class="tab" data-tab="vivo"><span class="live-dot" id="tab-vivo-dot" hidden></span><svg class="ic"><use href="#i-radio"/></svg>Monitoreo en vivo</button>
+        </nav>
+
+        <!-- EVOLUCIÓN -->
+        <section class="tab-panel" data-panel="evolucion">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Evolución funcional</div>
+                <h2>Rango de movimiento máximo por sesión</h2>
+                <p class="muted">Ángulo máximo alcanzado (°) en cada ejercicio. Haga clic en la leyenda para ocultar/mostrar series.</p>
+              </div>
+              <div class="seg" id="rom-modo" role="group" aria-label="Unidad">
+                <button class="seg-btn active" data-modo="grados">Grados</button>
+                <button class="seg-btn" data-modo="pct">% del valor de referencia</button>
+              </div>
+            </div>
+            <div class="chart-box tall"><canvas id="chart-rom"></canvas></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <div class="eyebrow">Indicadores</div>
+                  <h2 id="ind-titulo">Indicador por sesión</h2>
+                  <p class="muted" id="ind-desc"></p>
+                </div>
+                <select id="ind-select" aria-label="Indicador">
+                  <option value="cumplimiento">Cumplimiento de repeticiones (%)</option>
+                  <option value="dolor">Dolor reportado (EVA 0–10)</option>
+                  <option value="velocidad">Velocidad angular media (°/s)</option>
+                  <option value="variabilidad">Variabilidad entre repeticiones (%)</option>
+                  <option value="duracion">Duración de la sesión (min)</option>
+                </select>
+              </div>
+              <div class="chart-box"><canvas id="chart-ind"></canvas></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <div class="eyebrow">Análisis</div>
+                  <h2>Observaciones automáticas</h2>
+                  <p class="muted">Señales informativas calculadas a partir de los datos. No constituyen diagnóstico ni recomendación terapéutica.</p>
+                </div>
+              </div>
+              <ul class="obs-list" id="observaciones"></ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- DETALLE DE SESIÓN -->
+        <section class="tab-panel" data-panel="sesion" hidden>
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Detalle</div>
+                <h2>Sesión</h2>
+                <p class="muted" id="sesion-meta"></p>
+              </div>
+              <select id="sesion-select" aria-label="Sesión"></select>
+            </div>
+            <div class="badges" id="sesion-calidad"></div>
+            <div class="table-wrap">
+              <table class="table" id="tabla-ejercicios"></table>
+            </div>
+          </div>
+
+          <div class="card" id="sesion-rutina" hidden>
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Rutina grabada</div>
+                <h2 id="sesion-rutina-titulo"></h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="tabla-rutina"></table>
+            </div>
+          </div>
+
+          <div class="card" id="sesion-senal">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Señal del sensor</div>
+                <h2>Señal angular registrada</h2>
+                <p class="muted">Ángulo (°) en el tiempo durante el ejercicio seleccionado. Los puntos marcan las repeticiones detectadas.</p>
+              </div>
+              <select id="ejercicio-select" aria-label="Ejercicio"></select>
+            </div>
+            <div class="chart-box tall"><canvas id="chart-senal"></canvas></div>
+          </div>
+        </section>
+
+        <!-- COMPARAR -->
+        <section class="tab-panel" data-panel="comparar" hidden>
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Comparación</div>
+                <h2>Comparación entre sesiones</h2>
+                <p class="muted">Rango de movimiento máximo por ejercicio en dos sesiones.</p>
+              </div>
+              <div class="compare-pickers">
+                <label>A <select id="cmp-a"></select></label>
+                <label>B <select id="cmp-b"></select></label>
+              </div>
+            </div>
+            <div class="chart-box tall"><canvas id="chart-cmp"></canvas></div>
+            <div class="table-wrap"><table class="table" id="tabla-cmp"></table></div>
+          </div>
+        </section>
+
+        <!-- HISTORIAL -->
+        <section class="tab-panel" data-panel="historial" hidden>
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Historial</div>
+                <h2>Historial de sesiones</h2>
+                <p class="muted">Seleccione una fila para ver el detalle. Las notas se guardan automáticamente en este equipo.</p>
+              </div>
+              <button class="btn" id="btn-csv"><svg class="ic"><use href="#i-download"/></svg>Exportar CSV del paciente</button>
+            </div>
+            <div class="table-wrap"><table class="table table-hover" id="tabla-historial"></table></div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="eyebrow">Notas clínicas</div>
+              <h2>Notas de la sesión <span id="nota-sesion-label" class="muted"></span></h2>
+            </div>
+            <textarea id="nota" rows="5" placeholder="Observaciones del profesional para esta sesión…"></textarea>
+            <div class="note-foot muted" id="nota-estado"></div>
+          </div>
+        </section>
+
+        <!-- MONITOREO EN VIVO -->
+        <section class="tab-panel" data-panel="vivo" hidden>
+          <div class="live-top">
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <div class="eyebrow">Dispositivo</div>
+                  <h2>Conexión con el dispositivo</h2>
+                  <p class="muted" id="mv-paciente"></p>
+                </div>
+                <span class="badge" id="mv-estado"><span class="dot"></span>Desconectado</span>
+              </div>
+              <div class="live-controls">
+                <label>Origen
+                  <select id="mv-origen">
+                    <option value="usb">Dispositivo USB (puerto serie)</option>
+                    <option value="simulador">Simulador (sin hardware)</option>
+                  </select>
+                </label>
+                <label id="mv-baud-wrap">Velocidad
+                  <select id="mv-baud">
+                    <option>115200</option><option>57600</option><option>38400</option><option>9600</option>
+                  </select>
+                </label>
+                <button class="btn btn-primary" id="mv-conectar">Conectar</button>
+              </div>
+              <p class="muted" id="mv-soporte" hidden>Este navegador no permite conectar dispositivos USB. Use Google Chrome o Microsoft Edge, o el simulador.</p>
+              <div class="live-stats" id="mv-stats"></div>
+            </div>
+
+            <div class="card card-mint">
+              <div class="card-head">
+                <div>
+                  <div class="eyebrow">Paso 1</div>
+                  <h2>Calibración inicial</h2>
+                  <p class="muted">Con la mano en posición neutra y en reposo. Criterio: completar en ≤ 30 s.</p>
+                </div>
+                <span class="icon-bubble"><svg class="ic"><use href="#i-target"/></svg></span>
+              </div>
+              <button class="btn" id="mv-calibrar" disabled>Calibrar</button>
+              <div id="mv-cal" class="muted">Sin calibrar.</div>
+            </div>
+          </div>
+
+          <div class="card" id="rt-tarjeta">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Etapa del tratamiento</div>
+                <h2>Rutina de rehabilitación</h2>
+              </div>
+              <div class="seg" id="rt-etapas" role="group" aria-label="Etapa de la rutina"></div>
+            </div>
+            <div class="rt-etapa">
+              <h3 id="rt-etapa-titulo"></h3>
+              <p id="rt-etapa-desc"></p>
+              <p class="muted" id="rt-etapa-sug"></p>
+            </div>
+            <div class="rt-tarjeta-grid">
+              <ol class="rt-pasos" id="rt-pasos"></ol>
+              <div class="rt-cuidado-gral">
+                <div class="eyebrow">Cuidado general</div>
+                <ul class="rt-lista" id="rt-cuidado-gral"></ul>
+              </div>
+            </div>
+            <p class="muted rt-aviso">Rutina orientativa. El profesional debe ajustarla a cada paciente.</p>
+            <div class="dlg-actions">
+              <button class="btn" id="rt-revisar"><svg class="ic"><use href="#i-file"/></svg>Revisar rutina</button>
+              <button class="btn btn-primary" id="rt-iniciar"><svg class="ic"><use href="#i-play"/></svg>Iniciar rutina</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <div class="eyebrow">Paso 2 · En vivo</div>
+                <h2>Señal en vivo</h2>
+                <p class="muted" id="mv-ej-ayuda">La grabación se inicia desde la rutina de rehabilitación.</p>
+              </div>
+            </div>
+            <div class="live-readouts" id="mv-lecturas"></div>
+            <div class="chart-box tall"><canvas id="chart-vivo"></canvas></div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="footer">
+        <div class="values">
+          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-activity"/></svg></span><span>Datos objetivos<br>de cada sesión</span></div>
+          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-users"/></svg></span><span>Seguimiento<br>individualizado</span></div>
+          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-shield"/></svg></span><span>Seguridad<br>del paciente</span></div>
+          <div class="value"><span class="icon-bubble"><svg class="ic"><use href="#i-heart"/></svg></span><span>Apoyo al<br>criterio clínico</span></div>
+        </div>
+        <p class="disclaimer">
+          Prototipo académico. No es un dispositivo médico certificado. La información presentada complementa,
+          y no sustituye, la valoración y el criterio clínico del profesional responsable.
+        </p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Modal nuevo paciente -->
+  <dialog id="dlg-paciente">
+    <form method="dialog" id="form-paciente">
+      <div class="eyebrow">Registro</div>
+      <h2>Nuevo paciente</h2>
+      <div class="form-grid">
+        <label>Nombre completo<input name="nombre" required></label>
+        <label>Documento<input name="documento" required></label>
+        <label>Edad<input name="edad" type="number" min="1" max="120" required></label>
+        <label>Sexo
+          <select name="sexo"><option>F</option><option>M</option><option>Otro</option></select>
+        </label>
+        <label>Mano intervenida
+          <select name="mano"><option>Derecha</option><option>Izquierda</option></select>
+        </label>
+        <label>Fecha de cirugía<input name="fechaCirugia" type="date" required></label>
+        <label>Ocupación<input name="ocupacion"></label>
+        <label>Profesional responsable<input name="profesional"></label>
+      </div>
+      <div class="dlg-actions">
+        <button class="btn btn-ghost" value="cancel" formnovalidate>Cancelar</button>
+        <button class="btn btn-primary" value="ok">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Rutina de ejercicios en video -->
+  <dialog id="dlg-rutina" class="dlg-rutina" aria-labelledby="rt-nombre">
+    <div class="rt-body">
+      <div class="rt-head">
+        <div>
+          <div class="eyebrow" id="rt-paso">Ejercicio 1 de 5</div>
+          <h2 id="rt-nombre"></h2>
+        </div>
+        <button class="btn btn-ghost rt-cerrar" id="rt-cerrar" aria-label="Cerrar rutina"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="rt-main">
+        <div class="rt-media">
+          <video id="rt-video" autoplay muted loop playsinline></video>
+          <p class="rt-falta muted" id="rt-falta" hidden></p>
+        </div>
+        <div class="rt-info">
+          <span class="badge" id="rt-modo"></span>
+          <p class="rt-reps" id="rt-reps"></p>
+          <p class="rt-indicacion" id="rt-indicacion"></p>
+          <p class="rt-contador" id="rt-contador" aria-live="polite" hidden></p>
+          <div class="rt-grabado" id="rt-grabado" hidden>
+            <span class="rt-grabado-badge"><svg class="ic"><use href="#i-check"/></svg>Ya grabado</span>
+            <p class="rt-grabado-txt" id="rt-grabado-txt"></p>
+            <button type="button" class="btn" id="rt-regrabar"><svg class="ic"><use href="#i-refresh"/></svg>Volver a grabar</button>
+          </div>
+          <div>
+            <div class="eyebrow">Cuidado</div>
+            <ul class="rt-lista" id="rt-cuidado"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="rt-nav">
+        <button class="btn" id="rt-anterior"><svg class="ic"><use href="#i-chevron-left"/></svg>Anterior</button>
+        <button class="btn btn-primary" id="rt-siguiente"><span id="rt-siguiente-txt">Siguiente</span><svg class="ic"><use href="#i-chevron-right"/></svg></button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ¿Listos para empezar? -->
+  <dialog id="dlg-listos" class="dlg-listos" aria-labelledby="ls-titulo">
+    <div class="eyebrow">Rutina de rehabilitación</div>
+    <h2 id="ls-titulo">¿Listos para empezar?</h2>
+    <p class="ls-etapa" id="ls-etapa"></p>
+    <p class="muted" id="ls-resumen"></p>
+    <div class="ls-estado">
+      <div class="ls-fila"><span class="dot" id="ls-disp-dot"></span><span id="ls-disp"></span></div>
+      <div class="ls-fila"><span class="dot" id="ls-cal-dot"></span><span id="ls-cal"></span>
+        <button class="btn btn-ghost ls-reintentar" id="ls-reintentar" hidden><svg class="ic"><use href="#i-refresh"/></svg>Reintentar</button>
+      </div>
+    </div>
+    <ul class="rt-lista">
+      <li>Siéntese cómodo con el antebrazo apoyado.</li>
+      <li>Haga cada movimiento despacio y sin dolor.</li>
+      <li>Deténgase si siente dolor intenso, hormigueo o adormecimiento.</li>
+    </ul>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" id="ls-cancelar">Cancelar</button>
+      <button class="btn btn-primary" id="ls-empezar" disabled><svg class="ic"><use href="#i-play"/></svg>Empezar</button>
+    </div>
+  </dialog>
+
+  <!-- Rutina terminada -->
+  <dialog id="dlg-fin" class="dlg-fin" aria-labelledby="fin-titulo">
+    <div class="eyebrow" id="fin-etapa"></div>
+    <h2 id="fin-titulo">Rutina terminada</h2>
+    <div id="fin-con-datos">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Ejercicio</th><th class="num">Objetivo</th><th class="num">Detectadas</th><th class="num">Conteo manual</th></tr></thead>
+          <tbody id="fin-tabla"></tbody>
+        </table>
+      </div>
+      <div class="fin-campos">
+        <label>Dolor EVA (0–10)<input type="number" id="fin-dolor" min="0" max="10" step="1" placeholder="0–10"></label>
+        <label class="grow">Notas<textarea id="fin-notas" rows="3" placeholder="Observaciones de la sesión…"></textarea></label>
+      </div>
+    </div>
+    <p class="muted" id="fin-vacio" hidden>No se grabó ningún ejercicio.</p>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" id="fin-descartar">Descartar sesión</button>
+      <button class="btn btn-primary" id="fin-guardar"><svg class="ic"><use href="#i-save"/></svg>Guardar sesión</button>
+      <button class="btn btn-primary" id="fin-cerrar" hidden>Cerrar</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="rutinas.js"></script>
+  <script src="app.js"></script>
+  <script src="monitoreo.js"></script>
+  <script src="rutina.js"></script>
+</body>
+</html>
