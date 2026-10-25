@@ -57,11 +57,11 @@ D,<seq>,<t_ms>,<fe>,<rc>,<mcf>,<emg1>,<emg2>,<emg3>
     "flexores":   { "picos": [...], "media": ..., "extensoresDuranteFlexores": 96 },
     "extensores": { "picos": [...], "media": ... }
   },
-  "senal": { "fs": 10, "tenar": [...], "flexores": [...], "extensores": [...] }
+  "senal": { "fs": 2, "tenar": [...], "flexores": [...], "extensores": [...] }
 }
 ```
 
-  `extensoresDuranteFlexores` = promedio de los picos del canal de extensores durante las 3 contracciones del bloque de flexores (para la co-contracción). `senal` = los 3 canales durante la rutina, reducidos a ~10 Hz (como la señal cruda de los pasos sin medición). Sin prueba (Fase 1, omitida o sin EMG): `prueba` es `null`.
+  `extensoresDuranteFlexores` = promedio de los picos del canal de extensores durante las 3 contracciones del bloque de flexores (para la co-contracción). `senal` = los 3 canales durante la rutina, reducidos a 2 Hz guardando el máximo de cada medio segundo (a 10 Hz una rutina ocupaba ~80 KB y llenaba el almacenamiento con pocos pacientes). Sin prueba (Fase 1, omitida o sin EMG): `prueba` es `null`.
 
 ## 3. Medidas y dónde se ven
 

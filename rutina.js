@@ -287,7 +287,8 @@ function terminarRutina() {
   // Fase 2 y 3 con EMG: la prueba de fuerza muscular va antes de "Rutina terminada".
   const etapa = mv.sesion?.rutina?.etapa ?? etapaElegida;
   const hayPasos = !!mv.sesion?.rutina?.pasos.length;
-  if (hayPasos && mv.conectado && debeHacerPrueba(etapa, mv.sesion?.conEmg)) abrirPrueba(abrirFin);
+  // La conexión actual debe traer EMG (no basta con que lo haya traído antes en la sesión).
+  if (hayPasos && mv.conectado && debeHacerPrueba(etapa, mv.conEmg && mv.sesion?.conEmg)) abrirPrueba(abrirFin);
   else abrirFin();
 }
 

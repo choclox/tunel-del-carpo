@@ -10,12 +10,20 @@ const INDICACION_PRUEBA = {
   extensores: 'Lleve la muñeca hacia arriba con fuerza contra la resistencia.',
 };
 const TEXTO_SIN_CONEXION_PRUEBA = 'Se perdió la conexión: la prueba no se completó.';
+const TEXTO_SIN_ACTIVIDAD = 'No se detectó actividad; revise el electrodo.';
+const EMG_MINIMO_ACTIVIDAD = 20; // promedio por debajo de esto: el electrodo no está midiendo
 
 function debeHacerPrueba(etapa, conEmg) {
   return etapa >= 2 && !!conEmg;
 }
 
-let pr = null; // { indice, resultados, alTerminar, turno }
+let pr = null; // { indice, resultados, alTerminar, turno, recoger }
+
+// Muestras EMG que llegan durante "¡Fuerza!", en orden de llegada (no por la hora del dispositivo,
+// que vuelve a 0 si se reinicia). La llama procesarLinea (monitoreo.js).
+function pruebaRecibirMuestra(emg) {
+  pr?.recoger?.push(emg);
+}
 
 // Espera ms; devuelve false si la prueba se canceló o cambió de bloque mientras tanto.
 function esperarPrueba(ms, turno) {
@@ -55,7 +63,7 @@ async function correrBloque() {
     }
     $('#pr-cuenta').textContent = '¡Fuerza!';
     enviarPrueba(`PR,${musculo}`);
-    const tInicio = mv.buffer[mv.buffer.length - 1]?.t ?? -Infinity;
+    pr.recoger = [];
     const barra = setInterval(() => {
       const e = ultimoEmg();
       $('#pr-barra').style.width = `${e ? Math.min(100, e[musculo] / 10) : 0}%`;
@@ -65,20 +73,32 @@ async function correrBloque() {
     $('#pr-barra').style.width = '0%';
     enviarPrueba('PR,-');
     if (!sigue) return;
-    const muestras = mv.buffer.filter((m) => m.t > tInicio && m.emg);
-    picos.push(picoContraccion(muestras.map((m) => m.emg[musculo])) ?? 0);
-    extensores.push(picoContraccion(muestras.map((m) => m.emg.extensores)) ?? 0);
+    const muestras = pr.recoger;
+    pr.recoger = null;
+    picos.push(picoContraccion(muestras.map((e) => e[musculo])) ?? 0);
+    extensores.push(picoContraccion(muestras.map((e) => e.extensores)) ?? 0);
     $('#pr-cuenta').textContent = 'Descanse';
     if (!(await esperarPrueba(TIEMPOS_PRUEBA_EMG.descanso, turno))) return;
   }
 
   const r = resumenBloque(picos);
+  // Sin actividad (electrodo despegado o sin datos): no se guarda; se repite o se omite la prueba.
+  if (r.media < EMG_MINIMO_ACTIVIDAD) {
+    $('#pr-cuenta').textContent = '!';
+    $('#pr-contador').textContent = '';
+    $('#pr-dudosa').textContent = TEXTO_SIN_ACTIVIDAD;
+    $('#pr-dudosa').hidden = false;
+    $('#pr-repetir').hidden = false;
+    $('#pr-repetir').focus();
+    return;
+  }
   const resultado = { picos: r.picos, media: r.media };
   if (musculo === 'flexores') resultado.extensoresDuranteFlexores = resumenBloque(extensores).media;
   pr.resultados[musculo] = resultado;
   $('#pr-cuenta').textContent = '✓';
   $('#pr-contador').textContent = '';
   $('#pr-resultado').textContent = textoResultado(musculo, r.media);
+  $('#pr-dudosa').textContent = 'Una contracción salió más débil que las otras.';
   $('#pr-dudosa').hidden = !r.dudosa;
   $('#pr-repetir').hidden = !r.dudosa;
   $('#pr-siguiente').disabled = false;

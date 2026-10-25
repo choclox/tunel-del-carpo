@@ -330,12 +330,16 @@ await verificar('simulador sin EMG', async (page) => {
 }, { init: () => { window.SIMULADOR_SIN_EMG = true; } });
 
 await verificar('rutina guarda señal EMG', async (page) => {
+  const t0 = Date.now();
   await grabarRutina(page, 2);
+  const segundos = (Date.now() - t0) / 1000;
   if (await page.isVisible('#pr-omitir')) await page.click('#pr-omitir');
   await page.click('#fin-guardar');
   await page.waitForTimeout(300);
   const s = await ultimaSesion(page);
   afirmar(s.emg && s.emg.senal.tenar.length > 0 && s.emg.prueba === null, JSON.stringify(s.emg ?? null).slice(0, 120));
+  // Señal reducida a 2 Hz (máximo de cada medio segundo) para no llenar el almacenamiento.
+  afirmar(s.emg.senal.fs === 2 && s.emg.senal.tenar.length <= segundos * 2 + 2, `fs ${s.emg.senal.fs}, ${s.emg.senal.tenar.length} valores para ${segundos} s`);
 });
 
 await verificar('rutina completa con simulador', async (page) => {
@@ -379,6 +383,18 @@ await verificar('prueba: fase 2 completa', async (page) => {
   afirmar(p && p.tenar.picos.length === 3 && p.flexores.extensoresDuranteFlexores > 0, JSON.stringify(p));
   afirmar(p.tenar.media > 300 && p.extensores.media > 300, `medias: ${p.tenar.media}, ${p.extensores.media}`);
 }, { init: PRUEBA_RAPIDA });
+
+await verificar('prueba: sin actividad no se guarda', async (page) => {
+  await grabarRutina(page, 2);
+  await page.waitForSelector('#dlg-prueba[open]');
+  await page.waitForSelector('#pr-repetir:visible', { timeout: 15000 });
+  afirmar((await page.textContent('#pr-dudosa')).includes('No se detectó actividad'), 'sin aviso de actividad');
+  afirmar(await page.isDisabled('#pr-siguiente'), 'deja seguir sin actividad');
+  await page.click('#pr-omitir');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  afirmar((await ultimaSesion(page)).emg?.prueba === null, 'se guardó una prueba sin actividad');
+}, { init: () => { window.SIMULADOR_EMG_PLANO = true; window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; } });
 
 await verificar('prueba: fase 1 no aparece', async (page) => {
   await grabarRutina(page, 1);

@@ -121,6 +121,7 @@ class TransporteSimulado {
     this.cal = null;
     this.contraccion = null; // músculo pedido con PR en la prueba de fuerza
     this.emg = !(typeof window !== 'undefined' && window.SIMULADOR_SIN_EMG === true);
+    this.emgPlano = typeof window !== 'undefined' && window.SIMULADOR_EMG_PLANO === true; // electrodos despegados
     this.timer = setInterval(() => this._tick(), 20);
     setTimeout(() => { this.onLinea?.('#Simulador listo'); this.onLinea?.('BAT,87'); }, 50);
   }
@@ -194,6 +195,7 @@ class TransporteSimulado {
       const s = (t - ej.t0) / 1000 - 1.5;
       if (musculo && s > 0) v[musculo] += 130 * (0.5 - 0.5 * Math.cos(2 * Math.PI * ((s % ej.periodo) / ej.periodo)));
     }
+    if (this.emgPlano) return [0, 0, 0];
     return MUSCULOS.map((k) => Math.max(0, Math.min(1000, Math.round(v[k] + (this.rand() - 0.5) * 10))));
   }
 
@@ -218,7 +220,8 @@ function procesarLinea(linea) {
       if (emg) {
         mv.conEmg = true;
         if (mv.sesion) mv.sesion.conEmg = true;
-        if (mv.paso && mv.sesion && mv.sesion.emgCuenta++ % 5 === 0) MUSCULOS.forEach((k) => mv.sesion.emgSenal[k].push(emg[k]));
+        if (mv.paso && mv.sesion) acumularSenalEmg(mv.sesion, emg);
+        if (typeof pruebaRecibirMuestra === 'function') pruebaRecibirMuestra(emg);
       }
       const ult = mv.buffer[mv.buffer.length - 1];
       if (ult && m.t < ult.t) mv.buffer = []; // el dispositivo se reinició
@@ -247,6 +250,14 @@ function procesarLinea(linea) {
   }
 }
 
+function acumularSenalEmg(sesion, emg) {
+  const v = sesion.emgVentana;
+  MUSCULOS.forEach((k) => { v.max[k] = Math.max(v.max[k], emg[k]); });
+  if (++v.n < 25) return;
+  MUSCULOS.forEach((k) => { sesion.emgSenal[k].push(v.max[k]); v.max[k] = 0; });
+  v.n = 0;
+}
+
 /* ======================= Ejercicios ======================= */
 
 const maximo = (arr) => arr.reduce((a, b) => (b > a ? b : a), -Infinity);
@@ -273,8 +284,10 @@ function nuevaSesion() {
     origen: mv.origen,
     base: { recibidas: mv.stats?.recibidas ?? 0, perdidas: mv.stats?.perdidas ?? 0 },
     conEmg: mv.conEmg,
-    emgSenal: { fs: 10, tenar: [], flexores: [], extensores: [] }, // 1 de cada 5 muestras de los pasos
-    emgCuenta: 0,
+    // Señal EMG de los pasos a 2 Hz: máximo de cada 25 muestras (~0,5 s). Así una rutina de 10 min
+    // ocupa ~15 KB y no llena el almacenamiento del navegador.
+    emgSenal: { fs: 2, tenar: [], flexores: [], extensores: [] },
+    emgVentana: { n: 0, max: { tenar: 0, flexores: 0, extensores: 0 } },
     emgPrueba: null,       // la llena la prueba de fuerza muscular
   };
 }
