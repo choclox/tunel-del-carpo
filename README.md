@@ -16,6 +16,14 @@ Luego abra `http://localhost:8765` en **Google Chrome o Microsoft Edge**. Son lo
 
 > Si inicia el servidor desde la carpeta superior, la dirección es `http://localhost:8765/interfaz-medico/`.
 
+También está publicada en GitHub Pages: https://choclox.github.io/tunel-del-carpo/
+
+### Inicio de sesión (demostración)
+
+Al abrir el panel sin haber entrado se muestra `login.html`, con las pestañas **Iniciar sesión** y **Crear cuenta** (`login.html#registro` abre la segunda). Es una **maqueta**: no hay cuentas reales ni servidor, y cualquier correo y contraseña con formato válido dejan entrar. Al crear cuenta se pide nombre, profesión (Fisioterapeuta, Terapeuta ocupacional, Médico u Otro), correo y contraseña de al menos 8 caracteres. El panel muestra arriba a la derecha el nombre y la profesión del profesional y el botón **Cerrar sesión**. Al crear un paciente, "Profesional responsable" viene lleno con ese nombre.
+
+En el navegador se guardan la sesión (`kinemo.sesion`) y las cuentas creadas (`kinemo.cuentas`: nombre, profesión y correo). **La contraseña nunca se guarda.** Los datos de pacientes no dependen de la cuenta: todos los profesionales que entren en el mismo navegador ven los mismos pacientes.
+
 ## Qué incluye
 
 La pantalla tiene tres secciones. Lo técnico o secundario queda plegado ("Ver ficha", "Más indicadores", "Datos técnicos del dispositivo"…) para no saturar.
@@ -118,6 +126,8 @@ Si sus sensores miden otros ejes, ajuste `canal` y `signo` de cada ejercicio en 
 - `monitoreo.js`: monitoreo en vivo (puerto serie, simulador, conteo de repeticiones).
 - `rutinas.js`: contenido de las rutinas por etapa (ejercicios, repeticiones, cuidados) y funciones puras con pruebas.
 - `rutina.js`: ventanas de la rutina (revisión y grabación), "¿Listos para empezar?" y "Rutina terminada".
+- `login.html`, `login.js`: página de inicio de sesión y registro (maqueta).
+- `acceso.js`: validación de los formularios y sesión de demostración; funciones puras con pruebas.
 - `navegacion.js`: secciones (Ejercicios, Seguimiento, Reporte), vistas de Seguimiento y recorte de avisos; funciones puras con pruebas.
 - `tests/ui/humo.mjs`: prueba de humo de la interfaz en Chromium.
 - `videos/`: un `.mp4` por ejercicio de la rutina (ver [videos/LEEME.md](videos/LEEME.md)).

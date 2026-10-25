@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kinemo · Seguimiento de rehabilitación</title>
+  <!-- Sin sesión de demostración se va al login antes de pintar nada. -->
+  <script src="acceso.js"></script>
+  <script>if (!leerSesion()) location.replace('login.html');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -56,6 +59,11 @@
         <div class="brand-title">Kinemo</div>
         <div class="brand-sub">Monitoreo y rehabilitación</div>
       </div>
+    </div>
+    <div class="usuario">
+      <span class="avatar usuario-avatar" aria-hidden="true"></span>
+      <span class="usuario-datos"><span class="usuario-nombre"></span><span class="usuario-profesion"></span></span>
+      <button class="btn btn-ghost" id="btn-salir"><svg class="ic"><use href="#i-arrow"/></svg>Cerrar sesión</button>
     </div>
   </header>
 

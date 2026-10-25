@@ -705,8 +705,20 @@ function exportarCSV(p) {
 }
 
 /* ======================= Eventos ======================= */
+/* Profesional de la sesión de demostración (siempre como texto, nunca como HTML). */
+function renderUsuario() {
+  const s = leerSesion();
+  if (!s) return;
+  $('.usuario-nombre').textContent = s.nombre;
+  $('.usuario-profesion').textContent = s.profesion ?? '';
+  $('.usuario-profesion').hidden = !s.profesion;
+  $('.usuario-avatar').textContent = iniciales(s.nombre) || '?';
+}
+
 function init() {
   estado.db = cargarDB();
+  renderUsuario();
+  $('#btn-salir').addEventListener('click', () => { cerrarSesion(); location.replace('login.html'); });
   aplicarTemaCharts();
 
   $('#lista-pacientes').addEventListener('click', (e) => {
@@ -786,7 +798,11 @@ function init() {
     toast('Datos de demostración restablecidos.');
   });
 
-  $('#btn-nuevo').addEventListener('click', () => { $('#form-paciente').reset(); $('#dlg-paciente').showModal(); });
+  $('#btn-nuevo').addEventListener('click', () => {
+    $('#form-paciente').reset();
+    $('#form-paciente [name=profesional]').value = leerSesion()?.nombre ?? '';
+    $('#dlg-paciente').showModal();
+  });
   $('#dlg-paciente').addEventListener('close', () => {
     if ($('#dlg-paciente').returnValue !== 'ok') return;
     const d = Object.fromEntries(new FormData($('#form-paciente')));

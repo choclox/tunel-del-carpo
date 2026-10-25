@@ -51,7 +51,7 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   page.on('dialog', (d) => d.accept());
   page.setDefaultTimeout(10000);
   await page.goto(URL_APP + ruta);
-  if (!ruta || ruta === 'index.html') await page.waitForSelector('.patient-item');
+  if (sesion && (!ruta || ruta === 'index.html')) await page.waitForSelector('.patient-item');
   return page;
 }
 
@@ -90,7 +90,8 @@ await verificar('cambiar a reporte', async (page) => {
 });
 
 await verificar('barra superior limpia', async (page) => {
-  afirmar(await page.locator('.topbar button').count() === 0, 'hay botones en la barra superior');
+  const ids = await page.$$eval('.topbar button', (bs) => bs.map((b) => b.id));
+  afirmar(JSON.stringify(ids) === '["btn-salir"]', `botones en la barra superior: ${ids}`);
 });
 
 await verificar('marca Kinemo', async (page) => {
@@ -158,6 +159,37 @@ await verificar('aviso de demostración', async (page) => {
   await page.click('#tab-registro');
   afirmar(await page.isVisible('.aviso-demo'), 'sin aviso en Crear cuenta');
 }, SIN_SESION);
+
+/* ---------- Panel protegido ---------- */
+await verificar('sin sesión va al login', async (page) => {
+  await page.waitForURL(/login\.html$/);
+  afirmar(await page.evaluate(() => sessionStorage.getItem('humo.panel')) === null, 'se pintó el panel antes de redirigir');
+}, {
+  ruta: 'index.html', sesion: null,
+  init: () => new MutationObserver(() => {
+    if (document.querySelector('.patient-item')) sessionStorage.setItem('humo.panel', '1');
+  }).observe(document, { childList: true, subtree: true }),
+});
+
+await verificar('barra muestra al profesional', async (page) => {
+  afirmar((await page.textContent('.usuario-nombre')).trim() === 'Ana Pérez', 'nombre');
+  afirmar((await page.textContent('.usuario-profesion')).trim() === 'Médico', 'profesión');
+}, { sesion: { nombre: 'Ana Pérez', profesion: 'Médico', correo: 'ana@x.com' } });
+
+await verificar('nombre se muestra como texto', async (page) => {
+  afirmar((await page.textContent('.usuario-nombre')) === '<b>Ana</b>', 'texto distinto');
+  afirmar(await page.locator('.usuario-nombre b').count() === 0, 'se interpretó como HTML');
+}, { sesion: { nombre: '<b>Ana</b>', profesion: null, correo: 'ana@x.com' } });
+
+await verificar('cerrar sesión', async (page) => {
+  await Promise.all([page.waitForURL(/login\.html$/), page.click('#btn-salir')]);
+  afirmar(await page.evaluate(() => localStorage.getItem('kinemo.sesion')) === null, 'la sesión sigue guardada');
+});
+
+await verificar('paciente nuevo con profesional', async (page) => {
+  await page.click('#btn-nuevo');
+  afirmar(await page.inputValue('#form-paciente [name=profesional]') === 'Prueba', 'profesional vacío');
+});
 
 /* ---------- Seguimiento ---------- */
 await verificar('encabezado compacto', async (page) => {
