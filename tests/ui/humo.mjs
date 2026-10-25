@@ -89,6 +89,8 @@ await verificar('marca Kinemo', async (page) => {
   const logo = await page.$eval('.brand-mark img', (i) => ({ src: i.getAttribute('src'), ancho: i.naturalWidth }));
   afirmar(logo.src === 'img/kinemo-simbolo.png' && logo.ancho > 0, `logo: ${JSON.stringify(logo)}`);
   afirmar(await page.$eval('link[rel=icon]', (l) => l.getAttribute('href')) === 'img/favicon.png', 'sin icono de pestaña');
+  const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim());
+  afirmar(brand === '#1e6895', `--brand: ${brand} (debe ser el azul del logo)`);
 });
 
 /* ---------- Seguimiento ---------- */

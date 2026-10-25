@@ -1,26 +1,26 @@
-/* ===== Tema: verde azulado clínico (claro y oscuro) ===== */
+/* ===== Tema: colores del logo de Kinemo (azul marino, azul y celeste), claro y oscuro ===== */
 :root {
   color-scheme: light;
-  --page: #f3f9f8;
+  --page: #f4f7fb;
   --surface: #ffffff;
-  --surface-2: #eef7f5;
-  --surface-3: #e1f1ed;
-  --ink: #12302c;
-  --ink-2: #4a615d;
-  --muted: #7a8e8a;
-  --grid: #e4ecea;
-  --axis: #c8d6d2;
-  --border: rgba(15, 90, 80, 0.10);
-  --brand: #0f6b63;
-  --brand-hover: #0b5a53;
+  --surface-2: #edf3f9;
+  --surface-3: #e0eaf4;
+  --ink: #0b1f33;
+  --ink-2: #43566b;
+  --muted: #58697d;
+  --grid: #e3e9f0;
+  --axis: #c9d4df;
+  --border: rgba(10, 40, 80, 0.10);
+  --brand: #1e6895;
+  --brand-hover: #18587f;
   --brand-ink: #ffffff;
-  --brand-soft: #dcf0ec;
-  --brand-text: #0f6b63;
+  --brand-soft: #e0eef8;
+  --brand-text: #1a5d86;
   --accent: var(--brand);
   --good-text: #0b6b2a;
   --bad-text: #b02a2a;
-  --shadow: 0 1px 2px rgba(16, 60, 55, 0.04), 0 8px 24px rgba(16, 60, 55, 0.07);
-  --shadow-lg: 0 2px 4px rgba(16, 60, 55, 0.05), 0 16px 40px rgba(16, 60, 55, 0.10);
+  --shadow: 0 1px 2px rgba(10, 30, 60, 0.04), 0 8px 24px rgba(10, 30, 60, 0.07);
+  --shadow-lg: 0 2px 4px rgba(10, 30, 60, 0.05), 0 16px 40px rgba(10, 30, 60, 0.10);
 
   /* Series de gráficas (validadas: daltonismo y contraste) */
   --s1: #0a8f80; --s2: #eb6834; --s3: #2a78d6; --s4: #eda100;
@@ -37,10 +37,10 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --page: #0b1716; --surface: #12211f; --surface-2: #182b28; --surface-3: #1e3531;
-    --ink: #eaf5f3; --ink-2: #b5c9c5; --muted: #7f9692;
-    --grid: #22332f; --axis: #2f4440; --border: rgba(160, 230, 215, 0.10);
-    --brand: #14a394; --brand-hover: #1bb5a5; --brand-ink: #04211e; --brand-soft: #173a35; --brand-text: #4fd1c1;
+    --page: #07111d; --surface: #0e1b2a; --surface-2: #142536; --surface-3: #1b3044;
+    --ink: #e8f0f8; --ink-2: #b3c3d3; --muted: #8b9cb0;
+    --grid: #1e2f40; --axis: #2c4156; --border: rgba(150, 200, 240, 0.12);
+    --brand: #2a9fd0; --brand-hover: #3bb2e2; --brand-ink: #031322; --brand-soft: #12324a; --brand-text: #5cc3ea;
     --good-text: #2fbf4f; --bad-text: #e66767;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
     --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
@@ -50,10 +50,10 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0b1716; --surface: #12211f; --surface-2: #182b28; --surface-3: #1e3531;
-  --ink: #eaf5f3; --ink-2: #b5c9c5; --muted: #7f9692;
-  --grid: #22332f; --axis: #2f4440; --border: rgba(160, 230, 215, 0.10);
-  --brand: #14a394; --brand-hover: #1bb5a5; --brand-ink: #04211e; --brand-soft: #173a35; --brand-text: #4fd1c1;
+  --page: #07111d; --surface: #0e1b2a; --surface-2: #142536; --surface-3: #1b3044;
+  --ink: #e8f0f8; --ink-2: #b3c3d3; --muted: #8b9cb0;
+  --grid: #1e2f40; --axis: #2c4156; --border: rgba(150, 200, 240, 0.12);
+  --brand: #2a9fd0; --brand-hover: #3bb2e2; --brand-ink: #031322; --brand-soft: #12324a; --brand-text: #5cc3ea;
   --good-text: #2fbf4f; --bad-text: #e66767;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
   --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
@@ -85,7 +85,7 @@ p { margin: 0; }
 /* El símbolo tiene fondo blanco: el recuadro blanco lo integra también en modo oscuro. */
 .brand-mark { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: #fff; border: 1px solid var(--border); overflow: hidden; }
 .brand-mark img { width: 40px; height: 40px; display: block; }
-.brand-title { font-weight: 800; font-size: 18px; letter-spacing: 0.01em; color: var(--brand-text); line-height: 1.1; }
+.brand-title { font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.1; }
 .brand-sub { color: var(--muted); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 
 /* ===== Botones y campos ===== */
@@ -205,7 +205,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 /* Control segmentado */
 .seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--surface-2); }
 .seg-btn { font: inherit; font-size: 12.5px; font-weight: 600; background: transparent; color: var(--ink-2); border: none; padding: 7px 12px; cursor: pointer; border-radius: 9px; }
-.seg-btn.active { background: var(--surface); color: var(--brand-text); box-shadow: 0 1px 3px rgba(16, 60, 55, 0.12); }
+.seg-btn.active { background: var(--surface); color: var(--brand-text); box-shadow: 0 1px 3px rgba(10, 30, 60, 0.12); }
 
 /* Gráficas */
 .chart-box { position: relative; height: 270px; min-width: 0; }
@@ -288,14 +288,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 
 /* ===== Diálogo ===== */
 dialog { border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--ink); padding: 24px; width: min(580px, calc(100vw - 32px)); box-shadow: var(--shadow-lg); }
-dialog::backdrop { background: rgba(8, 40, 36, 0.40); backdrop-filter: blur(2px); }
+dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
 .form-grid label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* Rutina de ejercicios en video */
 .dlg-rutina { width: min(1100px, 94vw); height: min(88vh, 860px); max-width: none; max-height: none; padding: 0; }
-.dlg-rutina::backdrop { background: rgba(8, 40, 36, 0.45); backdrop-filter: blur(8px); }
+.dlg-rutina::backdrop { background: rgba(5, 20, 40, 0.45); backdrop-filter: blur(8px); }
 .rt-body { height: 100%; padding: 20px 24px; display: grid; grid-template-rows: auto 1fr auto; gap: 14px; }
 .rt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 #rt-nombre { font-family: var(--font-serif); font-size: 28px; margin: 0; }
