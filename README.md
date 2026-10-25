@@ -71,6 +71,7 @@ Los datos se guardan en el navegador (`localStorage`). Use **Reporte › Copia d
 - `senal` (opcional): la señal angular cruda en grados a `fs` Hz. Si no viene, la gráfica muestra una señal representativa reconstruida a partir de los indicadores, y lo indica en pantalla.
 - `origen` (lo agrega el panel al guardar desde la rutina): `"usb"` o `"simulador"`. Las sesiones del simulador se marcan en el detalle.
 - `rutina` (opcional, lo agrega el panel al guardar desde la rutina): `{ "etapa": 1, "pasos": [ ... ] }`. `etapa` es 1, 2 o 3 y `pasos` debe ser una lista (al importar se rechaza si no). Cada paso grabado tiene `id`, `nombre`, `tipo` (clave de `EJERCICIOS` o `null` si no se mide), `repeticionesObjetivo`, `repeticiones` (detectadas; `null` si no se midió), `repeticionesManual` (o `null`) y `duracionS`. Los pasos sin medición incluyen `senal: { fs, fe, rc, mcf }` con la señal cruda de los 3 canales reducida a ~10 Hz (`fs` indica la frecuencia efectiva). Los pasos medidos aparecen además en `ejercicios`. Las sesiones sin `rutina` se muestran igual que antes.
+- `emg` (opcional, lo agrega el panel si el dispositivo envía EMG): `{ "prueba": { "tenar": { "picos": [410, 425, 401], "media": 412 }, "flexores": { "picos": [...], "media": ..., "extensoresDuranteFlexores": 96 }, "extensores": { ... } }, "senal": { "fs": 10, "tenar": [...], "flexores": [...], "extensores": [...] } }`. `prueba` es `null` si no se hizo la prueba de fuerza (Fase 1, omitida o incompleta). Al importar, cada músculo debe traer `picos` con 3 números; si falta `media`, se calcula.
 - También se aceptan `"sesiones": [ ... ]` para importar varias sesiones a la vez, o un respaldo completo con `"pacientes": [ ... ]`.
 
 ## Ejercicios y monitoreo en vivo
@@ -92,16 +93,36 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 | Sentido | Mensaje | Significado |
 |---|---|---|
 | Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<mcf>` | Muestra (~50 Hz). `seq` es un contador creciente, `t_ms` el tiempo del dispositivo. Los ángulos van en grados: `fe` flexo-extensión (+flexión/−extensión), `rc` desviación (+radial/−cubital), `mcf` flexión de dedos. |
+| Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<mcf>,<emg1>,<emg2>,<emg3>` | Igual, con EMG: `emg1` tenar, `emg2` flexores, `emg3` extensores, enteros de 0 a 1000 ya sin el reposo. Otro número de campos o un EMG fuera de 0–1000 cuenta como línea no válida. |
 | Dispositivo → PC | `CAL,OK,<ms>` / `CAL,ERR,<motivo>` | Resultado de la calibración. |
 | Dispositivo → PC | `BAT,<pct>` | Batería (opcional). |
 | Dispositivo → PC | `#texto` | Depuración (se ignora). |
 | PC → Dispositivo | `START` / `STOP` | Iniciar o detener la transmisión. |
 | PC → Dispositivo | `CAL` | Calibrar (posición neutra = 0°). |
 | PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). |
+| PC → Dispositivo | `PR,<musculo>` / `PR,-` | Contracción de la prueba de fuerza EMG en curso (informativo; el simulador la usa). |
 
 [firmware/plantilla_protocolo/plantilla_protocolo.ino](firmware/plantilla_protocolo/plantilla_protocolo.ino) implementa este protocolo para Arduino y ESP32. Solo hay que reemplazar `leerAngulosCrudos()` por la lectura real de los sensores. Mientras tanto envía una señal de prueba. Cierre el monitor serie del IDE de Arduino antes de conectar desde la interfaz, porque el puerto solo admite un programa a la vez.
 
 Si sus sensores miden otros ejes, ajuste `canal` y `signo` de cada ejercicio en `EJERCICIOS` ([data.js](data.js)).
+
+### EMG: prueba de fuerza muscular
+
+Tres canales EMG relacionan la rehabilitación con la mejora del músculo:
+
+| Canal | Músculo | Colocación sugerida | Papel |
+|---|---|---|---|
+| EMG 1 | Eminencia tenar (abductor corto y oponente del pulgar) | Base del pulgar, en la palma; en la Fase 1 no se coloca por la herida | Músculo del nervio mediano: medida principal |
+| EMG 2 | Flexores del antebrazo (flexor radial del carpo, flexores de los dedos) | Cara anterior del antebrazo, tercio proximal | Fuerza de agarre |
+| EMG 3 | Extensores del antebrazo (extensor radial del carpo) | Cara posterior del antebrazo, tercio proximal | Control: no depende del mediano |
+
+La colocación exacta la define el equipo con el profesional. Use siempre el mismo lugar en todas las sesiones.
+
+- **Cuándo:** en las rutinas de **Fase 2 y 3**, si el dispositivo envía EMG, al pulsar "Terminar rutina" se abre **Prueba de fuerza muscular** antes de "Rutina terminada". "Omitir prueba" (o Esc) guarda la sesión sin prueba.
+- **Cómo:** por músculo, 3 contracciones guiadas: "Prepárese 3, 2, 1" → "¡Fuerza!" 3 s → "Descanse" 5 s. Pulgar: separar el pulgar contra resistencia; flexores: apretar la pelota o el puño; extensores: llevar la muñeca hacia arriba contra resistencia. Si una contracción queda por debajo del 70 % del promedio, se ofrece "Repetir este músculo".
+- **Medidas:** la primera prueba del paciente es la referencia (100 %). **Fuerza por músculo** = promedio de la sesión en % de la referencia. **Índice del nervio mediano** = (tenar ÷ extensores) en % de la referencia: sube si mejora el músculo del mediano más que el control. **Co-contracción** = extensores durante el bloque de flexores ÷ flexores: si baja, hay menos compensación.
+- **Dónde se ve:** tarjeta **Músculo** y plegable **Fuerza muscular (EMG)** en Seguimiento › Resumen; tarjeta **Prueba de fuerza muscular** y **Ver señal EMG** en Una sesión; avisos si el índice baja más del 15 % frente a la prueba anterior o si la co-contracción supera el 30 %; columnas `emg_*`, `indice_mediano_pct` y `cocontraccion_pct` en el CSV.
+- Los datos de demostración incluyen pruebas EMG desde la Fase 2. Si ya tenía datos guardados de antes, use **Reporte › Opciones de prueba › Restablecer datos de demostración** para verlos.
 
 ### Firmware real (ESP32 + GY-85)
 
@@ -114,6 +135,7 @@ Si sus sensores miden otros ejes, ajuste `canal` y `signo` de cada ejercicio en 
 - **Conexiones.** GY-85 VCC_IN a 3V3, GND a GND, SDA a GPIO21 y SCL a GPIO22, con una resistencia de 10 kΩ de SDA a 3V3 y otra de SCL a 3V3 (el GY-85 usado no trae pull-up en SDA). Todo se alimenta por el USB del PC: no hay batería y `MEDIR_BATERIA` está en `false`, así que el dispositivo no envía `BAT`. En la ESP32-C6 no use GPIO4, 5, 8, 9 ni 15 (pines de arranque).
 - **Compilar.** Placa `esp32:esp32:esp32c6` (ESP32C6 Dev Module) con el core esp32 3.2.0, desde el IDE de Arduino o con `arduino-cli`. Conecte el cable al puerto USB marcado **UART**; si usa el puerto **USB** nativo, active *USB CDC On Boot: Enabled* en el menú Herramientas.
 - **Opciones en `config.h`.** `TRANSMITIR_AL_ARRANCAR`: póngala en `true` si la placa se reinicia cuando el navegador abre el puerto y no llegan datos. `USAR_MAGNETOMETRO`: desactiva el magnetómetro en el filtro. `MONTAJE_*` define la orientación de los ejes de cada sensor.
+- **EMG.** En `config.h`: `USAR_EMG` (por defecto `false`: no cambia nada), `EMG_MODO` (`Envolvente`, p. ej. MyoWare 2.0 salida ENV; o `Crudo`: muestrea a 1000 Hz, resta `EMG_CENTRO_MV` y envía el RMS de 50 ms), `PINES_EMG = {0, 1, 3}` (tenar, flexores, extensores) y `EMG_MAX_MV` (lectura que equivale a 1000). Durante `CAL` se mide el reposo de cada canal y se resta después. El comando `PR` se acepta y no hace nada.
 - **Pruebas en el PC.** Una sola vez `python -m pip install ziglang==0.13.0`; luego `python firmware/pruebas/correr.py`.
 - **Pendiente.** La validación en banco todavía no se ha hecho. Son dos criterios separados: exactitud, con error ≤ 3° frente a un goniómetro; y estabilidad, 60 min seguidos sin reinicios con pérdida de datos < 1 %.
 
@@ -128,6 +150,8 @@ Si sus sensores miden otros ejes, ajuste `canal` y `signo` de cada ejercicio en 
 - `rutina.js`: ventanas de la rutina (revisión y grabación), "¿Listos para empezar?" y "Rutina terminada".
 - `login.html`, `login.js`: página de inicio de sesión y registro (maqueta).
 - `acceso.js`: validación de los formularios y sesión de demostración; funciones puras con pruebas.
+- `emg.js`: formato de la línea D con EMG, picos, línea base y medidas; funciones puras con pruebas.
+- `prueba-emg.js`: ventana guiada "Prueba de fuerza muscular".
 - `navegacion.js`: secciones (Ejercicios, Seguimiento, Reporte), vistas de Seguimiento y recorte de avisos; funciones puras con pruebas.
 - `tests/ui/humo.mjs`: prueba de humo de la interfaz en Chromium.
 - `videos/`: un `.mp4` por ejercicio de la rutina (ver [videos/LEEME.md](videos/LEEME.md)).

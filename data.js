@@ -104,6 +104,24 @@ function generarDemo() {
         let dolor = Math.round(Math.max(0, p.dolor0 - 5 * prog + (rand() - 0.5) * 1.5));
         if (p.meseta && i >= 6) dolor = Math.min(10, dolor + (i - 5));
 
+        // Prueba de fuerza muscular (EMG) desde la Fase 2 (≥ 14 días post-op). El tenar mejora con el
+        // nervio mediano; los extensores (control) casi no cambian; la co-contracción baja.
+        // Paciente con estancamiento: el tenar cae en la última sesión (dispara el aviso del índice).
+        let emg;
+        if (dias(p.fechaCirugia, fecha) >= 14) {
+          const picos = (media) => [0, 1, 2].map(() => Math.round(media * (0.97 + rand() * 0.06)));
+          const bloque = (media) => { const pk = picos(media); return { picos: pk, media: Math.round(pk.reduce((a, b) => a + b, 0) / 3) }; };
+          const tenarF = p.meseta && i === p.n - 1 ? 0.72 : 1;
+          const flex = bloque(300 + 160 * prog);
+          emg = {
+            prueba: {
+              tenar: bloque((240 + 220 * prog) * tenarF),
+              flexores: { ...flex, extensoresDuranteFlexores: Math.round(flex.media * (0.38 - 0.22 * prog)) },
+              extensores: bloque(360 + 20 * prog),
+            },
+          };
+        }
+
         sesiones.push({
           id: `${p.id}-S${String(i + 1).padStart(2, '0')}`,
           fecha,
@@ -113,6 +131,7 @@ function generarDemo() {
           dolorEVA: dolor,
           notas: i === 0 ? 'Sesión inicial. Se explica uso del dispositivo y protocolo de ejercicios.' : '',
           ejercicios,
+          ...(emg ? { emg } : {}),
         });
       }
       const { inicio, n, paso, inicioPct, finPct, k, dolor0, seed, meseta, ...datos } = p;

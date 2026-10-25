@@ -52,7 +52,8 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   // Los 404 se revisan por URL: los videos que faltan son esperados ("Video no adjuntado").
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|net::|Failed to load resource/.test(m.text())) page.errores.push(m.text()); });
   page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('.mp4')) page.errores.push(`${r.status()} ${r.url()}`); });
-  page.on('dialog', (d) => d.accept());
+  page.dialogos = [];
+  page.on('dialog', (d) => { page.dialogos.push(d.message()); d.accept(); });
   page.setDefaultTimeout(10000);
   await page.goto(URL_APP + ruta);
   if (sesion && (!ruta || ruta === 'index.html')) await page.waitForSelector('.patient-item');
@@ -227,9 +228,9 @@ await verificar('encabezado compacto', async (page) => {
   afirmar(await page.locator('.ring').count() === 0, 'sigue el anillo');
 });
 
-await verificar('tres tarjetas', async (page) => {
+await verificar('cuatro tarjetas', async (page) => {
   const titulos = await page.$$eval('#resumen-tarjetas > *', (ts) => ts.map((t) => t.querySelector('.kpi-label').textContent.trim()));
-  afirmar(JSON.stringify(titulos) === JSON.stringify(['Avance', 'Dolor', 'Última sesión']), `tarjetas: ${titulos}`);
+  afirmar(JSON.stringify(titulos) === JSON.stringify(['Avance', 'Dolor', 'Última sesión', 'Músculo']), `tarjetas: ${titulos}`);
 });
 
 await verificar('máximo 3 observaciones', async (page) => {
@@ -472,6 +473,70 @@ await verificar('nota tras importar va a la sesión importada', async (page) => 
     return p.sesiones.filter((x) => x.notas === 'HOLA').map((x) => x.fecha);
   });
   afirmar(JSON.stringify(r) === '["2020-01-01"]', `nota guardada en: ${r}`);
+});
+
+/* ---------- Mejora muscular (EMG) ---------- */
+const sesionImportada = (fecha, extra = {}) => ({ sesion: { fecha, ejercicios: [{ tipo: 'flexion', repeticiones: 10, repeticionesObjetivo: 10, anguloMax: 40 }], ...extra } });
+async function importar(page, datos) {
+  await page.click('.nav-seccion[data-seccion="reporte"]');
+  await page.setInputFiles('#file-input', { name: 'sesion.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(datos)) });
+  await page.waitForTimeout(300);
+}
+const tarjetaMusculo = (page) => page.locator('#resumen-tarjetas > *').nth(3);
+
+await verificar('emg: tarjeta y gráfica', async (page) => {
+  afirmar((await tarjetaMusculo(page).textContent()).includes('%'), 'la tarjeta Músculo no muestra %');
+  await page.click('#mas-emg summary');
+  await page.waitForTimeout(300);
+  const alto = await page.$eval('#chart-emg', (c) => c.getBoundingClientRect().height);
+  afirmar(alto > 100, `alto de la gráfica EMG: ${alto}`);
+});
+
+await verificar('emg: sin prueba', async (page) => {
+  await page.click('#btn-nuevo');
+  await page.fill('#form-paciente [name=nombre]', 'Paciente Sin EMG');
+  await page.fill('#form-paciente [name=documento]', '9');
+  await page.fill('#form-paciente [name=edad]', '40');
+  await page.fill('#form-paciente [name=fechaCirugia]', '2026-09-01');
+  await page.click('#form-paciente button[value=ok]');
+  await importar(page, sesionImportada('2026-10-01'));
+  await page.click('.nav-seccion[data-seccion="seguimiento"]');
+  await page.click('#seg-vistas [data-vista="resumen"]');
+  afirmar((await tarjetaMusculo(page).textContent()).includes('Sin prueba EMG (empieza en la Fase 2)'), 'texto de la tarjeta sin prueba');
+});
+
+await verificar('emg: sesiones sin prueba', async (page) => {
+  await importar(page, sesionImportada('2026-10-24'));
+  await page.click('.nav-seccion[data-seccion="seguimiento"]');
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  afirmar(await page.isHidden('#sesion-emg'), 'la tarjeta EMG aparece en una sesión sin prueba');
+  await page.click('#seg-vistas [data-vista="resumen"]');
+  await page.click('#mas-emg summary');
+  await page.waitForTimeout(300);
+  afirmar((await tarjetaMusculo(page).textContent()).includes('%'), 'la tarjeta perdió el último índice');
+});
+
+await verificar('emg: una sesión', async (page) => {
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  const txt = await page.textContent('#sesion-emg');
+  for (const m of ['Pulgar (tenar)', 'Flexores', 'Extensores', 'Co-contracción']) afirmar(txt.includes(m), `falta ${m}`);
+  afirmar(await page.locator('#sesion-emg .emg-pico').count() === 9, 'no muestra los 9 picos');
+});
+
+await verificar('emg: csv', async (page) => {
+  await page.click('.nav-seccion[data-seccion="reporte"]');
+  const [d] = await Promise.all([page.waitForEvent('download'), page.click('#btn-csv')]);
+  const texto = fs.readFileSync(await d.path(), 'utf8');
+  afirmar(texto.split(/\r?\n/)[0].includes('indice_mediano_pct'), 'el CSV no tiene columnas EMG');
+});
+
+await verificar('emg: importar inválido', async (page) => {
+  await importar(page, sesionImportada('2026-10-02', { emg: { prueba: { tenar: { picos: [1] } } } }));
+  afirmar(page.dialogos.some((m) => m.includes('No se pudo importar')), `diálogos: ${page.dialogos}`);
+});
+
+await verificar('emg: avisos', async (page) => {
+  afirmar((await page.textContent('#observaciones')).includes('nervio mediano'), 'sin aviso del nervio mediano');
 });
 
 /* ---------- Pulido ---------- */

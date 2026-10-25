@@ -221,7 +221,87 @@ function renderResumen(p) {
     tarjeta('heart', 'Dolor', `${ult.dolorEVA ?? '—'} <small>/ 10</small>`,
       deltaHTML(prev && ult.dolorEVA != null && prev.dolorEVA != null ? ult.dolorEVA - prev.dolorEVA : null, false, '', 0, 'vs. sesión anterior')) +
     tarjeta('calendar', 'Última sesión', fmtFecha(ult.fecha, true),
-      `<span class="muted">hace ${plural(dias(ult.fecha, hoyISO()), 'día', 'días')}</span>`);
+      `<span class="muted">hace ${plural(dias(ult.fecha, hoyISO()), 'día', 'días')}</span>`) +
+    tarjetaMusculo(ses, tarjeta);
+}
+
+/* ---------- Mejora muscular (EMG) ---------- */
+const COLOR_MUSCULO = { tenar: '--s2', flexores: '--s3', extensores: '--s7' };
+const conPruebaEmg = (ses) => ses.filter((s) => s.emg?.prueba);
+
+// Índice del nervio mediano de la última sesión con prueba EMG.
+function tarjetaMusculo(ses, tarjeta) {
+  const pruebas = conPruebaEmg(ses);
+  if (!pruebas.length) return tarjeta('activity', 'Músculo', '—', '<span class="muted">Sin prueba EMG (empieza en la Fase 2)</span>');
+  const m = medidasEmg(pruebas[pruebas.length - 1].emg.prueba, lineaBase(ses));
+  return tarjeta('activity', 'Músculo', m.indiceMediano == null ? '—' : `${fmt(m.indiceMediano)} %`,
+    deltaHTML(m.indiceMediano == null ? null : m.indiceMediano - 100, true, ' puntos', 0, 'índice del nervio mediano · desde la primera prueba'));
+}
+
+// Gráfica plegada de Resumen: % de la primera prueba por músculo y sesión (huecos sin prueba).
+function renderEmg(p) {
+  const ses = sesionesOrdenadas(p);
+  const base = lineaBase(ses);
+  const clave = { tenar: 'tenarPct', flexores: 'flexoresPct', extensores: 'extensoresPct' };
+  nuevoChart('chart-emg', {
+    type: 'line',
+    data: {
+      labels: ses.map((s) => fmtFecha(s.fecha, true)),
+      datasets: MUSCULOS.map((k) => ({
+        label: NOMBRES_MUSCULO[k],
+        data: ses.map((s) => (s.emg?.prueba ? medidasEmg(s.emg.prueba, base)[clave[k]] : null)),
+        borderColor: css(COLOR_MUSCULO[k]), backgroundColor: css(COLOR_MUSCULO[k]),
+        borderWidth: 2, pointRadius: 3, pointBorderColor: css('--surface'), pointBorderWidth: 2, tension: 0.25, spanGaps: true,
+      })),
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end' },
+        tooltip: { filter: (it) => it.parsed.y != null, callbacks: { label: (c) => ` ${c.dataset.label}: ${fmt(c.parsed.y)} %` } },
+      },
+      scales: { x: ejeX(), y: ejeY('% de la primera prueba', { beginAtZero: true, suggestedMax: 150 }) },
+    },
+  });
+}
+
+// Tarjeta "Prueba de fuerza muscular" y señal EMG de la sesión elegida.
+function renderEmgSesion(s, p) {
+  const prueba = s.emg?.prueba;
+  $('#sesion-emg').hidden = !prueba;
+  if (prueba) {
+    const m = medidasEmg(prueba, lineaBase(sesionesOrdenadas(p)));
+    const pctDe = { tenar: m.tenarPct, flexores: m.flexoresPct, extensores: m.extensoresPct };
+    $('#tabla-emg').innerHTML = `<thead><tr><th>Músculo</th><th class="num">Contracciones</th><th class="num">Promedio</th></tr></thead><tbody>${
+      MUSCULOS.map((k) => `<tr>
+        <td><span class="swatch" style="background:var(${COLOR_MUSCULO[k]})"></span>${NOMBRES_MUSCULO[k]}</td>
+        <td class="num">${prueba[k].picos.map((x) => `<span class="emg-pico">${fmt(x)}</span>`).join(' · ')}</td>
+        <td class="num">${fmt(prueba[k].media)} <span class="muted">(${pctDe[k] == null ? '—' : fmt(pctDe[k]) + ' %'})</span></td>
+      </tr>`).join('')}</tbody>`;
+    $('#sesion-emg-cocontraccion').innerHTML = `<b>Co-contracción:</b> ${m.cocontraccion == null ? '—' : fmt(m.cocontraccion) + ' %'}
+      <span class="muted">· índice del nervio mediano: ${m.indiceMediano == null ? '—' : fmt(m.indiceMediano) + ' %'}</span>`;
+  }
+  const senal = s.emg?.senal;
+  const haySenal = !!senal && MUSCULOS.some((k) => senal[k]?.length);
+  $('#sesion-emg-senal').hidden = !haySenal;
+  if (!haySenal || !$('#sesion-emg-senal').open) { charts['chart-emg-senal']?.destroy(); delete charts['chart-emg-senal']; return; }
+  const fs = senal.fs || 10;
+  nuevoChart('chart-emg-senal', {
+    type: 'line',
+    data: {
+      datasets: MUSCULOS.map((k) => ({
+        label: NOMBRES_MUSCULO[k],
+        data: (senal[k] ?? []).map((y, i) => ({ x: i / fs, y })),
+        borderColor: css(COLOR_MUSCULO[k]), backgroundColor: css(COLOR_MUSCULO[k]), borderWidth: 1.5, pointRadius: 0, tension: 0.2,
+      })),
+    },
+    options: {
+      parsing: false,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      plugins: { legend: { position: 'top', align: 'end' } },
+      scales: { x: ejeX({ type: 'linear', title: { display: true, text: 'Tiempo (s)', color: css('--muted') } }), y: ejeY('Unidades EMG', { beginAtZero: true }) },
+    },
+  });
 }
 
 /* ======================= Secciones ======================= */
@@ -311,6 +391,7 @@ function renderEvolucion(p) {
   });
 
   if ($('#mas-indicadores').open) renderIndicador(p);
+  if ($('#mas-emg').open) renderEmg(p);
   renderObservaciones(p, ses);
 }
 
@@ -404,6 +485,20 @@ function renderObservaciones(p, ses) {
     if (c0 != null && c1 != null && c1 < c0 - 1) obs.push({ nivel: 'good', texto: `<b>Consistencia:</b> la variabilidad entre repeticiones bajó de ${fmt(c0, 1)} % a ${fmt(c1, 1)} %.` });
   }
 
+  // EMG: índice del nervio mediano frente a la prueba anterior y co-contracción de la última prueba.
+  const pruebas = conPruebaEmg(ses);
+  if (pruebas.length) {
+    const base = lineaBase(ses);
+    const mUlt = medidasEmg(pruebas[pruebas.length - 1].emg.prueba, base);
+    const mPrev = pruebas.length > 1 ? medidasEmg(pruebas[pruebas.length - 2].emg.prueba, base) : null;
+    if (mPrev?.indiceMediano && mUlt.indiceMediano != null && (mPrev.indiceMediano - mUlt.indiceMediano) / mPrev.indiceMediano > 0.15) {
+      obs.push({ nivel: 'warning', texto: `<b>Índice del nervio mediano:</b> bajó ${fmt(((mPrev.indiceMediano - mUlt.indiceMediano) / mPrev.indiceMediano) * 100)} % respecto a la prueba anterior (${fmt(mPrev.indiceMediano)} % → ${fmt(mUlt.indiceMediano)} %).` });
+    }
+    if (mUlt.cocontraccion != null && mUlt.cocontraccion > 30) {
+      obs.push({ nivel: 'info', texto: `<b>Co-contracción:</b> al apretar, los extensores se activaron al ${fmt(mUlt.cocontraccion)} % de los flexores (más de 30 %).` });
+    }
+  }
+
   const sinSesion = dias(ult.fecha, hoyISO());
   if (sinSesion > 10) obs.push({ nivel: 'info', texto: `<b>Seguimiento:</b> han pasado ${sinSesion} días desde la última sesión registrada.` });
   if (!obs.length) obs.push({ nivel: 'info', texto: 'No se detectaron cambios relevantes en la última sesión.' });
@@ -468,6 +563,7 @@ function renderSesion(p) {
     </tr></thead><tbody>${filas || '<tr><td colspan="8" class="muted">Sin ejercicios medidos por el dispositivo en esta sesión.</td></tr>'}</tbody>`;
 
   renderRutinaSesion(s);
+  renderEmgSesion(s, p);
   // Señal del ejercicio (oculta si la sesión no tiene ejercicios medidos; se dibuja al abrir el <details>)
   $('#sesion-senal').hidden = !s.ejercicios.length;
   renderSenal(s);
@@ -656,6 +752,7 @@ function validarSesion(s) {
   s.perdidaDatosPct ??= 0;
   s.dolorEVA ??= null;
   s.notas ??= '';
+  validarEmg(s.emg);
   return s;
 }
 
@@ -693,12 +790,21 @@ function importarJSON(texto) {
 
 function exportarCSV(p) {
   const enc = ['paciente_id', 'sesion_id', 'fecha', 'dias_postop', 'duracion_min', 'dolor_eva', 'perdida_datos_pct', 'calibracion_s',
-    'ejercicio', 'repeticiones', 'repeticiones_objetivo', 'angulo_max', 'angulo_min', 'velocidad_media', 'variabilidad_pct', 'duracion_s'];
+    'ejercicio', 'repeticiones', 'repeticiones_objetivo', 'angulo_max', 'angulo_min', 'velocidad_media', 'variabilidad_pct', 'duracion_s',
+    'emg_tenar', 'emg_flexores', 'emg_extensores', 'emg_tenar_pct', 'emg_flexores_pct', 'emg_extensores_pct', 'indice_mediano_pct', 'cocontraccion_pct'];
   const filas = [enc.join(';')];
+  const base = lineaBase(p.sesiones);
+  // Columnas EMG por sesión (vacías si la sesión no tiene prueba de fuerza).
+  const columnasEmg = (s) => {
+    const pr = s.emg?.prueba;
+    if (!pr) return Array(8).fill('');
+    const m = medidasEmg(pr, base);
+    return [pr.tenar.media, pr.flexores.media, pr.extensores.media, m.tenarPct, m.flexoresPct, m.extensoresPct, m.indiceMediano, m.cocontraccion];
+  };
   // Una sesión sin ejercicios medidos sale en una fila con las columnas del ejercicio vacías.
   sesionesOrdenadas(p).forEach((s) => (s.ejercicios.length ? s.ejercicios : [{}]).forEach((e) => {
     filas.push([p.id, s.id, s.fecha, dias(p.fechaCirugia, s.fecha), s.duracionMin, s.dolorEVA ?? '', s.perdidaDatosPct, s.calibracion?.tiempoS ?? '',
-      e.tipo, e.repeticiones, e.repeticionesObjetivo, e.anguloMax, e.anguloMin, e.velocidadMedia, e.variabilidadPct, e.duracionS]
+      e.tipo, e.repeticiones, e.repeticionesObjetivo, e.anguloMax, e.anguloMin, e.velocidadMedia, e.variabilidadPct, e.duracionS, ...columnasEmg(s)]
       .map((v) => String(v ?? '').replace('.', ',')).join(';'));
   }));
   descargar(`${p.id}_sesiones.csv`, '﻿' + filas.join('\r\n'), 'text/csv;charset=utf-8');
@@ -740,6 +846,11 @@ function init() {
   }));
   $('#ind-select').addEventListener('change', (e) => { estado.indicador = e.target.value; renderIndicador(paciente()); });
   $('#mas-indicadores').addEventListener('toggle', (e) => { if (e.target.open && paciente()) renderIndicador(paciente()); });
+  $('#mas-emg').addEventListener('toggle', (e) => { if (e.target.open && paciente()) renderEmg(paciente()); });
+  $('#sesion-emg-senal').addEventListener('toggle', () => {
+    const s = paciente()?.sesiones.find((x) => x.id === estado.sesionId);
+    if (s) renderEmgSesion(s, paciente());
+  });
   $('#obs-mas').addEventListener('click', () => {
     document.querySelectorAll('#observaciones .obs-extra').forEach((li) => (li.hidden = false));
     $('#obs-mas').hidden = true;

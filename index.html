@@ -167,6 +167,12 @@
             </div>
             <div class="chart-box"><canvas id="chart-ind"></canvas></div>
           </details>
+
+          <details class="card plegable" id="mas-emg">
+            <summary>Fuerza muscular (EMG)</summary>
+            <p class="muted">Promedio de la prueba de fuerza de cada músculo, en % de la primera prueba (100 %). Empieza en la Fase 2.</p>
+            <div class="chart-box"><canvas id="chart-emg"></canvas></div>
+          </details>
         </div>
 
         <!-- UNA SESIÓN -->
@@ -196,6 +202,21 @@
               <table class="table" id="tabla-rutina"></table>
             </div>
           </div>
+
+          <div class="card" id="sesion-emg" hidden>
+            <div>
+              <h2>Prueba de fuerza muscular</h2>
+              <p class="muted">Pico de cada contracción y promedio, en unidades EMG; entre paréntesis, % de la primera prueba.</p>
+            </div>
+            <div class="table-wrap"><table class="table" id="tabla-emg"></table></div>
+            <p id="sesion-emg-cocontraccion"></p>
+          </div>
+
+          <details class="card plegable" id="sesion-emg-senal" hidden>
+            <summary>Ver señal EMG</summary>
+            <p class="muted">Activación de los 3 músculos durante la rutina (unidades EMG).</p>
+            <div class="chart-box tall"><canvas id="chart-emg-senal"></canvas></div>
+          </details>
 
           <details class="card plegable" id="sesion-senal">
             <summary>Ver señal del sensor</summary>
