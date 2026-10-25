@@ -47,4 +47,16 @@ PRUEBA(lector_descarta_linea_larga) {
   VERIFICAR(listo); TEXTO_IGUAL(l.linea(), "STOP");
 }
 
+PRUEBA(muestra_con_emg) {
+  char b[64];
+  const uint16_t emg[3] = {410, 96, 30};
+  formatearMuestraEmg(b, sizeof b, 7, 140, 12.345f, -3.26f, 0.0f, emg);
+  TEXTO_IGUAL(b, "D,7,140,12.3,-3.3,0.0,410,96,30");
+}
+PRUEBA(comando_prueba_emg) {
+  VERIFICAR(parsearComando("PR,tenar") == TipoComando::Prueba);
+  VERIFICAR(parsearComando("PR,-") == TipoComando::Prueba);
+  VERIFICAR(parsearComando("PR") == TipoComando::Desconocido);
+}
+
 int main() { return correrPruebas(); }

@@ -17,6 +17,7 @@ TipoComando parsearComando(const char* linea) {
   if (strcmp(linea, "RAW") == 0) return TipoComando::Raw;
   if (empiezaCon(linea, "EJ,")) return TipoComando::Ej;
   if (empiezaCon(linea, "MANO,")) return TipoComando::Mano;
+  if (empiezaCon(linea, "PR,")) return TipoComando::Prueba;
   return TipoComando::Desconocido;
 }
 
@@ -66,6 +67,13 @@ int formatearMuestra(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float fe
                      float mcf) {
   return snprintf(buf, tam, "D,%lu,%lu,%.1f,%.1f,%.1f", (unsigned long)seq, (unsigned long)tMs,
                   (double)fe, (double)rc, (double)mcf);
+}
+
+int formatearMuestraEmg(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float fe, float rc,
+                        float mcf, const uint16_t emg[3]) {
+  return snprintf(buf, tam, "D,%lu,%lu,%.1f,%.1f,%.1f,%u,%u,%u", (unsigned long)seq,
+                  (unsigned long)tMs, (double)fe, (double)rc, (double)mcf, (unsigned)emg[0],
+                  (unsigned)emg[1], (unsigned)emg[2]);
 }
 
 int formatearCalOk(char* buf, size_t tam, uint32_t ms) {

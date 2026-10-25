@@ -29,6 +29,18 @@ constexpr bool USAR_MAGNETOMETRO = true;
 // poner en true para transmitir desde el arranque.
 constexpr bool TRANSMITIR_AL_ARRANCAR = false;
 
+// EMG de 3 canales: EMG 1 tenar, EMG 2 flexores, EMG 3 extensores. Con USAR_EMG = false el
+// firmware envía la línea D de 6 campos, como siempre. Con true agrega ",emg1,emg2,emg3" (0–1000).
+constexpr bool USAR_EMG = false;
+enum class ModoEmg { Envolvente, Crudo };
+// Envolvente: el sensor ya entrega la envolvente (p. ej. MyoWare 2.0, salida ENV).
+// Crudo: señal centrada en EMG_CENTRO_MV; se muestrea a 1000 Hz y se envía el RMS de 50 ms.
+constexpr ModoEmg EMG_MODO = ModoEmg::Envolvente;
+constexpr int PINES_EMG[3] = {0, 1, 3};  // ADC del ESP32-C6, sin pines de arranque ni la batería
+constexpr float EMG_MAX_MV = 3300.0f;    // lectura que equivale a 1000
+constexpr float EMG_CENTRO_MV = 1650.0f; // solo en modo crudo
+constexpr size_t EMG_VENTANA_RMS = 50;   // muestras de 1 ms
+
 // Montaje de ejes: placa con los chips hacia arriba sobre el dorso y la flecha X hacia los dedos.
 constexpr Montaje MONTAJE_ACEL = MONTAJE_IDENTIDAD;
 constexpr Montaje MONTAJE_GIRO = MONTAJE_IDENTIDAD;

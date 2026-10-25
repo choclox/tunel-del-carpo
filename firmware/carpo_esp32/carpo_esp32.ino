@@ -10,6 +10,7 @@
 #include "src/nucleo/angulos.h"
 #include "src/nucleo/bateria.h"
 #include "src/nucleo/calibracion.h"
+#include "src/nucleo/emg.h"
 #include "src/nucleo/fusion.h"
 #include "src/nucleo/gy85_datos.h"
 #include "src/nucleo/protocolo.h"
@@ -20,6 +21,11 @@ static Calibrador calibrador;
 static CalibradorMag calibradorMag;
 static VigilanteSensor vigilante;
 static LectorLineas lector;
+static RmsVentana rmsEmg[3] = {RmsVentana(EMG_VENTANA_RMS), RmsVentana(EMG_VENTANA_RMS),
+                               RmsVentana(EMG_VENTANA_RMS)};
+static ReposoEmg reposoEmg;
+static uint16_t emgCrudo[3] = {0, 0, 0};  // último valor 0..1000 en modo crudo (RMS)
+static uint32_t ultimoMsEmg = 0;
 
 static bool detectado = false;
 static bool transmitiendo = TRANSMITIR_AL_ARRANCAR;
@@ -126,6 +132,7 @@ static void iniciarCalibracion(uint32_t ahora) {
   calibrando = true;  // un CAL en curso se reinicia
   filtro.fijarBeta(BETA_NORMAL);
   calibrador.iniciar(ahora);
+  if (USAR_EMG) reposoEmg.iniciar();  // el reposo EMG se mide durante la calibración
 }
 
 static void iniciarMag(uint32_t ahora) {
@@ -153,6 +160,7 @@ static void procesarComando(const char* linea, uint32_t ahora) {
     case TipoComando::Stop: transmitiendo = false; break;  // no cancela la calibración
     case TipoComando::Cal: iniciarCalibracion(ahora); break;
     case TipoComando::Ej: break;
+    case TipoComando::Prueba: break;  // informativo: la prueba EMG la guía la interfaz
     case TipoComando::Mag: iniciarMag(ahora); break;
     case TipoComando::Raw: enviandoRaw = !enviandoRaw; break;
     case TipoComando::Mano: {
@@ -209,6 +217,7 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
     qCal = filtro.orientacion();
     filtro.fijarBeta(BETA_NORMAL);
     calibrando = false;
+    if (USAR_EMG) reposoEmg.terminar();
     formatearCalOk(buf, sizeof(buf), calibrador.duracionMs());
     Serial.println(buf);
   } else if (despues == EstadoCal::Error) {
@@ -239,10 +248,36 @@ static void gestionarMag(const Vec3& mag, bool ok, uint32_t ahora) {
   }
 }
 
+// EMG actual de los 3 canales en 0..1000, sin restar el reposo.
+static void leerEmg(uint16_t v[3]) {
+  for (int i = 0; i < 3; i++) {
+    v[i] = EMG_MODO == ModoEmg::Envolvente
+               ? escalarEmg((float)analogReadMilliVolts(PINES_EMG[i]), EMG_MAX_MV)
+               : emgCrudo[i];
+  }
+}
+
+// Modo crudo: una muestra por canal cada 1 ms y RMS de la ventana (amplitud máxima = mitad del rango).
+static void muestrearEmgCrudo(uint32_t ahora) {
+  if (!USAR_EMG || EMG_MODO != ModoEmg::Crudo || ahora == ultimoMsEmg) return;
+  ultimoMsEmg = ahora;
+  for (int i = 0; i < 3; i++) {
+    float rms = rmsEmg[i].agregar((float)analogReadMilliVolts(PINES_EMG[i]) - EMG_CENTRO_MV);
+    emgCrudo[i] = escalarEmg(rms, EMG_MAX_MV / 2.0f);
+  }
+}
+
 static void enviarMuestra(uint32_t ahora) {
   AngulosMuneca a = angulosRelativos(qCal, filtro.orientacion(), manoIzquierda);
-  char buf[64];
-  formatearMuestra(buf, sizeof(buf), seq, ahora, a.fe, a.rc, 0.0f);
+  char buf[80];
+  if (USAR_EMG) {
+    uint16_t emg[3];
+    leerEmg(emg);
+    reposoEmg.restar(emg);
+    formatearMuestraEmg(buf, sizeof(buf), seq, ahora, a.fe, a.rc, 0.0f, emg);
+  } else {
+    formatearMuestra(buf, sizeof(buf), seq, ahora, a.fe, a.rc, 0.0f);
+  }
   Serial.println(buf);
 }
 
@@ -302,6 +337,11 @@ static void cicloFusion(uint32_t ahora) {
     actualizarFiltro(giro, acel, mag, dt);
   }
 
+  if (USAR_EMG && calibrando) {
+    uint16_t emg[3];
+    leerEmg(emg);
+    reposoEmg.agregar(emg);
+  }
   gestionarCalibracion(giro, acel, ok, ahora);
   gestionarMag(mag, ok, ahora);
 
@@ -342,6 +382,7 @@ void setup() {
 void loop() {
   uint32_t ahora = millis();
   leerComandos(ahora);
+  muestrearEmgCrudo(ahora);
 
   if ((int32_t)(ahora - proximaFusion) >= 0) {
     proximaFusion += PERIODO_FUSION_MS;

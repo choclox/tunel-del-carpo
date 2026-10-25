@@ -3,9 +3,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum class TipoComando { Start, Stop, Cal, Ej, Mag, Raw, Mano, Desconocido };
+enum class TipoComando { Start, Stop, Cal, Ej, Mag, Raw, Mano, Prueba, Desconocido };
 
-// Comparacion exacta y sensible a mayusculas. "EJ," y "MANO," se reconocen por prefijo.
+// Comparacion exacta y sensible a mayusculas. "EJ,", "MANO," y "PR," se reconocen por prefijo.
+// "PR,<musculo>" / "PR,-" marca la prueba de fuerza EMG: es informativo (no hace nada).
 TipoComando parsearComando(const char* linea);
 
 // "MANO,I" -> izquierda = true; "MANO,D" -> izquierda = false; otro valor -> false.
@@ -29,6 +30,9 @@ class LectorLineas {
 // "D,<seq>,<t>,<fe>,<rc>,<mcf>" con %.1f, sin '\n'. Devuelve la longitud (como snprintf).
 int formatearMuestra(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float fe, float rc,
                      float mcf);
+// Igual que formatearMuestra con ",<emg1>,<emg2>,<emg3>" (tenar, flexores, extensores; 0..1000).
+int formatearMuestraEmg(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float fe, float rc,
+                        float mcf, const uint16_t emg[3]);
 int formatearCalOk(char* buf, size_t tam, uint32_t ms);
 int formatearCalErr(char* buf, size_t tam, const char* motivo);
 int formatearBateria(char* buf, size_t tam, int pct);
