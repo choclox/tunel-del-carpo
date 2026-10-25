@@ -29,7 +29,7 @@ let fallas = 0;
 const SESION_PRUEBA = { nombre: 'Prueba', profesion: 'Fisioterapeuta', correo: 'prueba@kinemo.co' };
 
 // ruta: '' es el panel. sesion: la que se siembra una sola vez por pestaña (null = sin sesión).
-async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA } = {}) {
+async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {} } = {}) {
   const ctx = await navegador.newContext({ viewport, acceptDownloads: true });
   if (sesion) {
     await ctx.addInitScript((s) => {
@@ -42,6 +42,10 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   await ctx.route('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/**', (r) =>
     fs.existsSync(CHART_LOCAL) ? r.fulfill({ path: CHART_LOCAL, contentType: 'text/javascript' }) : r.continue());
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  // rutas: { 'archivo.js': contenido } reemplaza archivos del sitio (p. ej. para simular que no cargó).
+  for (const [archivo, cuerpo] of Object.entries(rutas)) {
+    await ctx.route(new RegExp(`/${archivo.replace('.', '\\.')}$`), (r) => r.fulfill({ body: cuerpo, contentType: 'text/javascript' }));
+  }
   const page = await ctx.newPage();
   page.errores = [];
   page.on('pageerror', (e) => page.errores.push(e.message));
@@ -159,6 +163,30 @@ await verificar('aviso de demostración', async (page) => {
   await page.click('#tab-registro');
   afirmar(await page.isVisible('.aviso-demo'), 'sin aviso en Crear cuenta');
 }, SIN_SESION);
+
+async function entrarCon(page) {
+  await page.fill('#form-login [name=correo]', 'ana@x.com');
+  await page.fill('#form-login [name=clave]', 'x');
+  await Promise.all([page.waitForURL(/index\.html$/), page.click('#form-login button[type=submit]')]);
+  await page.waitForSelector('.patient-item');
+  afirmar((await page.textContent('.usuario-nombre')).trim() === 'ana', 'no muestra al profesional');
+}
+
+await verificar('almacenamiento que no deja escribir: igual entra', entrarCon, {
+  ...SIN_SESION, init: () => { Storage.prototype.setItem = () => { throw new Error('bloqueado'); }; },
+});
+
+await verificar('almacenamiento bloqueado del todo: igual entra', entrarCon, {
+  ...SIN_SESION, init: () => { Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('denegado', 'SecurityError'); } }); },
+});
+
+await verificar('sin login.js la contraseña no va a la URL', async (page) => {
+  await page.fill('#form-login [name=correo]', 'ana@x.com');
+  await page.fill('#form-login [name=clave]', 'secreta-123');
+  await page.click('#form-login button[type=submit]');
+  await page.waitForTimeout(500);
+  afirmar(!page.url().includes('secreta-123'), `la contraseña quedó en la URL: ${page.url()}`);
+}, { ...SIN_SESION, rutas: { 'login.js': '' } });
 
 /* ---------- Panel protegido ---------- */
 await verificar('sin sesión va al login', async (page) => {
