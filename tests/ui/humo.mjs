@@ -339,6 +339,7 @@ await verificar('rutina guarda señal EMG', async (page) => {
 
 await verificar('rutina completa con simulador', async (page) => {
   await irEjercicios(page);
+  await page.click('#rt-etapas [data-etapa="1"]');
   await page.click('#rt-iniciar');
   await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
   await page.click('#ls-empezar');
@@ -359,6 +360,61 @@ await verificar('rutina completa con simulador', async (page) => {
   });
   afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
+
+/* ---------- Prueba de fuerza muscular ---------- */
+const PRUEBA_RAPIDA = () => { window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; };
+
+await verificar('prueba: fase 2 completa', async (page) => {
+  await grabarRutina(page, 2);
+  await page.waitForSelector('#dlg-prueba[open]');
+  for (let i = 0; i < 3; i++) {
+    await page.waitForSelector('#pr-siguiente:not([disabled])', { timeout: 15000 });
+    await page.click('#pr-siguiente');
+  }
+  await page.waitForSelector('#dlg-fin[open]');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  const p = (await ultimaSesion(page)).emg?.prueba;
+  afirmar(p && p.tenar.picos.length === 3 && p.flexores.extensoresDuranteFlexores > 0, JSON.stringify(p));
+  afirmar(p.tenar.media > 300 && p.extensores.media > 300, `medias: ${p.tenar.media}, ${p.extensores.media}`);
+}, { init: PRUEBA_RAPIDA });
+
+await verificar('prueba: fase 1 no aparece', async (page) => {
+  await grabarRutina(page, 1);
+  await page.waitForSelector('#dlg-fin[open]');
+  afirmar(!(await page.isVisible('#dlg-prueba')), 'apareció la prueba en Fase 1');
+}, { init: PRUEBA_RAPIDA });
+
+await verificar('prueba: sin EMG no aparece', async (page) => {
+  await grabarRutina(page, 2);
+  await page.waitForSelector('#dlg-fin[open]');
+  afirmar(!(await page.isVisible('#dlg-prueba')), 'apareció la prueba sin EMG');
+}, { init: () => { window.SIMULADOR_SIN_EMG = true; window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; } });
+
+await verificar('prueba: omitir', async (page) => {
+  await grabarRutina(page, 2);
+  await page.click('#pr-omitir');
+  await page.waitForSelector('#dlg-fin[open]');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  afirmar((await ultimaSesion(page)).emg?.prueba === null, 'la prueba no es null');
+}, { init: PRUEBA_RAPIDA });
+
+await verificar('prueba: Esc omite', async (page) => {
+  await grabarRutina(page, 2);
+  await page.waitForSelector('#dlg-prueba[open]');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#dlg-fin[open]');
+  afirmar(await page.isVisible('#fin-guardar'), 'no se puede guardar la rutina');
+}, { init: PRUEBA_RAPIDA });
+
+await verificar('prueba: desconexión', async (page) => {
+  await grabarRutina(page, 2);
+  await page.waitForSelector('#dlg-prueba[open]');
+  await page.evaluate(() => desconectar());
+  await page.waitForFunction(() => document.body.innerText.includes('Se perdió la conexión: la prueba no se completó.'));
+  await page.waitForSelector('#dlg-fin[open]', { timeout: 15000 });
+}, { init: PRUEBA_RAPIDA });
 
 await verificar('videos nuevos de la fase 1', async (page) => {
   await irEjercicios(page);

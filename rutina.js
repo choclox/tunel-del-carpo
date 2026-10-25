@@ -284,7 +284,11 @@ function terminarRutina() {
   rt = null;
   modoRutina = null; // antes de cerrar: el evento 'close' (asíncrono) ya no ve una grabación
   if ($('#dlg-rutina').open) cerrarDlgRutina();
-  abrirFin();
+  // Fase 2 y 3 con EMG: la prueba de fuerza muscular va antes de "Rutina terminada".
+  const etapa = mv.sesion?.rutina?.etapa ?? etapaElegida;
+  const hayPasos = !!mv.sesion?.rutina?.pasos.length;
+  if (hayPasos && mv.conectado && debeHacerPrueba(etapa, mv.sesion?.conEmg)) abrirPrueba(abrirFin);
+  else abrirFin();
 }
 
 function abrirFin() {

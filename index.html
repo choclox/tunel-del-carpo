@@ -436,6 +436,26 @@
     </div>
   </dialog>
 
+  <!-- Prueba de fuerza muscular (EMG) -->
+  <dialog id="dlg-prueba" class="dlg-prueba" aria-labelledby="pr-titulo">
+    <div class="eyebrow" id="pr-paso"></div>
+    <h2 id="pr-titulo">Prueba de fuerza muscular</h2>
+    <div class="pr-bloque">
+      <p class="pr-musculo" id="pr-musculo"></p>
+      <p class="pr-indicacion" id="pr-indicacion"></p>
+      <p class="pr-cuenta" id="pr-cuenta" aria-live="assertive"></p>
+      <p class="muted" id="pr-contador"></p>
+      <div class="pr-barra-pista" role="img" aria-label="Activación del músculo"><div class="pr-barra" id="pr-barra"></div></div>
+      <p class="pr-resultado" id="pr-resultado" aria-live="polite"></p>
+      <p class="pr-dudosa" id="pr-dudosa" hidden>Una contracción salió más débil que las otras.</p>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" id="pr-omitir">Omitir prueba</button>
+      <button class="btn" id="pr-repetir" hidden><svg class="ic"><use href="#i-refresh"/></svg>Repetir este músculo</button>
+      <button class="btn btn-primary" id="pr-siguiente" disabled>Siguiente músculo</button>
+    </div>
+  </dialog>
+
   <!-- Rutina terminada -->
   <dialog id="dlg-fin" class="dlg-fin" aria-labelledby="fin-titulo">
     <div class="eyebrow" id="fin-etapa"></div>
@@ -469,5 +489,6 @@
   <script src="emg.js"></script>
   <script src="monitoreo.js"></script>
   <script src="rutina.js"></script>
+  <script src="prueba-emg.js"></script>
 </body>
 </html>

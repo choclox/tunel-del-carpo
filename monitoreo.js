@@ -553,6 +553,7 @@ function alPerderConexion(motivo) {
     const registro = finalizarEjercicio();
     if (mv.paso) mv.paso.registro = registro;
   }
+  if (typeof pruebaPerdioConexion === 'function') pruebaPerdioConexion();
   if (mv.paso) toast('Se perdió la conexión: los ejercicios siguientes quedarán sin datos.');
   else if (motivo) toast(motivo);
   mv.conectado = false;
