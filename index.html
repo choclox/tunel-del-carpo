@@ -253,86 +253,71 @@
 
         <!-- ===== EJERCICIOS ===== -->
         <section class="seccion tab-panel" data-seccion="ejercicios" hidden>
-          <div class="live-top">
-            <div class="card">
-              <div class="card-head">
-                <div>
-                  <div class="eyebrow">Dispositivo</div>
-                  <h2>Conexión con el dispositivo</h2>
-                  <p class="muted" id="mv-paciente"></p>
+          <div class="card" id="rt-tarjeta">
+            <p class="muted" id="mv-paciente"></p>
+            <ol class="pasos-guia">
+              <li class="paso-guia" data-paso="1">
+                <span class="paso-num" aria-hidden="true">1</span>
+                <div class="paso-cuerpo">
+                  <h2 class="paso-titulo">Conecte el dispositivo</h2>
+                  <div class="paso-fila">
+                    <span class="badge" id="mv-estado"><span class="dot"></span>Desconectado</span>
+                    <button class="btn" id="mv-conectar">Conectar</button>
+                  </div>
+                  <p class="muted" id="mv-ayuda-conexion">Si no hay dispositivo, la rutina usa el simulador.</p>
                 </div>
-                <span class="badge" id="mv-estado"><span class="dot"></span>Desconectado</span>
-              </div>
-              <div class="live-controls">
-                <label>Origen
-                  <select id="mv-origen">
-                    <option value="usb">Dispositivo USB (puerto serie)</option>
-                    <option value="simulador">Simulador (sin hardware)</option>
-                  </select>
-                </label>
-                <label id="mv-baud-wrap">Velocidad
-                  <select id="mv-baud">
-                    <option>115200</option><option>57600</option><option>38400</option><option>9600</option>
-                  </select>
-                </label>
-                <button class="btn btn-primary" id="mv-conectar">Conectar</button>
-              </div>
-              <p class="muted" id="mv-soporte" hidden>Este navegador no permite conectar dispositivos USB. Use Google Chrome o Microsoft Edge, o el simulador.</p>
-              <div class="live-stats" id="mv-stats"></div>
-            </div>
+              </li>
+              <li class="paso-guia" data-paso="2">
+                <span class="paso-num" aria-hidden="true">2</span>
+                <div class="paso-cuerpo">
+                  <h2 class="paso-titulo">Elija la fase</h2>
+                  <div class="seg" id="rt-etapas" role="group" aria-label="Fase de la rutina"></div>
+                  <p><b id="rt-etapa-titulo"></b> <span class="muted" id="rt-etapa-sug"></span></p>
+                  <details class="rt-detalle">
+                    <summary>Ver los ejercicios de esta fase</summary>
+                    <p id="rt-etapa-desc"></p>
+                    <ol class="rt-pasos" id="rt-pasos"></ol>
+                    <div class="rt-cuidado-gral">
+                      <b>Cuidado general</b>
+                      <ul class="rt-lista" id="rt-cuidado-gral"></ul>
+                    </div>
+                    <p class="muted rt-aviso">Rutina orientativa. El profesional debe ajustarla a cada paciente.</p>
+                    <button class="btn" id="rt-revisar"><svg class="ic"><use href="#i-play"/></svg>Ver videos</button>
+                  </details>
+                </div>
+              </li>
+              <li class="paso-guia" data-paso="3">
+                <span class="paso-num" aria-hidden="true">3</span>
+                <div class="paso-cuerpo">
+                  <h2 class="paso-titulo">Empiece la rutina</h2>
+                  <p class="muted">Antes de empezar se calibra solo: mano quieta y en posición neutra.</p>
+                  <button class="btn btn-primary btn-grande" id="rt-iniciar"><svg class="ic"><use href="#i-play"/></svg>Empezar rutina</button>
+                </div>
+              </li>
+            </ol>
+          </div>
 
-            <div class="card card-mint">
-              <div class="card-head">
-                <div>
-                  <div class="eyebrow">Paso 1</div>
-                  <h2>Calibración inicial</h2>
-                  <p class="muted">Con la mano en posición neutra y en reposo. Criterio: completar en ≤ 30 s.</p>
-                </div>
-                <span class="icon-bubble"><svg class="ic"><use href="#i-target"/></svg></span>
-              </div>
+          <details class="card plegable" id="det-tecnicos">
+            <summary>Datos técnicos del dispositivo</summary>
+            <div class="live-controls">
+              <label>Origen
+                <select id="mv-origen">
+                  <option value="usb">Dispositivo USB (puerto serie)</option>
+                  <option value="simulador">Simulador (sin hardware)</option>
+                </select>
+              </label>
+              <label id="mv-baud-wrap">Velocidad
+                <select id="mv-baud">
+                  <option>115200</option><option>57600</option><option>38400</option><option>9600</option>
+                </select>
+              </label>
               <button class="btn" id="mv-calibrar" disabled>Calibrar</button>
               <div id="mv-cal" class="muted">Sin calibrar.</div>
             </div>
-          </div>
-
-          <div class="card" id="rt-tarjeta">
-            <div class="card-head">
-              <div>
-                <div class="eyebrow">Etapa del tratamiento</div>
-                <h2>Rutina de rehabilitación</h2>
-              </div>
-              <div class="seg" id="rt-etapas" role="group" aria-label="Etapa de la rutina"></div>
-            </div>
-            <div class="rt-etapa">
-              <h3 id="rt-etapa-titulo"></h3>
-              <p id="rt-etapa-desc"></p>
-              <p class="muted" id="rt-etapa-sug"></p>
-            </div>
-            <div class="rt-tarjeta-grid">
-              <ol class="rt-pasos" id="rt-pasos"></ol>
-              <div class="rt-cuidado-gral">
-                <div class="eyebrow">Cuidado general</div>
-                <ul class="rt-lista" id="rt-cuidado-gral"></ul>
-              </div>
-            </div>
-            <p class="muted rt-aviso">Rutina orientativa. El profesional debe ajustarla a cada paciente.</p>
-            <div class="dlg-actions">
-              <button class="btn" id="rt-revisar"><svg class="ic"><use href="#i-file"/></svg>Revisar rutina</button>
-              <button class="btn btn-primary" id="rt-iniciar"><svg class="ic"><use href="#i-play"/></svg>Iniciar rutina</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <div class="eyebrow">Paso 2 · En vivo</div>
-                <h2>Señal en vivo</h2>
-                <p class="muted" id="mv-ej-ayuda">La grabación se inicia desde la rutina de rehabilitación.</p>
-              </div>
-            </div>
+            <div class="live-stats" id="mv-stats"></div>
             <div class="live-readouts" id="mv-lecturas"></div>
             <div class="chart-box tall"><canvas id="chart-vivo"></canvas></div>
-          </div>
+          </details>
         </section>
       </div>
 

@@ -1,4 +1,4 @@
-/* Rutina de rehabilitación por etapa: tarjeta de la pestaña "Monitoreo en vivo" y las tres
+/* Rutina de rehabilitación por etapa: pasos de la sección "Ejercicios" y las tres
  * ventanas (#dlg-rutina en modo revisión o grabación, #dlg-listos "¿Listos para empezar?" y
  * #dlg-fin "Rutina terminada"). Las funciones de la primera parte son puras (sin DOM) para
  * poder probarlas con `node --test`; la segunda parte solo corre en el navegador.

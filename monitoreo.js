@@ -551,7 +551,8 @@ function estadoConexion() {
 function renderMonitor() {
   mv.chart = null; // se recrea con los colores del tema actual
   const p = estado.db.pacientes.find((x) => x.id === (mv.sesion?.pacienteId ?? estado.pacienteId));
-  $('#mv-paciente').textContent = p ? `Registrando para: ${p.nombre} (${p.id})` : '';
+  $('#mv-paciente').textContent = mv.sesion && p ? `Registrando para: ${p.nombre} (${p.id})` : '';
+  $('#mv-paciente').hidden = !$('#mv-paciente').textContent;
   renderMonitorControles();
   refrescar();
   renderTarjetaRutina();
@@ -562,14 +563,15 @@ function renderMonitorControles() {
   const optUsb = $('#mv-origen option[value="usb"]');
   optUsb.disabled = sinSerial;
   if (sinSerial && $('#mv-origen').value === 'usb') $('#mv-origen').value = 'simulador';
-  $('#mv-soporte').hidden = !sinSerial;
+  $('#mv-ayuda-conexion').textContent = sinSerial
+    ? 'Este navegador no puede conectar el dispositivo: se usará el simulador.'
+    : 'Si no hay dispositivo, la rutina usa el simulador.';
   $('#mv-baud-wrap').hidden = $('#mv-origen').value !== 'usb';
   $('#mv-origen').disabled = $('#mv-baud').disabled = mv.conectado || mv.conectando;
 
   const btn = $('#mv-conectar');
   btn.textContent = mv.conectando ? 'Conectando…' : mv.conectado ? 'Desconectar' : 'Conectar';
   btn.disabled = mv.conectando;
-  btn.classList.toggle('btn-primary', !mv.conectado);
 
   const est = estadoConexion();
   $('#mv-estado').innerHTML = `<span class="dot ${est.dot}"></span>${est.txt}`;
@@ -675,6 +677,7 @@ function crearChartVivo() {
 }
 
 function actualizarChartVivo() {
+  if (!$('#det-tecnicos').open) return; // plegado: se dibuja al abrir
   if (!mv.chart) crearChartVivo();
   const ds = mv.chart.data.datasets;
   const b = mv.buffer;
@@ -716,6 +719,7 @@ function initMonitor() {
   $('#mv-origen').addEventListener('change', renderMonitorControles);
   $('#mv-conectar').addEventListener('click', alternarConexion);
   $('#mv-calibrar').addEventListener('click', calibrar);
+  $('#det-tecnicos').addEventListener('toggle', (e) => { if (e.target.open) { mv.chart = null; refrescar(); } });
   window.addEventListener('beforeunload', (ev) => {
     if (sesionTieneDatos()) { ev.preventDefault(); ev.returnValue = ''; }
   });

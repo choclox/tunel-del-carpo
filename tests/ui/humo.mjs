@@ -35,7 +35,9 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init } = {
   const page = await ctx.newPage();
   page.errores = [];
   page.on('pageerror', (e) => page.errores.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|net::/.test(m.text())) page.errores.push(m.text()); });
+  // Los 404 se revisan por URL: los videos que faltan son esperados ("Video no adjuntado").
+  page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|net::|Failed to load resource/.test(m.text())) page.errores.push(m.text()); });
+  page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('.mp4')) page.errores.push(`${r.status()} ${r.url()}`); });
   page.on('dialog', (d) => d.accept());
   page.setDefaultTimeout(10000);
   await page.goto(URL_APP);
@@ -51,7 +53,7 @@ async function verificar(nombre, fn, opciones) {
     console.log('✓', nombre);
   } catch (e) {
     fallas++;
-    console.log('✗', nombre, '—', e.message.split('\n')[0]);
+    console.log('✗', nombre, '—', process.env.DEPURAR ? e.message : e.message.split('\n')[0]);
   } finally {
     await page.context().close();
   }
@@ -127,6 +129,52 @@ await verificar('tabla de sesión corta', async (page) => {
   afirmar(!(await page.locator('#tabla-ejercicios thead th.col-extra').first().isVisible()), 'columnas extra visibles');
   await page.click('#btn-columnas');
   afirmar(await page.locator('#tabla-ejercicios thead th.col-extra').first().isVisible(), 'no se muestran las columnas extra');
+});
+
+/* ---------- Ejercicios ---------- */
+const irEjercicios = (page) => page.click('.nav-seccion[data-seccion="ejercicios"]');
+
+await verificar('tres pasos', async (page) => {
+  await irEjercicios(page);
+  const titulos = await page.$$eval('.paso-guia', (ps) => ps.map((p) => p.querySelector('.paso-titulo').textContent.trim()));
+  afirmar(JSON.stringify(titulos) === JSON.stringify(['Conecte el dispositivo', 'Elija la fase', 'Empiece la rutina']), `pasos: ${titulos}`);
+  const primarios = page.locator('section.seccion[data-seccion="ejercicios"] .btn-primary:visible');
+  afirmar(await primarios.count() === 1 && await primarios.getAttribute('id') === 'rt-iniciar', 'el único primario no es #rt-iniciar');
+});
+
+await verificar('técnicos plegados', async (page) => {
+  await irEjercicios(page);
+  const det = await page.$eval('#det-tecnicos', (d) => ({ open: d.open, chart: !!d.querySelector('#chart-vivo'), stats: !!d.querySelector('#mv-stats') }));
+  afirmar(!det.open && det.chart && det.stats, JSON.stringify(det));
+});
+
+await verificar('sin web serial', async (page) => {
+  await irEjercicios(page);
+  const txt = await page.textContent('.paso-guia[data-paso="1"]');
+  afirmar(txt.includes('se usará el simulador'), `paso 1: ${txt.trim().slice(0, 120)}`);
+}, { init: () => { delete Navigator.prototype.serial; } });
+
+await verificar('rutina completa con simulador', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-iniciar');
+  await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
+  await page.click('#ls-empezar');
+  await page.waitForSelector('#dlg-rutina[open]');
+  await page.waitForTimeout(2500); // un paso necesita ≥ 1 s y ≥ 25 muestras para guardarse
+  afirmar(await page.isVisible('#nav-ejercicios-dot'), 'sin punto de grabación en Ejercicios');
+  for (let i = 0; i < 20 && (await page.textContent('#rt-siguiente-txt')).trim() !== 'Terminar rutina'; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(700);
+  }
+  await page.click('#rt-siguiente');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  afirmar(await seccionActiva(page) === 'seguimiento', 'no volvió a Seguimiento');
+  const r = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    return { vista: estado.vista, nueva: p.sesiones[p.sesiones.length - 1].id, sel: document.querySelector('#sesion-select').value };
+  });
+  afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
 
 await navegador.close();
