@@ -23,4 +23,17 @@ function recortarObservaciones(obs, max = 3) {
   return { visibles: orden.slice(0, max), ocultas: orden.slice(max) };
 }
 
-if (typeof module !== 'undefined') module.exports = { SECCIONES, VISTAS_SEGUIMIENTO, normalizarRuta, seccionInicial, recortarObservaciones };
+/* Pasos de la sesión guiada: Chequeo → Dispositivo → Rutina → Prueba EMG → Cierre → Resumen. */
+const PASOS_SESION = ['Chequeo', 'Dispositivo', 'Rutina', 'Prueba EMG', 'Cierre', 'Resumen'];
+
+// actual: índice del paso en curso (0–5). Los anteriores salen "hecho"; la prueba EMG, "omitido" si no aplica.
+function htmlPasosSesion(actual, { pruebaOmitida = false } = {}) {
+  return `<ol class="pasos-sesion-lista">${PASOS_SESION.map((nombre, i) => {
+    const omitido = pruebaOmitida && i === 3 && i !== actual;
+    const clase = i === actual ? 'actual' : omitido ? 'omitido' : i < actual ? 'hecho' : '';
+    const marca = clase === 'hecho' ? '✓' : clase === 'omitido' ? '–' : i + 1;
+    return `<li class="${clase}"${i === actual ? ' aria-current="step"' : ''}><span class="paso-marca">${marca}</span>${nombre}${omitido ? ' (omitida)' : ''}</li>`;
+  }).join('')}</ol>`;
+}
+
+if (typeof module !== 'undefined') module.exports = { SECCIONES, VISTAS_SEGUIMIENTO, normalizarRuta, seccionInicial, recortarObservaciones, PASOS_SESION, htmlPasosSesion };

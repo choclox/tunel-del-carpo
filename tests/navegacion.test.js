@@ -1,7 +1,7 @@
 // interfaz-medico/tests/navegacion.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { SECCIONES, VISTAS_SEGUIMIENTO, normalizarRuta, seccionInicial, recortarObservaciones } = require('../navegacion.js');
+const { SECCIONES, VISTAS_SEGUIMIENTO, normalizarRuta, seccionInicial, recortarObservaciones, PASOS_SESION, htmlPasosSesion } = require('../navegacion.js');
 
 test('secciones y vistas', () => {
   assert.deepStrictEqual(SECCIONES, ['ejercicios', 'seguimiento', 'reporte']);
@@ -27,4 +27,12 @@ test('recortarObservaciones ordena por gravedad y corta', () => {
   assert.deepStrictEqual(r.visibles.map((x) => x.texto), ['c', 'w', 'i1']);
   assert.deepStrictEqual(r.ocultas.map((x) => x.texto), ['i2', 'g']);
   assert.deepStrictEqual(recortarObservaciones([], 3), { visibles: [], ocultas: [] });
+});
+
+test('pasos de la sesión', () => {
+  assert.deepStrictEqual(PASOS_SESION, ['Chequeo', 'Dispositivo', 'Rutina', 'Prueba EMG', 'Cierre', 'Resumen']);
+  const clases = (html) => [...html.matchAll(/<li class="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(clases(htmlPasosSesion(2)), ['hecho', 'hecho', 'actual', '', '', '']);
+  assert.deepStrictEqual(clases(htmlPasosSesion(4, { pruebaOmitida: true })), ['hecho', 'hecho', 'hecho', 'omitido', 'actual', '']);
+  assert.ok(htmlPasosSesion(0).includes('aria-current="step"'));
 });

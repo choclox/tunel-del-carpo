@@ -152,6 +152,8 @@ function abrirDlgRutina(modo) {
   etapaRutina = etapaPorNumero(etapaElegida);
   rt = crearRutina(etapaRutina.pasos);
   if (modo === 'grabacion') iniciarPasoSiFalta();
+  $('#dlg-rutina .pasos-sesion').hidden = modo !== 'grabacion';
+  if (modo === 'grabacion') pintarPasosSesion($('#dlg-rutina'), 2);
   mostrarPaso();
   clearInterval(timerContador);
   if (modo === 'grabacion') timerContador = setInterval(actualizarContador, 250);
@@ -215,6 +217,7 @@ async function abrirListos() {
   $('#ls-resumen').textContent = `${plural(e.pasos.length, 'ejercicio', 'ejercicios')} · Paciente: ${p.nombre}`;
   $('#ls-empezar').disabled = true;
   actualizarListos();
+  pintarPasosSesion($('#dlg-listos'), 1);
   $('#dlg-listos').showModal();
   clearInterval(timerListos);
   timerListos = setInterval(actualizarListos, 200);
@@ -312,6 +315,7 @@ function abrirFin() {
   $('#fin-dolor').value = '';
   $('#fin-notas').value = '';
   if (!hay && mv.sesion) descartarSesion(false); // nada que guardar
+  pintarPasosSesion($('#dlg-fin'), 4);
   $('#dlg-fin').showModal();
 }
 
@@ -346,7 +350,7 @@ function initRutina() {
     renderTarjetaRutina();
   });
   $('#rt-revisar').addEventListener('click', abrirRevision);
-  $('#rt-iniciar').addEventListener('click', abrirListos);
+  $('#rt-iniciar').addEventListener('click', () => abrirChequeo(abrirListos)); // paso 1: chequeo
 
   $('#rt-cerrar').addEventListener('click', () => {
     if (modoRutina === 'grabacion') pedirTerminar(); else cerrarDlgRutina();

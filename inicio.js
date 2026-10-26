@@ -129,6 +129,7 @@ function empezarSesionCon(id) {
   seleccionarPaciente(id);
   if (estado.pacienteId !== id) return; // hay una sesión en vivo sin guardar y no se quiso descartar
   irA('ejercicios');
+  abrirChequeo(abrirListos); // paso 1 de la sesión guiada
 }
 
 function renderElegirPaciente() {

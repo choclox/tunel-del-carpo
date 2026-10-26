@@ -387,11 +387,20 @@ await verificar('sin web serial', async (page) => {
   afirmar(txt.includes('se usará el simulador'), `paso 1: ${txt.trim().slice(0, 120)}`);
 }, { init: () => { delete Navigator.prototype.serial; } });
 
+// Chequeo de seguridad (paso 1): dolor ahora, sin hormigueo, herida bien → Continuar.
+async function completarChequeo(page, { dolor = 2, bajar = false } = {}) {
+  await page.waitForSelector('#dlg-chequeo[open]');
+  await page.fill('#ch-dolor', String(dolor));
+  if (bajar) await page.click('#ch-bajar');
+  await page.click('#ch-continuar');
+}
+
 // Graba una rutina con el simulador hasta pulsar "Terminar rutina" (etapa: 1–3 o null = la sugerida).
-async function grabarRutina(page, etapa = null) {
+async function grabarRutina(page, etapa = null, chequeo = {}) {
   await irEjercicios(page);
   if (etapa) await page.click(`#rt-etapas [data-etapa="${etapa}"]`);
   await page.click('#rt-iniciar');
+  await completarChequeo(page, chequeo);
   await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
   await page.click('#ls-empezar');
   await page.waitForSelector('#dlg-rutina[open]');
@@ -442,6 +451,7 @@ await verificar('rutina completa con simulador', async (page) => {
   await irEjercicios(page);
   await page.click('#rt-etapas [data-etapa="1"]');
   await page.click('#rt-iniciar');
+  await completarChequeo(page);
   await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
   await page.click('#ls-empezar');
   await page.waitForSelector('#dlg-rutina[open]');
@@ -462,8 +472,75 @@ await verificar('rutina completa con simulador', async (page) => {
   afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
 
-/* ---------- Prueba de fuerza muscular ---------- */
 const PRUEBA_RAPIDA = () => { window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; };
+
+/* ---------- Chequeo de seguridad y pasos ---------- */
+await verificar('chequeo: aparece antes', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-iniciar');
+  await page.waitForSelector('#dlg-chequeo[open]');
+  afirmar(!(await page.isVisible('#dlg-listos')), 'se abrió "¿Listos?" antes del chequeo');
+});
+
+await verificar('chequeo: dolor obligatorio', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-iniciar');
+  await page.click('#ch-continuar');
+  afirmar((await page.textContent('#ch-error')).includes('Indique el dolor de 0 a 10.'), 'sin aviso de dolor');
+  afirmar(!(await page.isVisible('#dlg-listos')), 'continuó sin dolor');
+});
+
+await verificar('chequeo: detener', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-iniciar');
+  await page.fill('#ch-dolor', '1');
+  await page.selectOption('#ch-herida', 'abierta');
+  afirmar((await page.textContent('#ch-no-hacer')).trim() === 'No hacer la sesión hoy', 'sin "No hacer la sesión hoy"');
+  afirmar(await page.isHidden('#ch-continuar'), '"Continuar" sigue visible');
+  afirmar(await page.isDisabled('#ch-continuar-criterio'), 'se puede continuar sin marcar la casilla');
+  await page.check('#ch-criterio');
+  afirmar(await page.isEnabled('#ch-continuar-criterio'), 'no se habilita al marcar la casilla');
+  await page.click('#ch-no-hacer');
+  afirmar(!(await page.isVisible('#dlg-chequeo')) && !(await page.isVisible('#dlg-listos')), 'no se cerró sin empezar');
+});
+
+await verificar('chequeo: bajar de fase', async (page) => {
+  await grabarRutina(page, 2, { dolor: 5, bajar: true });
+  await page.waitForSelector('#dlg-fin[open]');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  const s = await ultimaSesion(page);
+  afirmar(s.rutina.etapa === 1 && s.chequeo.nivel === 'precaucion', `etapa ${s.rutina.etapa}, nivel ${s.chequeo?.nivel}`);
+}, { init: PRUEBA_RAPIDA });
+
+await verificar('chequeo: Esc no empieza', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-iniciar');
+  await page.waitForSelector('#dlg-chequeo[open]');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  afirmar(!(await page.isVisible('#dlg-chequeo')) && !(await page.isVisible('#dlg-listos')), 'Esc empezó la sesión');
+});
+
+await verificar('chequeo: se guarda', async (page) => {
+  await grabarRutina(page, 1);
+  await page.waitForSelector('#dlg-fin[open]');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  const c = (await ultimaSesion(page)).chequeo;
+  afirmar(c && c.dolorAntes === 2 && c.nivel === 'ok' && c.hormigueo === 'no' && c.herida === 'bien' && c.continuoBajoCriterio === false, JSON.stringify(c));
+});
+
+await verificar('pasos: visibles', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-iniciar');
+  afirmar((await page.textContent('#dlg-chequeo [aria-current=step]')).includes('Chequeo'), 'el chequeo no es el paso actual');
+  await completarChequeo(page);
+  await page.waitForSelector('#dlg-listos[open]');
+  afirmar((await page.textContent('#dlg-listos [aria-current=step]')).includes('Dispositivo'), 'Dispositivo no es el paso actual');
+});
+
+/* ---------- Prueba de fuerza muscular ---------- */
 
 await verificar('prueba: fase 2 completa', async (page) => {
   await grabarRutina(page, 2);

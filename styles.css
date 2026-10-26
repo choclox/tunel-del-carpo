@@ -357,8 +357,30 @@ dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px)
 .seg-btn .rt-sug { margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-text); }
 
 /* ¿Listos para empezar? y Rutina terminada */
-.dlg-listos, .dlg-fin, .dlg-prueba { display: none; }
-.dlg-listos[open], .dlg-fin[open], .dlg-prueba[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.dlg-listos, .dlg-fin, .dlg-prueba, .dlg-chequeo { display: none; }
+.dlg-listos[open], .dlg-fin[open], .dlg-prueba[open], .dlg-chequeo[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+
+/* Barra de pasos de la sesión guiada */
+.pasos-sesion-lista { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.pasos-sesion-lista li { display: inline-flex; align-items: center; gap: 6px; }
+.paso-marca { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--surface-2); }
+.pasos-sesion-lista li.hecho { color: var(--good-text); }
+.pasos-sesion-lista li.hecho .paso-marca { background: color-mix(in srgb, var(--st-good) 18%, transparent); }
+.pasos-sesion-lista li.actual { color: var(--brand-text); font-weight: 800; }
+.pasos-sesion-lista li.actual .paso-marca { background: var(--brand); color: var(--brand-ink); }
+.pasos-sesion-lista li.omitido { text-decoration: line-through; }
+
+/* Chequeo de seguridad */
+.dlg-chequeo { width: min(680px, calc(100vw - 32px)); }
+.ch-campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ch-campos label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.ch-campos input, .ch-campos select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.ch-campos label { align-content: end; }
+.ch-resultado { display: grid; gap: 8px; justify-items: start; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-2); border-left: 4px solid var(--st-good); }
+.ch-resultado[data-nivel="precaucion"] { border-left-color: var(--st-warning); }
+.ch-resultado[data-nivel="detener"] { border-left-color: var(--st-critical); }
+.ch-mensaje { font-weight: 700; }
+.ch-criterio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 
 /* Prueba de fuerza muscular */
 .pr-bloque { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 16px; border-radius: var(--radius); background: var(--surface-2); }
@@ -424,6 +446,7 @@ dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px)
   .rt-info { overflow: visible; }
 }
 @media (max-width: 760px) {
+  .ch-campos { grid-template-columns: 1fr; }
   .inicio-grid { grid-template-columns: 1fr; }
   #inicio-cifras { grid-template-columns: 1fr 1fr; }
   #inicio-cifras .kpi .icon-bubble { display: none; }

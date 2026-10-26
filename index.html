@@ -444,6 +444,7 @@
     <div class="rt-body">
       <div class="rt-head">
         <div>
+          <div class="pasos-sesion"></div>
           <div class="eyebrow" id="rt-paso">Ejercicio 1 de 5</div>
           <h2 id="rt-nombre"></h2>
         </div>
@@ -478,7 +479,37 @@
   </dialog>
 
   <!-- ¿Listos para empezar? -->
+  <!-- Paso 1: chequeo de seguridad -->
+  <dialog id="dlg-chequeo" class="dlg-chequeo" aria-labelledby="ch-titulo">
+    <div class="pasos-sesion"></div>
+    <h2 id="ch-titulo">Chequeo antes de empezar</h2>
+    <p class="muted" id="ch-paciente"></p>
+    <div class="ch-campos">
+      <label>Dolor ahora (0–10)<input type="number" id="ch-dolor" min="0" max="10" step="1" inputmode="numeric" placeholder="0–10"></label>
+      <label>Hormigueo o adormecimiento
+        <select id="ch-hormigueo"><option value="no">No</option><option value="leve">Leve</option><option value="fuerte">Fuerte</option></select>
+      </label>
+      <label>Herida
+        <select id="ch-herida"><option value="bien">Bien</option><option value="enrojecida">Enrojecida o con secreción</option><option value="abierta">Abierta</option></select>
+      </label>
+    </div>
+    <p class="campo-error" id="ch-error" aria-live="polite"></p>
+    <div class="ch-resultado" id="ch-resultado" aria-live="polite" hidden>
+      <p class="ch-mensaje" id="ch-mensaje"></p>
+      <p class="muted">Recomendación orientativa: decide el profesional.</p>
+      <button class="btn" id="ch-bajar" hidden></button>
+      <label class="ch-criterio" id="ch-criterio-fila" hidden><input type="checkbox" id="ch-criterio"> Revisé al paciente y decido continuar</label>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" id="ch-cancelar">Cancelar</button>
+      <button class="btn" id="ch-continuar-criterio" hidden disabled>Continuar bajo mi criterio</button>
+      <button class="btn btn-primary" id="ch-no-hacer" hidden>No hacer la sesión hoy</button>
+      <button class="btn btn-primary" id="ch-continuar">Continuar</button>
+    </div>
+  </dialog>
+
   <dialog id="dlg-listos" class="dlg-listos" aria-labelledby="ls-titulo">
+    <div class="pasos-sesion"></div>
     <div class="eyebrow">Rutina de rehabilitación</div>
     <h2 id="ls-titulo">¿Listos para empezar?</h2>
     <p class="ls-etapa" id="ls-etapa"></p>
@@ -502,6 +533,7 @@
 
   <!-- Prueba de fuerza muscular (EMG) -->
   <dialog id="dlg-prueba" class="dlg-prueba" aria-labelledby="pr-titulo">
+    <div class="pasos-sesion"></div>
     <div class="eyebrow" id="pr-paso"></div>
     <h2 id="pr-titulo">Prueba de fuerza muscular</h2>
     <div class="pr-bloque">
@@ -522,6 +554,7 @@
 
   <!-- Rutina terminada -->
   <dialog id="dlg-fin" class="dlg-fin" aria-labelledby="fin-titulo">
+    <div class="pasos-sesion"></div>
     <div class="eyebrow" id="fin-etapa"></div>
     <h2 id="fin-titulo">Rutina terminada</h2>
     <div id="fin-con-datos">
@@ -554,6 +587,7 @@
   <script src="inicio.js"></script>
   <script src="monitoreo.js"></script>
   <script src="rutina.js"></script>
+  <script src="chequeo.js"></script>
   <script src="prueba-emg.js"></script>
 </body>
 </html>

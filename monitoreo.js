@@ -487,6 +487,8 @@ function guardarSesionRutina({ dolor = null, notas = '', manuales = {} } = {}) {
   };
   if (mv.sesion.rutina) s.rutina = { etapa: mv.sesion.rutina.etapa, pasos };
   if (mv.sesion.conEmg) s.emg = { prueba: mv.sesion.emgPrueba ?? null, senal: mv.sesion.emgSenal };
+  const chequeo = typeof tomarChequeo === 'function' ? tomarChequeo(p.id) : null;
+  if (chequeo) s.chequeo = chequeo;
   p.sesiones.push(s);
   if (!guardarDB()) {
     p.sesiones.pop();

@@ -108,6 +108,7 @@ async function correrBloque() {
 function abrirPrueba(alTerminar) {
   pr = { indice: 0, resultados: {}, alTerminar, turno: 0 };
   if (mv.sesion) mv.sesion.emgPrueba = null;
+  pintarPasosSesion($('#dlg-prueba'), 3);
   $('#dlg-prueba').showModal();
   correrBloque();
 }
