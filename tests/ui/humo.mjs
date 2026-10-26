@@ -29,7 +29,8 @@ let fallas = 0;
 const SESION_PRUEBA = { nombre: 'Prueba', profesion: 'Fisioterapeuta', correo: 'prueba@kinemo.co' };
 
 // ruta: '' es el panel. sesion: la que se siembra una sola vez por pestaña (null = sin sesión).
-async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {} } = {}) {
+// abrirPaciente: tras cargar el panel (que empieza en el Inicio) abre el primer paciente de la lista.
+async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {}, abrirPaciente = true } = {}) {
   const ctx = await navegador.newContext({ viewport, acceptDownloads: true });
   if (sesion) {
     await ctx.addInitScript((s) => {
@@ -56,7 +57,10 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   page.on('dialog', (d) => { page.dialogos.push(d.message()); d.accept(); });
   page.setDefaultTimeout(10000);
   await page.goto(URL_APP + ruta);
-  if (sesion && (!ruta || ruta === 'index.html')) await page.waitForSelector('.patient-item');
+  if (sesion && (!ruta || ruta === 'index.html')) {
+    await page.waitForSelector('.patient-item');
+    if (abrirPaciente) { await page.click('.patient-item >> nth=0'); await page.waitForSelector('#vista-paciente:not([hidden])'); }
+  }
   return page;
 }
 
@@ -219,6 +223,58 @@ await verificar('paciente nuevo con profesional', async (page) => {
   await page.click('#btn-nuevo');
   afirmar(await page.inputValue('#form-paciente [name=profesional]') === 'Prueba', 'profesional vacío');
 });
+
+/* ---------- Inicio ---------- */
+const SIN_ABRIR = { abrirPaciente: false };
+
+await verificar('inicio: tras el login', async (page) => {
+  afirmar(await page.isVisible('#inicio') && await page.isHidden('#vista-paciente'), 'no arranca en el Inicio');
+  afirmar((await page.textContent('#inicio-saludo')).includes('Prueba'), 'el saludo no tiene el nombre');
+  afirmar(await page.locator('#inicio-cifras .kpi').count() === 4, 'no hay 4 cifras');
+  const primarios = await page.$$eval('main .btn-primary', (bs) => bs.filter((b) => b.offsetParent).map((b) => b.id));
+  afirmar(JSON.stringify(primarios) === '["btn-nueva-sesion"]', `primarios: ${primarios}`);
+}, SIN_ABRIR);
+
+await verificar('inicio: atención abre seguimiento', async (page) => {
+  await page.click('#inicio-atencion [data-accion] >> nth=0');
+  afirmar(await page.isVisible('#vista-paciente') && await seccionActiva(page) === 'seguimiento', 'no abrió Seguimiento');
+}, SIN_ABRIR);
+
+await verificar('inicio: nueva sesión', async (page) => {
+  await page.click('#btn-nueva-sesion');
+  await page.fill('#buscar-sesion', 'Luz');
+  await page.click('#elegir-lista [data-id] >> nth=0');
+  afirmar(await page.evaluate(() => estado.pacienteId) === 'P-003', 'no eligió a Luz Dary');
+  afirmar(await seccionActiva(page) === 'ejercicios', 'no abrió Ejercicios');
+}, SIN_ABRIR);
+
+await verificar('inicio: volver', async (page) => {
+  await page.click('#nav-inicio');
+  afirmar(await page.isVisible('#inicio') && await page.isHidden('#vista-paciente'), 'no volvió al Inicio');
+  await page.click('.patient-item >> nth=0');
+  await page.click('#marca-inicio');
+  afirmar(await page.isVisible('#inicio'), 'la marca no lleva al Inicio');
+});
+
+await verificar('inicio: archivados fuera', async (page) => {
+  afirmar((await page.textContent('#inicio-citas')).includes('Carlos'), 'Carlos debería tener cita hoy');
+  await page.evaluate(() => { estado.db.pacientes.find((p) => p.id === 'P-002').archivado = true; renderPaciente(); });
+  const txt = (await page.textContent('#inicio-citas')) + (await page.textContent('#inicio-atencion'));
+  afirmar(!txt.includes('Carlos'), 'un archivado sigue en el Inicio');
+  await page.click('#btn-nueva-sesion');
+  afirmar(!(await page.textContent('#elegir-lista')).includes('Carlos'), 'un archivado se puede elegir');
+}, SIN_ABRIR);
+
+await verificar('inicio: datos antiguos', async (page) => {
+  afirmar(await page.isVisible('#inicio-cifras'), 'no se ve el Inicio');
+}, { ...SIN_ABRIR, init: () => {
+  if (sessionStorage.getItem('humo.antiguos')) return;
+  sessionStorage.setItem('humo.antiguos', '1');
+  localStorage.setItem('rehabcarpo.db.v1', JSON.stringify({ version: 1, pacientes: [
+    { id: 'P-001', nombre: 'Antigua', documento: '1', edad: 50, sexo: 'F', mano: 'Derecha', fechaCirugia: '2026-08-01',
+      sesiones: [{ id: 'S1', fecha: '2026-08-20', duracionMin: 20, perdidaDatosPct: 0, dolorEVA: 4, notas: '', ejercicios: [{ tipo: 'flexion', repeticiones: 10, repeticionesObjetivo: 10, anguloMax: 40 }] }] },
+  ] }));
+} });
 
 /* ---------- Ficha del paciente ---------- */
 const abrirFicha = (page) => page.click('#encabezado details summary');

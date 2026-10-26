@@ -53,13 +53,13 @@
   </svg>
 
   <header class="topbar">
-    <div class="brand">
+    <a class="brand" id="marca-inicio" href="#inicio" title="Ir al inicio">
       <span class="brand-mark" aria-hidden="true"><img src="img/kinemo-simbolo.png" alt="" width="40" height="40"></span>
       <div>
         <div class="brand-title">Kinemo</div>
         <div class="brand-sub">Monitoreo y rehabilitación</div>
       </div>
-    </div>
+    </a>
     <div class="usuario">
       <span class="avatar usuario-avatar" aria-hidden="true"></span>
       <span class="usuario-datos"><span class="usuario-nombre"></span><span class="usuario-profesion"></span></span>
@@ -71,6 +71,7 @@
     <!-- Lista de pacientes -->
     <aside class="sidebar">
       <div class="sidebar-head">
+        <button class="nav-inicio" id="nav-inicio"><svg class="ic"><use href="#i-trend"/></svg>Inicio</button>
         <div class="eyebrow">Mis pacientes</div>
         <div class="search">
           <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
@@ -83,11 +84,40 @@
     </aside>
 
     <main class="main" id="main">
-      <div class="empty" id="vacio">
-        <span class="empty-icon"><svg class="ic"><use href="#i-users"/></svg></span>
-        <h2>Seleccione un paciente</h2>
-        <p class="muted">Elija un paciente de la lista para ver su evolución.</p>
-      </div>
+      <!-- ===== INICIO DEL PROFESIONAL ===== -->
+      <section id="inicio" class="inicio" hidden>
+        <div class="inicio-cabecera">
+          <div>
+            <h1 class="inicio-saludo" id="inicio-saludo"></h1>
+            <p class="muted inicio-fecha" id="inicio-fecha"></p>
+          </div>
+        </div>
+        <div class="vacio" id="inicio-vacio" hidden>
+          <h2>Aún no tiene pacientes</h2>
+          <p class="muted">Registre a su primer paciente para empezar.</p>
+          <button class="btn btn-primary" id="inicio-btn-nuevo"><svg class="ic"><use href="#i-plus"/></svg>Nuevo paciente</button>
+        </div>
+        <div class="inicio-contenido" id="inicio-contenido">
+          <button class="btn btn-primary btn-grande inicio-nueva" id="btn-nueva-sesion"><svg class="ic"><use href="#i-play"/></svg>Nueva sesión</button>
+          <div class="kpis" id="inicio-cifras"></div>
+          <div class="inicio-grid">
+            <div class="card">
+              <h2>Requieren atención</h2>
+              <ul class="inicio-lista" id="inicio-atencion"></ul>
+            </div>
+            <div class="inicio-col">
+              <div class="card">
+                <h2>Citas de hoy</h2>
+                <ul class="inicio-lista" id="inicio-citas"></ul>
+              </div>
+              <div class="card">
+                <h2>Sesiones recientes</h2>
+                <ul class="inicio-lista" id="inicio-recientes"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div id="vista-paciente" hidden>
         <!-- Encabezado del paciente -->
@@ -398,6 +428,17 @@
     </form>
   </dialog>
 
+  <!-- Nueva sesión: elegir paciente -->
+  <dialog id="dlg-elegir-paciente" class="dlg-elegir" aria-labelledby="elegir-titulo">
+    <h2 id="elegir-titulo">¿Con qué paciente?</h2>
+    <div class="search">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="search" id="buscar-sesion" placeholder="Buscar por nombre o documento…" aria-label="Buscar paciente">
+    </div>
+    <ul class="inicio-lista elegir-lista" id="elegir-lista"></ul>
+    <div class="dlg-actions"><button class="btn btn-ghost" id="elegir-cancelar">Cancelar</button></div>
+  </dialog>
+
   <!-- Rutina de ejercicios en video -->
   <dialog id="dlg-rutina" class="dlg-rutina" aria-labelledby="rt-nombre">
     <div class="rt-body">
@@ -510,6 +551,7 @@
   <script src="navegacion.js"></script>
   <script src="app.js"></script>
   <script src="emg.js"></script>
+  <script src="inicio.js"></script>
   <script src="monitoreo.js"></script>
   <script src="rutina.js"></script>
   <script src="prueba-emg.js"></script>

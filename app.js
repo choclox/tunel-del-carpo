@@ -15,6 +15,7 @@ const estado = {
   cmpA: null,
   cmpB: null,
   busqueda: '',
+  pantalla: 'inicio',    // 'inicio' | 'paciente'
   verArchivados: false,
   editandoId: null,      // paciente que se edita en #dlg-paciente (null = nuevo)
 };
@@ -148,7 +149,7 @@ function renderLista() {
     const ses = sesionesOrdenadas(p);
     const ult = ses[ses.length - 1];
     const prog = progresoGlobal(ult);
-    return `<li class="patient-item ${p.id === estado.pacienteId ? 'active' : ''}" data-id="${esc(p.id)}" tabindex="0">
+    return `<li class="patient-item ${p.id === estado.pacienteId && estado.pantalla === 'paciente' ? 'active' : ''}" data-id="${esc(p.id)}" tabindex="0">
       <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
       <span class="pi-name">${esc(p.nombre)}</span>
       <span class="pi-meta"><span>${esc(p.id)} · Mano ${esc(p.mano.toLowerCase())}${p.archivado ? ' · <b>Dado de alta</b>' : ''}</span><span>${dias(p.fechaCirugia, hoyISO())} d post-op</span></span>
@@ -160,9 +161,14 @@ function renderLista() {
 
 function seleccionarPaciente(id) {
   if (id !== estado.pacienteId && typeof monitorPuedeCambiarPaciente === 'function' && !monitorPuedeCambiarPaciente()) return;
+  // La sección se elige de nuevo solo al cambiar de paciente o al entrar desde el Inicio
+  // (importar en Reporte, por ejemplo, debe dejar al usuario donde estaba).
+  const nuevo = id !== estado.pacienteId || estado.pantalla !== 'paciente';
   estado.pacienteId = id;
+  estado.pantalla = 'paciente';
   const p = paciente();
   const ses = sesionesOrdenadas(p);
+  if (nuevo) estado.seccion = seccionInicial(ses.length);
   estado.sesionId = ses.length ? ses[ses.length - 1].id : null;
   estado.cmpA = ses.length ? ses[0].id : null;
   estado.cmpB = ses.length ? ses[ses.length - 1].id : null;
@@ -173,9 +179,10 @@ function seleccionarPaciente(id) {
 /* ======================= Vista del paciente ======================= */
 function renderPaciente() {
   const p = paciente();
-  $('#vacio').hidden = !!p;
-  $('#vista-paciente').hidden = !p;
-  if (!p) return;
+  const enInicio = estado.pantalla === 'inicio' || !p;
+  $('#inicio').hidden = !enInicio;
+  $('#vista-paciente').hidden = enInicio;
+  if (enInicio) { renderInicio(); return; }
   renderEncabezado(p);
   renderSeccion();
 }
@@ -976,9 +983,9 @@ function init() {
   window.addEventListener('beforeunload', guardarDB);
 
   renderLista();
-  const primero = [...estado.db.pacientes].sort((a, b) => a.nombre.localeCompare(b.nombre))[0];
-  estado.seccion = seccionInicial(primero?.sesiones.length);
-  if (primero) seleccionarPaciente(primero.id); else renderPaciente();
+  // Tras el login se empieza en el Inicio del profesional.
+  estado.pantalla = 'inicio';
+  renderPaciente();
 }
 
 document.addEventListener('DOMContentLoaded', init);
