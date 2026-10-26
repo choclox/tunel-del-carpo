@@ -114,7 +114,7 @@ function renderInicio() {
       <button class="btn" data-id="${esc(p.id)}" data-accion="empezar">Empezar</button></li>`).join('') || '<li class="muted">No hay citas para hoy.</li>';
   $('#inicio-recientes').innerHTML = sesionesRecientes(db).map(({ paciente: p, sesion: s }) => `<li>
       <button class="inicio-item" data-id="${esc(p.id)}" data-accion="seguimiento">
-        <span><b>${esc(p.nombre)}</b><small>${fmtFecha(s.fecha)} · dolor ${s.dolorEVA ?? '—'}/10</small></span>
+        <span><b>${esc(p.nombre)}</b><small>${fmtFecha(s.fecha)} · dolor ${esc(s.dolorEVA ?? '—')}/10</small></span>
       </button></li>`).join('') || '<li class="muted">Aún no hay sesiones.</li>';
 }
 
@@ -135,7 +135,7 @@ function empezarSesionCon(id) {
 function renderElegirPaciente() {
   const q = $('#buscar-sesion').value.trim().toLowerCase();
   const lista = pacientesActivos(estado.db)
-    .filter((p) => !q || p.nombre.toLowerCase().includes(q) || p.documento.includes(q))
+    .filter((p) => !q || p.nombre.toLowerCase().includes(q) || (p.documento ?? '').includes(q))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
   $('#elegir-lista').innerHTML = lista.map((p) => `<li><button class="inicio-item" data-id="${esc(p.id)}">
       <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>

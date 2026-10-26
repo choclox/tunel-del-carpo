@@ -55,7 +55,8 @@ function datosHojaPaciente(p, s) {
   const { EJERCICIOS: EJ, etapaPorNumero: porNumero, etapaSugerida: sugerida } = depsResumen();
   const etapa = porNumero(s.rutina?.etapa ?? sugerida(p.fechaCirugia, s.fecha));
   const hizo = s.rutina?.pasos?.length
-    ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, reps: x.repeticionesManual ?? x.repeticiones ?? x.repeticionesObjetivo }))
+    // Solo repeticiones contadas (a mano o por el detector): nunca el objetivo como si se hubiera hecho.
+    ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, reps: x.repeticionesManual ?? x.repeticiones ?? null }))
     : (s.ejercicios ?? []).map((e) => ({ nombre: EJ[e.tipo]?.nombre ?? e.tipo, reps: e.repeticiones }));
   return {
     nombre: p.nombre,

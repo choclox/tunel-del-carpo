@@ -50,3 +50,8 @@ test('sin nada comparable, una frase que lo dice', () => {
   const a = { fecha: '2026-10-01', ejercicios: [{ tipo: 'flexion', anguloMax: 40 }] }, b = { fecha: '2026-10-05', ejercicios: [], dolorEVA: null };
   assert.deepStrictEqual(comparacionConAnterior({ sesiones: [a, b] }, b), ['Sin datos comparables con la sesión anterior.']);
 });
+
+test('la hoja no da por hechas repeticiones que nadie contó', () => {
+  const s = { fecha: '2026-10-24', ejercicios: [], rutina: { etapa: 1, pasos: [{ id: 'mesa', nombre: 'Mesa', repeticiones: null, repeticionesManual: null, repeticionesObjetivo: 10 }] } };
+  assert.deepStrictEqual(datosHojaPaciente({ nombre: 'X', fechaCirugia: '2026-10-10', sesiones: [s] }, s).hizo, [{ nombre: 'Mesa', reps: null }]);
+});

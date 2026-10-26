@@ -143,7 +143,7 @@ function renderLista() {
   const q = estado.busqueda.toLowerCase();
   const lista = estado.db.pacientes
     .filter((p) => estado.verArchivados || !p.archivado)
-    .filter((p) => !q || p.nombre.toLowerCase().includes(q) || p.documento.includes(q) || p.id.toLowerCase().includes(q))
+    .filter((p) => !q || p.nombre.toLowerCase().includes(q) || (p.documento ?? '').includes(q) || p.id.toLowerCase().includes(q))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
   $('#lista-pacientes').innerHTML = lista.map((p) => {
     const ses = sesionesOrdenadas(p);
@@ -773,6 +773,9 @@ function validarSesion(s) {
   s.duracionMin ??= Math.round(s.ejercicios.reduce((a, e) => a + e.duracionS, 0) / 60);
   s.perdidaDatosPct ??= 0;
   s.dolorEVA ??= null;
+  if (s.dolorEVA !== null && !(typeof s.dolorEVA === 'number' && s.dolorEVA >= 0 && s.dolorEVA <= 10)) {
+    throw new Error('"dolorEVA" debe ser un número de 0 a 10.');
+  }
   s.notas ??= '';
   validarEmg(s.emg);
   return s;

@@ -514,6 +514,32 @@ await verificar('chequeo: bajar de fase', async (page) => {
   afirmar(s.rutina.etapa === 1 && s.chequeo.nivel === 'precaucion', `etapa ${s.rutina.etapa}, nivel ${s.chequeo?.nivel}`);
 }, { init: PRUEBA_RAPIDA });
 
+await verificar('chequeo: bajar una sola vez y cancelar restaura', async (page) => {
+  await irEjercicios(page);
+  await page.click('#rt-etapas [data-etapa="3"]');
+  await page.click('#rt-iniciar');
+  await page.fill('#ch-dolor', '5');
+  await page.click('#ch-bajar');
+  afirmar(await page.isHidden('#ch-bajar'), 'se puede seguir bajando de fase');
+  afirmar(await page.evaluate(() => etapaElegida) === 2, 'no bajó a la Fase 2');
+  await page.click('#ch-cancelar');
+  // 'close' llega en una tarea aparte: esperar a que se restaure la fase.
+  await page.waitForFunction(() => etapaElegida === 3, null, { timeout: 3000 });
+});
+
+await verificar('buscar paciente sin documento', async (page) => {
+  await page.fill('#buscar', 'xx');
+  await page.click('#btn-nueva-sesion');
+  await page.fill('#buscar-sesion', 'an');
+  afirmar(await page.locator('#elegir-lista [data-id]').count() === 1, 'no lista al paciente');
+}, { ...SIN_ABRIR, init: () => {
+  if (sessionStorage.getItem('humo.sindoc')) return;
+  sessionStorage.setItem('humo.sindoc', '1');
+  localStorage.setItem('rehabcarpo.db.v1', JSON.stringify({ version: 1, pacientes: [
+    { id: 'P-001', nombre: 'Ana Antigua', edad: 50, sexo: 'F', mano: 'Derecha', fechaCirugia: '2026-08-01', sesiones: [] },
+  ] }));
+} });
+
 await verificar('chequeo: Esc no empieza', async (page) => {
   await irEjercicios(page);
   await page.click('#rt-iniciar');
@@ -799,6 +825,13 @@ await verificar('emg: importar inválido', async (page) => {
 
 await verificar('emg: avisos', async (page) => {
   afirmar((await page.textContent('#observaciones')).includes('nervio mediano'), 'sin aviso del nervio mediano');
+});
+
+await verificar('importar: dolor no numérico rechazado', async (page) => {
+  await importar(page, sesionImportada('2026-10-03', { dolorEVA: '<img src=x onerror="window.__xss=1">' }));
+  afirmar(page.dialogos.some((m) => m.includes('No se pudo importar')), `diálogos: ${page.dialogos}`);
+  await page.click('#nav-inicio');
+  afirmar(await page.evaluate(() => window.__xss) === undefined, 'se ejecutó código del archivo importado');
 });
 
 /* ---------- Pulido ---------- */

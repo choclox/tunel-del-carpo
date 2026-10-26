@@ -24,6 +24,10 @@ function evaluarChequeo({ dolorAntes, hormigueo, herida }, etapa) {
 
 let chequeoPendiente = null; // { pacienteId, dolorAntes, hormigueo, herida, nivel, continuoBajoCriterio }
 let alContinuarChequeo = null;
+// Fase con la que se abrió el chequeo: "Bajar de fase" ofrece como mucho un paso menos que esta,
+// y cancelar la restaura (bajar de fase solo vale si se continúa).
+let etapaInicioChequeo = null;
+let chequeoContinuado = false;
 
 // Pinta la barra de pasos de la sesión en la ventana `dlg` (actual: 0–5). pruebaOmitida: por defecto
 // según la sesión en curso; el Resumen lo pasa desde la sesión guardada (la de curso ya se borró).
@@ -46,12 +50,12 @@ function actualizarChequeo() {
   const d = leerChequeo();
   $('#ch-resultado').hidden = d.dolorAntes == null;
   if (d.dolorAntes != null) $('#ch-error').textContent = '';
-  const r = d.dolorAntes == null ? null : evaluarChequeo(d, etapaElegida);
+  const r = d.dolorAntes == null ? null : evaluarChequeo(d, etapaInicioChequeo);
   const detener = r?.nivel === 'detener';
   if (r) {
     $('#ch-mensaje').textContent = r.mensaje;
     $('#ch-resultado').dataset.nivel = r.nivel;
-    $('#ch-bajar').hidden = !r.etapaSugerida;
+    $('#ch-bajar').hidden = !r.etapaSugerida || etapaElegida < etapaInicioChequeo;
     if (r.etapaSugerida) $('#ch-bajar').textContent = `Bajar a la Fase ${r.etapaSugerida}`;
   }
   $('#ch-criterio-fila').hidden = !detener;
@@ -66,6 +70,8 @@ function abrirChequeo(alContinuar) {
   if (!p) return;
   alContinuarChequeo = alContinuar;
   chequeoPendiente = null;
+  etapaInicioChequeo = etapaElegida;
+  chequeoContinuado = false;
   $('#ch-dolor').value = '';
   $('#ch-hormigueo').value = 'no';
   $('#ch-herida').value = 'bien';
@@ -85,9 +91,10 @@ function continuarChequeo(bajoCriterio) {
     $('#ch-dolor').focus();
     return;
   }
-  const r = evaluarChequeo(d, etapaElegida);
+  const r = evaluarChequeo(d, etapaInicioChequeo);
   if (r.nivel === 'detener' && !bajoCriterio) return;
   chequeoPendiente = { pacienteId: estado.pacienteId, ...d, nivel: r.nivel, continuoBajoCriterio: !!bajoCriterio };
+  chequeoContinuado = true;
   $('#dlg-chequeo').close();
   alContinuarChequeo?.();
 }
@@ -107,9 +114,15 @@ function initChequeo() {
   $('#ch-continuar-criterio').addEventListener('click', () => continuarChequeo(true));
   $('#ch-no-hacer').addEventListener('click', () => { $('#dlg-chequeo').close(); toast('No se hizo la sesión hoy.'); });
   $('#ch-cancelar').addEventListener('click', () => $('#dlg-chequeo').close());
+  // Cancelar, Esc o "No hacer la sesión hoy": la fase vuelve a la de antes del chequeo.
+  $('#dlg-chequeo').addEventListener('close', () => {
+    if (chequeoContinuado || etapaInicioChequeo == null || etapaElegida === etapaInicioChequeo) return;
+    etapaElegida = etapaInicioChequeo;
+    renderTarjetaRutina();
+  });
   $('#ch-bajar').addEventListener('click', () => {
-    const r = evaluarChequeo(leerChequeo(), etapaElegida);
-    if (!r.etapaSugerida) return;
+    const r = evaluarChequeo(leerChequeo(), etapaInicioChequeo);
+    if (!r.etapaSugerida || etapaElegida < etapaInicioChequeo) return;
     etapaElegida = r.etapaSugerida;
     renderTarjetaRutina();
     $('#ch-paciente').textContent = `${paciente().nombre} · Fase ${etapaElegida}`;
