@@ -24,6 +24,18 @@ Al abrir el panel sin haber entrado se muestra `login.html`, con las pestañas *
 
 En el navegador se guardan la sesión (`kinemo.sesion`) y las cuentas creadas (`kinemo.cuentas`: nombre, profesión y correo). **La contraseña nunca se guarda.** Los datos de pacientes no dependen de la cuenta: todos los profesionales que entren en el mismo navegador ven los mismos pacientes.
 
+## Flujo del profesional
+
+**Login → Inicio → Nueva sesión → 1 Chequeo → 2 Dispositivo → 3 Rutina → 4 Prueba EMG → 5 Cierre → 6 Resumen → Inicio**
+
+- **Inicio** (lo primero tras el login; también con la marca o con "Inicio" en la barra lateral): saludo, botón **Nueva sesión** (elegir paciente y empezar), cifras (pacientes activos, sesiones de la semana, citas de hoy, requieren atención), **Requieren atención** (cita vencida, sin sesión hace más de 10 días, el dolor subió ≥ 2, bajó el movimiento más de 8 %, bajó el índice del nervio mediano más de 15 %, se perdieron datos ≥ 1 %, el chequeo pidió no hacer la sesión), **Citas de hoy** con "Empezar" y **Sesiones recientes**.
+- **Barra de pasos:** cada ventana de la sesión muestra en qué paso va (la prueba EMG aparece "omitida" en Fase 1 o sin EMG).
+- **1 Chequeo de seguridad:** dolor ahora (0–10), hormigueo o adormecimiento (No / Leve / Fuerte) y herida (Bien / Enrojecida o con secreción / Abierta). Recomendación orientativa (decide el profesional): **detener** si la herida no está bien, hay hormigueo fuerte o dolor ≥ 7 (solo se continúa marcando "Revisé al paciente y decido continuar"); **precaución** si dolor 4–6 o hormigueo leve (ofrece bajar a la fase anterior); si no, **todo bien**. Se guarda en la sesión (`chequeo`).
+- **5 Cierre** ("Rutina terminada"): dolor después, notas, conteos manuales y **próxima cita** (por defecto en 7 días; "Sin próxima cita").
+- **6 Resumen de la sesión:** hasta 3 frases de qué mejoró frente a la sesión anterior (movimiento, dolor antes → después, índice del nervio mediano), los avisos nuevos y los botones **Hoja para el paciente**, **Ver seguimiento** y **Volver al inicio**. Cerrar la ventana también vuelve al Inicio (la sesión ya está guardada).
+- **Hoja para el paciente:** una página A4 para imprimir o guardar como PDF desde el diálogo de impresión: qué hizo hoy, cómo va, ejercicios para casa de su fase, cuidados y próxima cita.
+- **Ficha del paciente:** en "Ver ficha", **Editar ficha** (incluye la próxima cita) y **Dar de alta (archivar)**. Los dados de alta salen de la lista y del Inicio; "Mostrar dados de alta" los muestra y permite **Reactivar**.
+
 ## Qué incluye
 
 La pantalla tiene tres secciones. Lo técnico o secundario queda plegado ("Ver ficha", "Más indicadores", "Datos técnicos del dispositivo"…) para no saturar.
@@ -152,6 +164,9 @@ La colocación exacta la define el equipo con el profesional. Use siempre el mis
 - `acceso.js`: validación de los formularios y sesión de demostración; funciones puras con pruebas.
 - `emg.js`: formato de la línea D con EMG, picos, línea base y medidas; funciones puras con pruebas.
 - `prueba-emg.js`: ventana guiada "Prueba de fuerza muscular".
+- `inicio.js`: Inicio del profesional (atención, citas, sesiones recientes, nueva sesión).
+- `chequeo.js`: chequeo de seguridad antes de la rutina.
+- `resumen-sesion.js`: resumen de la sesión y hoja imprimible para el paciente.
 - `navegacion.js`: secciones (Ejercicios, Seguimiento, Reporte), vistas de Seguimiento y recorte de avisos; funciones puras con pruebas.
 - `tests/ui/humo.mjs`: prueba de humo de la interfaz en Chromium.
 - `videos/`: un `.mp4` por ejercicio de la rutina (ver [videos/LEEME.md](videos/LEEME.md)).

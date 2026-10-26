@@ -25,10 +25,11 @@ function evaluarChequeo({ dolorAntes, hormigueo, herida }, etapa) {
 let chequeoPendiente = null; // { pacienteId, dolorAntes, hormigueo, herida, nivel, continuoBajoCriterio }
 let alContinuarChequeo = null;
 
-// Pinta la barra de pasos de la sesión en la ventana `dlg` (actual: 0–5).
-function pintarPasosSesion(dlg, actual) {
+// Pinta la barra de pasos de la sesión en la ventana `dlg` (actual: 0–5). pruebaOmitida: por defecto
+// según la sesión en curso; el Resumen lo pasa desde la sesión guardada (la de curso ya se borró).
+function pintarPasosSesion(dlg, actual, pruebaOmitida = actual > 3 && !mv.sesion?.emgPrueba) {
   const el = dlg.querySelector('.pasos-sesion');
-  if (el) el.innerHTML = htmlPasosSesion(actual, { pruebaOmitida: actual > 3 && !mv.sesion?.emgPrueba });
+  if (el) el.innerHTML = htmlPasosSesion(actual, { pruebaOmitida });
 }
 
 function leerChequeo() {

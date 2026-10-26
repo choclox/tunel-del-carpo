@@ -193,3 +193,5 @@ function detectarPicos(angulos, fs, umbralFrac = 0.6) {
   }
   return picos;
 }
+
+if (typeof module !== 'undefined') module.exports = { EJERCICIOS, ORDEN_EJERCICIOS };

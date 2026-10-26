@@ -463,6 +463,7 @@ await verificar('rutina completa con simulador', async (page) => {
   }
   await page.click('#rt-siguiente');
   await page.click('#fin-guardar');
+  await page.click('#rs-seguimiento');
   await page.waitForTimeout(300);
   afirmar(await seccionActiva(page) === 'seguimiento', 'no volvió a Seguimiento');
   const r = await page.evaluate(() => {
@@ -540,6 +541,76 @@ await verificar('pasos: visibles', async (page) => {
   afirmar((await page.textContent('#dlg-listos [aria-current=step]')).includes('Dispositivo'), 'Dispositivo no es el paso actual');
 });
 
+/* ---------- Cierre, resumen y hoja para el paciente ---------- */
+async function rutinaHastaCierre(page) {
+  await grabarRutina(page, 1);
+  await page.waitForSelector('#dlg-fin[open]');
+}
+const pacienteActual = (page) => page.evaluate(() => estado.db.pacientes.find((p) => p.id === estado.pacienteId));
+
+await verificar('cierre: próxima cita', async (page) => {
+  await rutinaHastaCierre(page);
+  const esperada = await page.evaluate(() => sumarDiasISO(hoyISO(), 7));
+  afirmar(await page.inputValue('#fin-cita') === esperada, `cita por defecto: ${await page.inputValue('#fin-cita')}`);
+  afirmar((await page.textContent('#dlg-fin')).includes('Dolor después (0–10)'), 'no dice "Dolor después"');
+  await page.fill('#fin-cita', '2026-12-15');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  afirmar((await pacienteActual(page)).proximaCita === '2026-12-15', 'no guardó la próxima cita');
+});
+
+await verificar('cierre: sin próxima cita', async (page) => {
+  await rutinaHastaCierre(page);
+  await page.check('#fin-sin-cita');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  afirmar((await pacienteActual(page)).proximaCita === null, 'la próxima cita no es null');
+});
+
+await verificar('resumen: tras guardar', async (page) => {
+  await rutinaHastaCierre(page);
+  await page.click('#fin-guardar');
+  await page.waitForSelector('#dlg-resumen[open]');
+  afirmar(await page.locator('#rs-comparacion li').count() >= 1, 'sin frases de comparación');
+  afirmar((await page.textContent('#dlg-resumen .btn-primary')).trim() === 'Volver al inicio', 'el primario no es "Volver al inicio"');
+  await page.click('#rs-inicio');
+  await page.waitForSelector('#inicio:not([hidden])');
+});
+
+await verificar('resumen: ver seguimiento', async (page) => {
+  await rutinaHastaCierre(page);
+  await page.click('#fin-guardar');
+  await page.click('#rs-seguimiento');
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    return { vista: estado.vista, sel: document.querySelector('#sesion-select').value, nueva: p.sesiones[p.sesiones.length - 1].id };
+  });
+  afirmar(await seccionActiva(page) === 'seguimiento' && r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
+});
+
+await verificar('resumen: Esc vuelve al inicio', async (page) => {
+  await rutinaHastaCierre(page);
+  await page.click('#fin-guardar');
+  await page.waitForSelector('#dlg-resumen[open]');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#inicio:not([hidden])');
+});
+
+await verificar('hoja: imprime una página', async (page) => {
+  await rutinaHastaCierre(page);
+  await page.click('#fin-guardar');
+  await page.click('#rs-hoja');
+  afirmar(await page.evaluate(() => window.__impreso) === 1, 'no llamó a imprimir');
+  const txt = await page.textContent('#hoja-paciente');
+  const nombre = (await pacienteActual(page)).nombre;
+  for (const t of [nombre, 'Ejercicios para casa', 'Próxima cita', 'Hoy hizo']) afirmar(txt.includes(t), `la hoja no tiene "${t}"`);
+  await page.emulateMedia({ media: 'print' });
+  const pdf = (await page.pdf({ format: 'A4' })).toString('latin1');
+  const paginas = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
+  afirmar(paginas === 1, `la hoja ocupa ${paginas} páginas`);
+}, { init: () => { window.print = () => { window.__impreso = (window.__impreso || 0) + 1; }; } });
+
 /* ---------- Prueba de fuerza muscular ---------- */
 
 await verificar('prueba: fase 2 completa', async (page) => {
@@ -554,6 +625,8 @@ await verificar('prueba: fase 2 completa', async (page) => {
   await page.waitForTimeout(300);
   const p = (await ultimaSesion(page)).emg?.prueba;
   afirmar(p && p.tenar.picos.length === 3 && p.flexores.extensoresDuranteFlexores > 0, JSON.stringify(p));
+  const clase = await page.getAttribute('#dlg-resumen .pasos-sesion-lista li:nth-child(4)', 'class');
+  afirmar(clase === 'hecho', `en el Resumen, la Prueba EMG figura como "${clase}"`);
   afirmar(p.tenar.media > 300 && p.extensores.media > 300, `medias: ${p.tenar.media}, ${p.extensores.media}`);
 }, { init: PRUEBA_RAPIDA });
 

@@ -380,6 +380,28 @@ dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px)
 .ch-resultado[data-nivel="precaucion"] { border-left-color: var(--st-warning); }
 .ch-resultado[data-nivel="detener"] { border-left-color: var(--st-critical); }
 .ch-mensaje { font-weight: 700; }
+.dlg-resumen { width: min(620px, calc(100vw - 32px)); }
+.dlg-resumen[open] { display: grid; gap: 14px; }
+.rs-comparacion { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; font-weight: 600; }
+.fin-cita { display: grid; gap: 6px; }
+.fin-sin-cita { display: flex !important; align-items: center; gap: 8px; font-weight: 500 !important; }
+
+/* Hoja para el paciente: solo al imprimir */
+.hoja-paciente { display: none; }
+@media print {
+  body > *:not(.hoja-paciente) { display: none !important; }
+  body { background: #fff !important; }
+  .hoja-paciente { display: block !important; color: #000; font: 12pt/1.4 var(--font); }
+  .hoja-cabecera { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #999; padding-bottom: 8px; margin-bottom: 8px; }
+  .hoja-cabecera h1 { font-size: 18pt; margin: 0; }
+  .hoja-paciente h2 { font-family: var(--font); font-size: 13pt; margin: 10px 0 4px; }
+  .hoja-paciente table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  .hoja-paciente td { padding: 2px 4px; border-bottom: 1px solid #ddd; }
+  .hoja-paciente ul { margin: 0; padding-left: 18px; }
+  .hoja-paciente footer { margin-top: 12px; font-size: 9pt; color: #444; }
+  @page { size: A4; margin: 14mm; }
+}
+
 .ch-criterio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 
 /* Prueba de fuerza muscular */

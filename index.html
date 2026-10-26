@@ -565,7 +565,11 @@
         </table>
       </div>
       <div class="fin-campos">
-        <label>Dolor EVA (0–10)<input type="number" id="fin-dolor" min="0" max="10" step="1" placeholder="0–10"></label>
+        <label>Dolor después (0–10)<input type="number" id="fin-dolor" min="0" max="10" step="1" placeholder="0–10"></label>
+        <div class="fin-cita">
+          <label>Próxima cita<input type="date" id="fin-cita"></label>
+          <label class="fin-sin-cita"><input type="checkbox" id="fin-sin-cita"> Sin próxima cita</label>
+        </div>
         <label class="grow">Notas<textarea id="fin-notas" rows="3" placeholder="Observaciones de la sesión…"></textarea></label>
       </div>
     </div>
@@ -576,6 +580,30 @@
       <button class="btn btn-primary" id="fin-cerrar" hidden>Cerrar</button>
     </div>
   </dialog>
+
+  <!-- Paso 6: resumen de la sesión -->
+  <dialog id="dlg-resumen" class="dlg-resumen" aria-labelledby="rs-titulo">
+    <div class="pasos-sesion"></div>
+    <h2 id="rs-titulo">Sesión guardada</h2>
+    <p class="muted" id="rs-sub"></p>
+    <div>
+      <div class="eyebrow">Cómo va</div>
+      <ul class="rs-comparacion" id="rs-comparacion"></ul>
+    </div>
+    <div id="rs-avisos-bloque">
+      <div class="eyebrow">Avisos</div>
+      <ul class="obs-list" id="rs-avisos"></ul>
+    </div>
+    <p id="rs-cita"></p>
+    <div class="dlg-actions">
+      <button class="btn" id="rs-hoja"><svg class="ic"><use href="#i-file"/></svg>Hoja para el paciente</button>
+      <button class="btn btn-ghost" id="rs-seguimiento">Ver seguimiento</button>
+      <button class="btn btn-primary" id="rs-inicio">Volver al inicio</button>
+    </div>
+  </dialog>
+
+  <!-- Hoja imprimible para el paciente (solo se ve al imprimir) -->
+  <section class="hoja-paciente" id="hoja-paciente" aria-hidden="true"></section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -588,6 +616,7 @@
   <script src="monitoreo.js"></script>
   <script src="rutina.js"></script>
   <script src="chequeo.js"></script>
+  <script src="resumen-sesion.js"></script>
   <script src="prueba-emg.js"></script>
 </body>
 </html>

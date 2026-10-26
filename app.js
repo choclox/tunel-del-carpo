@@ -457,10 +457,11 @@ function renderIndicador(p) {
   });
 }
 
-function renderObservaciones(p, ses) {
+/* Avisos automáticos de un paciente (sin DOM): los usan Seguimiento › Resumen y el Resumen de la sesión. */
+function calcularObservaciones(p, ses) {
   const obs = []; // {nivel: critical|warning|good|info, texto}
   const n = ses.length;
-  if (!n) { $('#observaciones').innerHTML = '<li class="muted">Sin sesiones registradas.</li>'; return; }
+  if (!n) return [];
   const ult = ses[n - 1], prev = ses[n - 2], primera = ses[0];
 
   // Calidad de datos de la última sesión (criterios de éxito del brief)
@@ -516,6 +517,12 @@ function renderObservaciones(p, ses) {
 
   const sinSesion = dias(ult.fecha, hoyISO());
   if (sinSesion > 10) obs.push({ nivel: 'info', texto: `<b>Seguimiento:</b> han pasado ${sinSesion} días desde la última sesión registrada.` });
+  return obs;
+}
+
+function renderObservaciones(p, ses) {
+  if (!ses.length) { $('#observaciones').innerHTML = '<li class="muted">Sin sesiones registradas.</li>'; return; }
+  const obs = calcularObservaciones(p, ses);
   if (!obs.length) obs.push({ nivel: 'info', texto: 'No se detectaron cambios relevantes en la última sesión.' });
 
   const icono = { critical: '!', warning: '!', info: 'i', good: '✓' };

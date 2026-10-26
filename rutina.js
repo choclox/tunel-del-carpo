@@ -315,6 +315,9 @@ function abrirFin() {
   $('#fin-dolor').value = '';
   $('#fin-notas').value = '';
   if (!hay && mv.sesion) descartarSesion(false); // nada que guardar
+  $('#fin-cita').value = sumarDiasISO(hoyISO(), 7);
+  $('#fin-sin-cita').checked = false;
+  $('#fin-cita').disabled = false;
   pintarPasosSesion($('#dlg-fin'), 4);
   $('#dlg-fin').showModal();
 }
@@ -333,8 +336,12 @@ function cerrarFin() {
 function guardarDesdeFin() {
   const manuales = {};
   document.querySelectorAll('#fin-tabla input[data-id]').forEach((i) => { manuales[i.dataset.id] = i.value; });
-  const ok = guardarSesionRutina({ dolor: $('#fin-dolor').value, notas: $('#fin-notas').value, manuales });
-  if (ok) cerrarFin();
+  const proximaCita = $('#fin-sin-cita').checked ? null : ($('#fin-cita').value || null);
+  const s = guardarSesionRutina({ dolor: $('#fin-dolor').value, notas: $('#fin-notas').value, manuales, proximaCita });
+  if (!s) return;
+  cerrarFin();
+  const p = estado.db.pacientes.find((x) => x.sesiones.includes(s));
+  if (p) abrirResumen(p, s); // paso 6
 }
 
 /* ---------- Eventos ---------- */
@@ -424,6 +431,7 @@ function initRutina() {
   const fin = $('#dlg-fin');
   $('#fin-descartar').addEventListener('click', descartarDesdeFin);
   $('#fin-guardar').addEventListener('click', guardarDesdeFin);
+  $('#fin-sin-cita').addEventListener('change', (e) => { $('#fin-cita').disabled = e.target.checked; });
   $('#fin-cerrar').addEventListener('click', cerrarFin);
   // Un cierre que no fue Guardar, Descartar ni Cerrar (p. ej. una petición de cierre que el
   // navegador no deja cancelar) no puede dejar datos grabados sin forma de guardarlos.

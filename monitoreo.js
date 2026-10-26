@@ -457,12 +457,13 @@ function descartarSesion(preguntar = true) {
 
 const conteoManual = (v) => (v == null || v === '' || !isFinite(Number(v)) ? null : Math.max(0, Math.round(Number(v))));
 
-function guardarSesionRutina({ dolor = null, notas = '', manuales = {} } = {}) {
+// Devuelve la sesión guardada, o null si no se pudo guardar. proximaCita: ISO, null (sin cita) o undefined (no cambia).
+function guardarSesionRutina({ dolor = null, notas = '', manuales = {}, proximaCita } = {}) {
   if (mv.paso) finalizarPasoRutina();
   if (mv.ej) finalizarEjercicio();
-  if (!mv.sesion?.rutina?.pasos.length) { toast('No se grabó ningún ejercicio; no se puede guardar.'); return false; }
+  if (!mv.sesion?.rutina?.pasos.length) { toast('No se grabó ningún ejercicio; no se puede guardar.'); return null; }
   const p = estado.db.pacientes.find((x) => x.id === mv.sesion.pacienteId);
-  if (!p) { toast('El paciente de esta sesión ya no existe.'); return false; }
+  if (!p) { toast('El paciente de esta sesión ya no existe.'); return null; }
 
   const eva = dolor == null || dolor === '' || !isFinite(Number(dolor)) ? null : Math.min(10, Math.max(0, Math.round(Number(dolor))));
   const pasos = (mv.sesion.rutina?.pasos ?? []).map((r) => ({ ...r, repeticionesManual: conteoManual(manuales[r.id]) }));
@@ -489,22 +490,23 @@ function guardarSesionRutina({ dolor = null, notas = '', manuales = {} } = {}) {
   if (mv.sesion.conEmg) s.emg = { prueba: mv.sesion.emgPrueba ?? null, senal: mv.sesion.emgSenal };
   const chequeo = typeof tomarChequeo === 'function' ? tomarChequeo(p.id) : null;
   if (chequeo) s.chequeo = chequeo;
+  const citaAnterior = p.proximaCita;
   p.sesiones.push(s);
+  if (proximaCita !== undefined) p.proximaCita = proximaCita;
   if (!guardarDB()) {
     p.sesiones.pop();
+    p.proximaCita = citaAnterior;
     alert('No se pudo guardar: el almacenamiento del navegador está lleno o bloqueado. Exporte los datos y libere espacio.');
-    return false;
+    return null;
   }
   descartarSesion(false);
   toast(`Sesión guardada para ${p.nombre}.`);
   if (p.id === estado.pacienteId) {
     estado.sesionId = s.id;
-    estado.seccion = 'seguimiento';
-    estado.vista = 'sesion';
     renderLista();
     renderPaciente();
   }
-  return true;
+  return s;
 }
 
 function monitorPuedeCambiarPaciente() {
