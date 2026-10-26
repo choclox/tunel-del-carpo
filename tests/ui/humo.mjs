@@ -220,6 +220,46 @@ await verificar('paciente nuevo con profesional', async (page) => {
   afirmar(await page.inputValue('#form-paciente [name=profesional]') === 'Prueba', 'profesional vacío');
 });
 
+/* ---------- Ficha del paciente ---------- */
+const abrirFicha = (page) => page.click('#encabezado details summary');
+
+await verificar('ficha: editar', async (page) => {
+  const id = await page.evaluate(() => estado.pacienteId);
+  await abrirFicha(page);
+  await page.click('#btn-editar-ficha');
+  await page.fill('#form-paciente [name=ocupacion]', 'Docente');
+  await page.click('#form-paciente button[value=ok]');
+  // El evento 'close' del diálogo llega en una tarea aparte: esperar a que se repinte.
+  await page.waitForFunction(() => document.querySelector('#encabezado').textContent.includes('Docente'));
+  afirmar(await page.evaluate(() => estado.pacienteId) === id, 'cambió el paciente');
+  afirmar(await page.evaluate((id) => estado.db.pacientes.filter((p) => p.id === id).length, id) === 1, 'se duplicó el paciente');
+});
+
+await verificar('ficha: archivar y reactivar', async (page) => {
+  const id = await page.evaluate(() => estado.pacienteId);
+  await abrirFicha(page);
+  await page.click('#btn-archivar');
+  afirmar(await page.locator(`.patient-item[data-id="${id}"]`).count() === 0, 'sigue en la lista');
+  await page.check('#ver-archivados');
+  const item = page.locator(`.patient-item[data-id="${id}"]`);
+  afirmar((await item.textContent()).includes('Dado de alta'), 'no dice Dado de alta');
+  await item.click();
+  await abrirFicha(page);
+  afirmar((await page.textContent('#btn-archivar')).trim() === 'Reactivar', 'el botón no dice Reactivar');
+  await page.click('#btn-archivar');
+  await page.uncheck('#ver-archivados');
+  afirmar(await page.locator(`.patient-item[data-id="${id}"]`).count() === 1, 'no volvió a la lista');
+});
+
+await verificar('ficha: próxima cita', async (page) => {
+  await abrirFicha(page);
+  await page.click('#btn-editar-ficha');
+  await page.fill('#form-paciente [name=proximaCita]', '2026-12-01');
+  await page.click('#form-paciente button[value=ok]');
+  const esperado = await page.evaluate(() => fmtFecha('2026-12-01'));
+  await page.waitForFunction((t) => document.querySelector('#encabezado').textContent.includes(t), esperado);
+});
+
 /* ---------- Seguimiento ---------- */
 await verificar('encabezado compacto', async (page) => {
   const txt = await page.textContent('#encabezado');

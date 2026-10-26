@@ -47,25 +47,25 @@ function generarDemo() {
       id: 'P-001', nombre: 'María Fernanda Gómez', documento: '43.512.880', edad: 47, sexo: 'F',
       mano: 'Derecha', ocupacion: 'Manicurista', profesional: 'Ft. Laura Henao',
       fechaCirugia: '2026-07-20', inicio: '2026-08-05', n: 12, paso: [4, 5, 5, 4, 5, 5, 4, 5, 5, 4, 5],
-      inicioPct: 0.42, finPct: 0.93, k: 0.30, dolor0: 6, seed: 11,
+      inicioPct: 0.42, finPct: 0.93, k: 0.30, dolor0: 6, seed: 11, cita: 2,
     },
     {
       id: 'P-002', nombre: 'Carlos Andrés Restrepo', documento: '71.230.455', edad: 52, sexo: 'M',
       mano: 'Izquierda', ocupacion: 'Mecánico automotriz', profesional: 'Ft. Laura Henao',
       fechaCirugia: '2026-08-10', inicio: '2026-08-26', n: 8, paso: [4, 5, 5, 4, 5, 4, 5],
-      inicioPct: 0.38, finPct: 0.80, k: 0.35, dolor0: 7, seed: 22, meseta: true,
+      inicioPct: 0.38, finPct: 0.80, k: 0.35, dolor0: 7, seed: 22, meseta: true, cita: 0,
     },
     {
       id: 'P-003', nombre: 'Luz Dary Cardona', documento: '32.774.019', edad: 39, sexo: 'F',
       mano: 'Derecha', ocupacion: 'Cocinera', profesional: 'T.O. Andrés Mejía',
       fechaCirugia: '2026-06-25', inicio: '2026-07-10', n: 14, paso: [4, 5, 5, 4, 5, 5, 4, 5, 5, 4, 5, 5, 4],
-      inicioPct: 0.48, finPct: 0.97, k: 0.25, dolor0: 5, seed: 33,
+      inicioPct: 0.48, finPct: 0.97, k: 0.25, dolor0: 5, seed: 33, cita: 5,
     },
     {
       id: 'P-004', nombre: 'Jhon Fredy Ospina', documento: '15.408.632', edad: 58, sexo: 'M',
       mano: 'Derecha', ocupacion: 'Operario minero', profesional: 'T.O. Andrés Mejía',
       fechaCirugia: '2026-09-05', inicio: '2026-09-21', n: 3, paso: [4, 5],
-      inicioPct: 0.33, finPct: 0.85, k: 0.30, dolor0: 7, seed: 44,
+      inicioPct: 0.33, finPct: 0.85, k: 0.30, dolor0: 7, seed: 44, cita: -3,
     },
   ];
 
@@ -134,8 +134,9 @@ function generarDemo() {
           ...(emg ? { emg } : {}),
         });
       }
-      const { inicio, n, paso, inicioPct, finPct, k, dolor0, seed, meseta, ...datos } = p;
-      return { ...datos, sesiones };
+      const { inicio, n, paso, inicioPct, finPct, k, dolor0, seed, meseta, cita, ...datos } = p;
+      // Próxima cita relativa a hoy: una hoy, una vencida y dos futuras.
+      return { ...datos, proximaCita: sumarDias(hoyISO(), cita), archivado: false, sesiones };
     }),
   };
 }

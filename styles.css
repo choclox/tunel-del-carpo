@@ -162,6 +162,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .enc-ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 10px 0 0; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
 .enc-ficha dt { color: var(--muted); }
 .enc-ficha dd { margin: 0; font-weight: 600; }
+.enc-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ver-archivados { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
 
 /* Bloques plegables y vacío */
 .plegable > summary { font-size: 15px; }

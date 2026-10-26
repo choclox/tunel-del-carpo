@@ -77,6 +77,7 @@
           <input type="search" id="buscar" placeholder="Buscar paciente o documento…" aria-label="Buscar paciente">
         </div>
         <button class="btn btn-primary btn-block" id="btn-nuevo"><svg class="ic"><use href="#i-plus"/></svg>Nuevo paciente</button>
+        <label class="ver-archivados"><input type="checkbox" id="ver-archivados"> Mostrar dados de alta</label>
       </div>
       <ul class="patient-list" id="lista-pacientes"></ul>
     </aside>
@@ -374,7 +375,7 @@
   <dialog id="dlg-paciente">
     <form method="dialog" id="form-paciente">
       <div class="eyebrow">Registro</div>
-      <h2>Nuevo paciente</h2>
+      <h2 id="dlg-paciente-titulo">Nuevo paciente</h2>
       <div class="form-grid">
         <label>Nombre completo<input name="nombre" required></label>
         <label>Documento<input name="documento" required></label>
@@ -388,6 +389,7 @@
         <label>Fecha de cirugía<input name="fechaCirugia" type="date" required></label>
         <label>Ocupación<input name="ocupacion"></label>
         <label>Profesional responsable<input name="profesional"></label>
+        <label>Próxima cita<input name="proximaCita" type="date"></label>
       </div>
       <div class="dlg-actions">
         <button class="btn btn-ghost" value="cancel" formnovalidate>Cancelar</button>

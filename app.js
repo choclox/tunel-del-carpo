@@ -15,6 +15,8 @@ const estado = {
   cmpA: null,
   cmpB: null,
   busqueda: '',
+  verArchivados: false,
+  editandoId: null,      // paciente que se edita en #dlg-paciente (null = nuevo)
 };
 const charts = {};
 
@@ -139,6 +141,7 @@ function nuevoChart(id, config) {
 function renderLista() {
   const q = estado.busqueda.toLowerCase();
   const lista = estado.db.pacientes
+    .filter((p) => estado.verArchivados || !p.archivado)
     .filter((p) => !q || p.nombre.toLowerCase().includes(q) || p.documento.includes(q) || p.id.toLowerCase().includes(q))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
   $('#lista-pacientes').innerHTML = lista.map((p) => {
@@ -148,7 +151,7 @@ function renderLista() {
     return `<li class="patient-item ${p.id === estado.pacienteId ? 'active' : ''}" data-id="${esc(p.id)}" tabindex="0">
       <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
       <span class="pi-name">${esc(p.nombre)}</span>
-      <span class="pi-meta"><span>${esc(p.id)} · Mano ${esc(p.mano.toLowerCase())}</span><span>${dias(p.fechaCirugia, hoyISO())} d post-op</span></span>
+      <span class="pi-meta"><span>${esc(p.id)} · Mano ${esc(p.mano.toLowerCase())}${p.archivado ? ' · <b>Dado de alta</b>' : ''}</span><span>${dias(p.fechaCirugia, hoyISO())} d post-op</span></span>
       <span class="pi-meta"><span>${ult ? 'Última: ' + fmtFecha(ult.fecha, true) : 'Sin sesiones'} · ${ses.length} ses.</span><span>${prog == null ? '' : fmt(prog) + ' %'}</span></span>
       ${prog == null ? '' : `<span></span><span class="pi-bar" title="Progreso global: ${fmt(prog)} % del valor de referencia"><span style="width:${prog}%"></span></span>`}
     </li>`;
@@ -193,7 +196,12 @@ function renderEncabezado(p) {
       <dl>
         ${fila('ID', p.id)}${fila('Documento', p.documento)}${fila('Edad', p.edad ? p.edad + ' años' : '')}${fila('Sexo', p.sexo)}
         ${fila('Fecha de cirugía', fmtFecha(p.fechaCirugia))}${fila('Ocupación', p.ocupacion)}${fila('Profesional', p.profesional)}
+        ${fila('Próxima cita', p.proximaCita ? fmtFecha(p.proximaCita) : 'Por definir')}
       </dl>
+      <div class="enc-acciones">
+        <button class="btn" id="btn-editar-ficha">Editar ficha</button>
+        <button class="btn btn-ghost" id="btn-archivar">${p.archivado ? 'Reactivar' : 'Dar de alta (archivar)'}</button>
+      </div>
     </details>`;
 }
 
@@ -810,6 +818,33 @@ function exportarCSV(p) {
   descargar(`${p.id}_sesiones.csv`, '﻿' + filas.join('\r\n'), 'text/csv;charset=utf-8');
 }
 
+/* ======================= Ficha del paciente ======================= */
+// p = null: paciente nuevo; con p: editar su ficha (mismo id, conserva las sesiones).
+function abrirFormPaciente(p) {
+  const form = $('#form-paciente');
+  form.reset();
+  estado.editandoId = p?.id ?? null;
+  $('#dlg-paciente-titulo').textContent = p ? 'Editar paciente' : 'Nuevo paciente';
+  if (p) {
+    for (const campo of ['nombre', 'documento', 'edad', 'sexo', 'mano', 'fechaCirugia', 'ocupacion', 'profesional', 'proximaCita']) {
+      form.elements[campo].value = p[campo] ?? '';
+    }
+  } else {
+    form.elements.profesional.value = leerSesion()?.nombre ?? '';
+  }
+  $('#dlg-paciente').showModal();
+}
+
+function archivarPaciente(id, archivado) {
+  const p = estado.db.pacientes.find((x) => x.id === id);
+  if (!p) return;
+  if (archivado && !confirm(`¿Dar de alta a ${p.nombre}? Dejará de aparecer en la lista y en el Inicio; puede reactivarlo cuando quiera.`)) return;
+  p.archivado = archivado;
+  guardarDB();
+  renderLista(); renderPaciente();
+  toast(archivado ? `${p.nombre} quedó dado de alta.` : `${p.nombre} está activo de nuevo.`);
+}
+
 /* ======================= Eventos ======================= */
 /* Profesional de la sesión de demostración (siempre como texto, nunca como HTML). */
 function renderUsuario() {
@@ -909,21 +944,31 @@ function init() {
     toast('Datos de demostración restablecidos.');
   });
 
-  $('#btn-nuevo').addEventListener('click', () => {
-    $('#form-paciente').reset();
-    $('#form-paciente [name=profesional]').value = leerSesion()?.nombre ?? '';
-    $('#dlg-paciente').showModal();
-  });
+  $('#btn-nuevo').addEventListener('click', () => abrirFormPaciente(null));
   $('#dlg-paciente').addEventListener('close', () => {
     if ($('#dlg-paciente').returnValue !== 'ok') return;
     const d = Object.fromEntries(new FormData($('#form-paciente')));
+    const datos = { ...d, edad: Number(d.edad), proximaCita: d.proximaCita || null };
+    const editado = estado.db.pacientes.find((p) => p.id === estado.editandoId);
+    if (editado) {
+      Object.assign(editado, datos);
+      guardarDB();
+      renderLista(); renderPaciente();
+      toast('Ficha actualizada.');
+      return;
+    }
     const num = Math.max(0, ...estado.db.pacientes.map((p) => parseInt(p.id.replace(/\D/g, ''), 10) || 0)) + 1;
-    const p = { id: `P-${String(num).padStart(3, '0')}`, ...d, edad: Number(d.edad), sesiones: [] };
+    const p = { id: `P-${String(num).padStart(3, '0')}`, ...datos, sesiones: [] };
     estado.db.pacientes.push(p);
     guardarDB();
     seleccionarPaciente(p.id);
     toast(`Paciente ${p.id} creado.`);
   });
+  $('#encabezado').addEventListener('click', (e) => {
+    if (e.target.closest('#btn-editar-ficha')) abrirFormPaciente(paciente());
+    if (e.target.closest('#btn-archivar')) archivarPaciente(estado.pacienteId, !paciente()?.archivado);
+  });
+  $('#ver-archivados').addEventListener('change', (e) => { estado.verArchivados = e.target.checked; renderLista(); });
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { aplicarTemaCharts(); renderSeccion(); });
   // Redibuja las gráficas cuando termine de cargar la tipografía web
