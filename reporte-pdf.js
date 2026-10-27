@@ -9,12 +9,15 @@ const depsPdf = () => (typeof EJERCICIOS !== 'undefined'
   ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./reporte.js'), ...require('./resumen-sesion.js') });
 
-const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≤', '<='], ['–', '-'], ['—', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!']];
+const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≤', '<='], ['–', '-'], ['—', '-'], ['−', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!'],
+  ['“', '"'], ['”', '"'], ['‘', "'"], ['’', "'"]];
 
+// Helvetica solo tiene Latin-1: lo demás se cambia por '?' (si no, jsPDF borra el carácter o
+// estropea toda la línea).
 function textoPdf(texto) {
   let s = String(texto ?? '');
   for (const [a, b] of REEMPLAZOS_PDF) s = s.split(a).join(b);
-  return s;
+  return Array.from(s, (c) => (c.codePointAt(0) > 0xff ? '?' : c)).join('');
 }
 
 // <id>_sesion_<fecha>.pdf; la segunda sesión del mismo día lleva _2, la tercera _3…
@@ -25,7 +28,8 @@ function nombreArchivoPdf(p, s) {
 }
 
 const fechaLargaPdf = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
-const sinHtml = (t) => String(t).replace(/<[^>]*>/g, '');
+const ENTIDADES = { '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&amp;': '&' };
+const sinHtml = (t) => String(t).replace(/<[^>]*>/g, '').replace(/&(lt|gt|quot|#39|amp);/g, (e) => ENTIDADES[e]);
 const num = (v) => (v == null || !isFinite(v) ? '—' : String(Math.round(v)));
 const RECOMENDACION = { ok: 'Todo bien', precaucion: 'Precaución', detener: 'No hacer la sesión' };
 

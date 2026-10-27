@@ -56,8 +56,10 @@ test('desviaciones: recalibrar y postura de canto', () => {
     assert.strictEqual(p.recalibrar, true);
     assert.strictEqual(p.indicacion, ind);
   }
+  // Prono-supinación también: se calibra con el pulgar hacia arriba para que `ps` no pase de ±180°.
   const otros = ETAPAS.flatMap((e) => e.pasos).filter((p) => p.recalibrar);
-  assert.deepStrictEqual(otros.map((p) => p.id), ['desv_radial', 'desv_cubital']);
+  assert.deepStrictEqual(otros.map((p) => p.id), ['desv_radial', 'desv_cubital', 'pronacion', 'supinacion', 'pronosup_martillo']);
+  for (const p of otros.slice(2)) assert.match(p.indicacion, /pulgar hacia arriba/);
 });
 
 test('pronación y supinación por el canal ps', () => {

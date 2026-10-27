@@ -253,11 +253,22 @@ function procesarLinea(linea) {
         ? { tiempoS, ok: tiempoS <= CAL_TIMEOUT_S }
         : { tiempoS, ok: false, motivo: partes.slice(2).join(',') || 'error del dispositivo' };
       mv.calInicio = null;
+      // Calibración pedida por un paso en su propia postura (mano de canto, pulgar arriba): solo vale
+      // para ese tipo de paso; los demás y la sesión siguiente vuelven a calibrar en posición neutra.
+      if (mv.cal.ok && mv.calEnPostura) mv.cal.postura = 'paso';
+      // Las muestras anteriores usan el cero viejo: el reposo del ejercicio no puede salir de ellas.
+      if (mv.cal.ok) mv.buffer = [];
       if (mv.sesion) mv.sesion.calibracion = mv.cal;
       if (mv.paso?.esperandoCal) {
-        mv.paso.esperandoCal = false;
-        if (mv.cal.ok) iniciarEjercicio(mv.paso.medicion.tipo, mv.paso.paso.reps);
-        else mv.paso.medicion = null; // sin calibración en la postura nueva: conteo manual
+        if (!mv.cal.ok) {
+          mv.paso.esperandoCal = false;
+          mv.paso.medicion = null; // sin calibración: conteo manual
+        } else if (mv.cal.postura && !mv.paso.paso.recalibrar) {
+          pedirCalibracion(false); // terminó la del paso anterior, de canto: falta la neutra
+        } else {
+          mv.paso.esperandoCal = false;
+          iniciarEjercicio(mv.paso.medicion.tipo, mv.paso.paso.reps);
+        }
       }
       renderMonitorControles();
       break;
@@ -303,7 +314,8 @@ function nuevaSesion() {
 function iniciarEjercicio(tipo, objetivo) {
   objetivo = Math.max(1, parseInt(objetivo, 10) || 10);
   if (!mv.conectado || mv.ej || !EJERCICIOS[tipo]) return;
-  if (!mv.cal?.ok) { toast('Calibre el dispositivo antes de iniciar.'); return; }
+  const enPostura = !!mv.paso?.paso.recalibrar;
+  if (!mv.cal?.ok || (mv.cal.postura && !enPostura)) { toast('Calibre el dispositivo antes de iniciar.'); return; }
 
   if (!mv.sesion) mv.sesion = nuevaSesion();
 
@@ -425,15 +437,13 @@ function iniciarPasoRutina(paso) {
   // Sin calibración válida (y sin una en curso) no se puede medir el ángulo: conteo manual.
   if (medicion?.fuente === 'imu' && !paso.recalibrar && mv.calInicio == null && !mv.cal?.ok) medicion = null;
   mv.paso = { paso, muestras: [], medicion, sinEmg, esperandoCal: false };
-  if (medicion?.fuente === 'imu' && (paso.recalibrar || mv.calInicio != null)) {
-    // Espera la calibración: la que pide este paso o la que sigue en curso desde el anterior.
+  const calDeOtraPostura = !paso.recalibrar && !!mv.cal?.postura;
+  if (medicion?.fuente === 'imu' && (paso.recalibrar || mv.calInicio != null || calDeOtraPostura)) {
+    // Espera la calibración: la que pide este paso (en su postura, o neutra si la vigente es de
+    // canto) o la que sigue en curso desde el anterior.
     mv.paso.esperandoCal = true;
     mv.transporte.enviar('EJ,-').catch(() => {});
-    if (mv.calInicio == null) {
-      mv.calInicio = performance.now();
-      mv.cal = null;
-      mv.transporte.enviar('CAL');
-    }
+    if (mv.calInicio == null) pedirCalibracion(!!paso.recalibrar);
   } else if (medicion?.fuente === 'imu') iniciarEjercicio(medicion.tipo, paso.reps);
   else if (medicion?.fuente === 'emg') iniciarEjercicioEmg(medicion.musculo, paso.reps);
   else mv.transporte?.enviar('EJ,-').catch(() => {});
@@ -487,7 +497,7 @@ function estadoDispositivo() {
     conectado: mv.conectado,
     origen: mv.conectado ? mv.origen : null,
     calibrando: mv.calInicio != null,
-    calOk: !!cal?.ok,
+    calOk: !!cal?.ok && !cal.postura, // la de un paso (mano de canto) no vale para empezar
     calMotivo: cal && !cal.ok ? cal.motivo || `tardó ${fmt(cal.tiempoS, 1)} s (> ${CAL_TIMEOUT_S} s)` : null,
     calTiempoS: cal ? cal.tiempoS : null,
     conEmg: mv.conEmg,
@@ -642,10 +652,16 @@ async function desconectar() {
 
 function calibrar() {
   if (!mv.conectado || mv.ej || mv.paso || mv.calInicio != null) return;
+  pedirCalibracion(false);
+  renderMonitorControles();
+}
+
+// enPostura: la pide un paso `recalibrar` en su propia postura (no sirve como calibración neutra).
+function pedirCalibracion(enPostura) {
   mv.calInicio = performance.now();
+  mv.calEnPostura = enPostura;
   mv.cal = null;
   mv.transporte.enviar('CAL');
-  renderMonitorControles();
 }
 
 /* ======================= Render ======================= */

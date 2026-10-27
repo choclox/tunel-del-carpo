@@ -19,6 +19,13 @@ test('textoPdf deja solo caracteres de Helvetica', () => {
   assert.strictEqual(textoPdf('Dolor 5 → 3 · ≥ 7 – Andrés ñ ✓ …'), 'Dolor 5 -> 3 · >= 7 - Andrés ñ OK ...');
   assert.strictEqual(textoPdf('≤ 3 — ⚠'), '<= 3 - !');
   assert.strictEqual(textoPdf(null), '');
+  // Comillas de autocorrección, signo menos y lo que no está en Latin-1.
+  assert.strictEqual(textoPdf('“can’t” ‘x’ −3 € 😀'), '"can\'t" \'x\' -3 ? ?');
+});
+
+test('datosReporteSesion: los avisos no traen entidades HTML', () => {
+  const d = datosReporteSesion(pac, s2, '2026-10-28', () => [{ nivel: 'critical', texto: '<b>Datos:</b> 2 % (criterio &lt; 1 %) &amp; &gt; &quot;x&quot; &#39;y&#39;' }]);
+  assert.deepStrictEqual(d.avisos, ['Datos: 2 % (criterio < 1 %) & > "x" \'y\'']);
 });
 
 test('nombre de archivo, con sufijo si hay dos sesiones el mismo día', () => {

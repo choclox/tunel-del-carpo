@@ -561,6 +561,42 @@ await verificar('desviación pide recalibrar', async (page) => {
   await esperarDetectadas(page);
 });
 
+await verificar('calibración de canto no vale para flexión', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 15000 });
+  afirmar(await page.evaluate(() => !estadoDispositivo().calOk), 'la calibración de canto cuenta como válida para la sesión');
+  const cal0 = await page.evaluate(() => window.comandos.filter((c) => c === 'CAL').length);
+  await page.click('#rt-anterior');
+  await page.waitForTimeout(450);
+  await page.click('#rt-anterior');
+  await page.waitForTimeout(450);
+  afirmar((await page.textContent('#rt-nombre')).trim() === 'Flexión de muñeca', await page.textContent('#rt-nombre'));
+  // Si la flexión ya quedó grabada se vuelve a grabar; si no, empieza sola al volver.
+  if (await page.isVisible('#rt-regrabar')) await page.click('#rt-regrabar');
+  await page.waitForTimeout(200);
+  afirmar(await page.evaluate((n) => window.comandos.filter((c) => c === 'CAL').length > n, cal0), 'no recalibró en la postura neutra');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), await page.textContent('#rt-contador'));
+  await page.waitForFunction(() => mv.ej?.tipo === 'flexion', null, { timeout: 15000 });
+  afirmar(await page.evaluate(() => estadoDispositivo().calOk), 'tras calibrar en neutro la calibración no vuelve a ser válida');
+});
+
+await verificar('reposo tomado después de recalibrar', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), 'no está calibrando');
+  // Muestras con el cero anterior (mano de canto con la muñeca algo flexionada): rc ≈ 30.
+  // Se meten justo antes de que llegue CAL,OK, como las que el dispositivo sigue enviando mientras calibra.
+  await page.evaluate(() => {
+    const t = mv.transporte, onLinea = t.onLinea;
+    t.onLinea = (l) => {
+      if (l.startsWith('CAL,OK')) { const u = mv.buffer[mv.buffer.length - 1]; for (let i = 0; i < 25; i++) mv.buffer.push({ ...u, rc: 30 }); }
+      onLinea(l);
+    };
+  });
+  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 15000 });
+  const base = await page.evaluate(() => mv.ej.base);
+  afirmar(Math.abs(base) < 3, `reposo ${base}: usa muestras de antes de la calibración`);
+});
+
 await verificar('paso EMG sin electrodos', async (page) => {
   await rutinaHastaPaso(page, 1, 'tendon_recto');
   await page.waitForTimeout(1500); // un paso necesita ≥ 1 s para guardarse
