@@ -363,6 +363,7 @@ dialog::backdrop { background: rgba(5, 20, 40, 0.40); backdrop-filter: blur(2px)
 .rt-indicacion { font-size: 15px; color: var(--ink-2); }
 .rt-contador { width: 100%; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--brand-soft); color: var(--brand-text); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .rt-contador.medido { font-size: 24px; font-weight: 800; }
+.rt-contador.aviso { background: var(--surface); border: 1px solid var(--st-warning); border-left-width: 4px; color: var(--ink); }
 .rt-grabado { width: 100%; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); display: grid; justify-items: start; gap: 8px; }
 .rt-grabado-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--good-text); }
 .rt-grabado-txt { margin: 0; font-size: 18px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }

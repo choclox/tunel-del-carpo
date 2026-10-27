@@ -68,7 +68,9 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   return page;
 }
 
+// HUMO_SOLO=<texto>: corre solo las comprobaciones cuyo nombre lo contiene (para depurar).
 async function verificar(nombre, fn, opciones) {
+  if (process.env.HUMO_SOLO && !nombre.includes(process.env.HUMO_SOLO)) return;
   const page = await nuevaPagina(opciones);
   try {
     await fn(page);
@@ -476,6 +478,97 @@ await verificar('rutina completa con simulador', async (page) => {
   });
   afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
+
+// Empieza una rutina con el simulador y avanza hasta el paso `id` (sin terminar la rutina).
+async function rutinaHastaPaso(page, etapa, id, { herida } = {}) {
+  await irEjercicios(page);
+  await page.click(`#rt-etapas [data-etapa="${etapa}"]`);
+  await page.click('#rt-iniciar');
+  await page.waitForSelector('#dlg-chequeo[open]');
+  await page.fill('#ch-dolor', '2');
+  if (herida) {
+    await page.selectOption('#ch-herida', herida);
+    await page.check('#ch-criterio');
+    await page.click('#ch-continuar-criterio');
+  } else {
+    await page.click('#ch-continuar');
+  }
+  await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
+  await page.click('#ls-empezar');
+  await page.waitForSelector('#dlg-rutina[open]');
+  await page.evaluate(() => {
+    window.comandos = [];
+    const t = mv.transporte, enviar = t.enviar.bind(t);
+    t.enviar = (c) => { window.comandos.push(c); return enviar(c); };
+  });
+  const nombre = await page.evaluate(({ etapa, id }) => etapaPorNumero(etapa).pasos.find((x) => x.id === id).nombre, { etapa, id });
+  for (let i = 0; i < 20 && (await page.textContent('#rt-nombre')).trim() !== nombre; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(450);
+  }
+}
+// Desde el paso actual: pasa por el resto, termina y guarda (omitiendo la prueba de fuerza).
+async function terminarYGuardar(page) {
+  for (let i = 0; i < 20 && (await page.textContent('#rt-siguiente-txt')).trim() !== 'Terminar rutina'; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(450);
+  }
+  await page.click('#rt-siguiente');
+  if (await page.isVisible('#pr-omitir')) await page.click('#pr-omitir');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  return ultimaSesion(page);
+}
+const pasoGuardado = (s, id) => s.rutina.pasos.find((x) => x.id === id);
+const esperarDetectadas = (page) => page.waitForFunction(() => /^Detectadas: [1-9]/.test(document.querySelector('#rt-contador').textContent), null, { timeout: 15000 });
+
+await verificar('fase 1 con EMG', async (page) => {
+  await rutinaHastaPaso(page, 1, 'tendon_recto');
+  await esperarDetectadas(page);
+  afirmar(await page.evaluate(() => mv.ej?.musculo) === 'flexores', 'el paso no mide los flexores');
+  afirmar(await page.evaluate(() => { terminarRutina(); return document.querySelector('#fin-tabla td:nth-child(3)').textContent; }) !== '—', 'la tabla final no muestra las detectadas por EMG');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  const s = await ultimaSesion(page);
+  const r = pasoGuardado(s, 'tendon_recto');
+  afirmar(r.medicion?.fuente === 'emg' && r.emg?.musculo === 'flexores' && r.emg.repeticiones > 0 && r.repeticiones === r.emg.repeticiones, JSON.stringify(r).slice(0, 200));
+  afirmar(!s.ejercicios.length, 'un paso EMG no debe entrar en los ejercicios con ángulo');
+});
+
+await verificar('fase 1 herida → oposición manual', async (page) => {
+  await rutinaHastaPaso(page, 1, 'pulgar_oposicion', { herida: 'enrojecida' });
+  await page.waitForTimeout(600);
+  afirmar((await page.textContent('#rt-contador')).startsWith('Cuente las repeticiones'), await page.textContent('#rt-contador'));
+  afirmar(await page.evaluate(() => mv.ej) === null, 'se está midiendo la oposición');
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'pulgar_oposicion');
+  afirmar(r.medicion === null && r.repeticiones === null && s.chequeo.herida === 'enrojecida', JSON.stringify(r).slice(0, 200));
+});
+
+await verificar('pronación con IMU', async (page) => {
+  await rutinaHastaPaso(page, 2, 'pronacion');
+  await esperarDetectadas(page);
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'pronacion');
+  afirmar(r.medicion?.fuente === 'imu' && r.tipo === 'pronacion' && r.repeticiones > 0, JSON.stringify(r).slice(0, 200));
+  afirmar(s.ejercicios.some((e) => e.tipo === 'pronacion' && e.anguloMax > 20), 'sin ángulo de pronación');
+});
+
+await verificar('desviación pide recalibrar', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  afirmar(await page.evaluate(() => window.comandos.includes('CAL')), 'no envió CAL');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), await page.textContent('#rt-contador'));
+  await esperarDetectadas(page);
+});
+
+await verificar('paso EMG sin electrodos', async (page) => {
+  await rutinaHastaPaso(page, 1, 'tendon_recto');
+  await page.waitForTimeout(1500); // un paso necesita ≥ 1 s para guardarse
+  afirmar((await page.textContent('#rt-contador')).trim() === 'Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.', await page.textContent('#rt-contador'));
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'tendon_recto');
+  afirmar(r.medicion === null && r.repeticiones === null && r.senal, JSON.stringify(r).slice(0, 200));
+}, { init: () => { window.SIMULADOR_SIN_EMG = true; } });
 
 const PRUEBA_RAPIDA = () => { window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; };
 

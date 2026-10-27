@@ -134,6 +134,15 @@ class TransporteSimulado {
     if (c === 'STOP') this.transmitiendo = false;
     if (c === 'CAL') this.cal = { inicio: performance.now(), dur: 3000 + this.rand() * 5000 };
     if (c === 'PR') this.contraccion = MUSCULOS.includes(tipo) ? { musculo: tipo, amp: 400 + this.rand() * 100 } : null;
+    if (c === 'EJ' && tipo?.startsWith('emg-') && MUSCULOS.includes(tipo.slice(4))) {
+      const reps = Math.max(1, Number(objetivo) - (this.rand() < 0.3 ? 1 : 0));
+      const amp = 250 + this.rand() * 100;
+      this.ejercicio = {
+        tipo, musculo: tipo.slice(4), t0: this._ahora(), periodo: 3 + this.rand() * 1.2, reps,
+        amps: Array.from({ length: reps }, () => amp * (0.9 + this.rand() * 0.2)),
+      };
+      return;
+    }
     if (c === 'EJ') {
       if (!EJERCICIOS[tipo]) { this.ejercicio = null; return; }
       const reps = Math.max(1, Number(objetivo) - (this.rand() < 0.3 ? 1 : 0));
@@ -170,7 +179,7 @@ class TransporteSimulado {
     const ruido = () => (this.rand() - 0.5) * 1.2;
     const a = { fe: 2 + ruido(), rc: ruido(), ps: ruido() };
     const ej = this.ejercicio;
-    if (ej) {
+    if (ej && !ej.musculo) {
       const { canal, signo } = EJERCICIOS[ej.tipo];
       const s = (t - ej.t0) / 1000 - 1.5; // el paciente arranca tras 1,5 s
       const k = Math.floor(s / ej.periodo);
@@ -183,12 +192,18 @@ class TransporteSimulado {
   }
 
   // EMG simulado (0–1000): reposo ~20; en la prueba, el músculo pedido ~400–500 y los otros ~60–100;
-  // en la rutina, flexión/puño activan los flexores y extensión los extensores (~150).
+  // en la rutina, flexión/puño activan los flexores y extensión los extensores (~150), y un paso
+  // medido con EMG contrae su músculo (~250–350) a ritmo de repeticiones.
   _emg(t) {
     const v = { tenar: 20, flexores: 20, extensores: 20 };
     const c = this.contraccion;
     if (c) {
       MUSCULOS.forEach((k) => { v[k] = k === c.musculo ? c.amp : 60 + this.rand() * 40; });
+    } else if (this.ejercicio?.musculo) {
+      const ej = this.ejercicio;
+      const s = (t - ej.t0) / 1000 - 1.5;
+      const k = Math.floor(s / ej.periodo);
+      if (s > 0 && k < ej.reps) v[ej.musculo] += ej.amps[k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * ((s - k * ej.periodo) / ej.periodo)));
     } else if (this.ejercicio) {
       const ej = this.ejercicio;
       const musculo = ej.tipo === 'extension' ? 'extensores' : ['flexion', 'puno'].includes(ej.tipo) ? 'flexores' : null;
@@ -239,6 +254,11 @@ function procesarLinea(linea) {
         : { tiempoS, ok: false, motivo: partes.slice(2).join(',') || 'error del dispositivo' };
       mv.calInicio = null;
       if (mv.sesion) mv.sesion.calibracion = mv.cal;
+      if (mv.paso?.esperandoCal) {
+        mv.paso.esperandoCal = false;
+        if (mv.cal.ok) iniciarEjercicio(mv.paso.medicion.tipo, mv.paso.paso.reps);
+        else mv.paso.medicion = null; // sin calibración en la postura nueva: conteo manual
+      }
       renderMonitorControles();
       break;
     }
@@ -262,18 +282,6 @@ function acumularSenalEmg(sesion, emg) {
 
 const maximo = (arr) => arr.reduce((a, b) => (b > a ? b : a), -Infinity);
 const minimo = (arr) => arr.reduce((a, b) => (b < a ? b : a), Infinity);
-
-const mediana = (arr) => {
-  const s = [...arr].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
-
-/* Umbrales con histéresis relativos a la posición de reposo, ajustados a la
- * amplitud típica de las repeticiones ya detectadas. */
-function umbrales(ej) {
-  return { alto: Math.max(8, 0.5 * ej.refAmp), bajo: Math.max(3, 0.25 * ej.refAmp) };
-}
 
 function nuevaSesion() {
   return {
@@ -307,37 +315,38 @@ function iniciarEjercicio(tipo, objetivo) {
     inicio: Date.now(),
     tiempos: [],
     valores: [],
-    picos: [],       // índices de los picos (repeticiones)
-    picosRel: [],    // amplitud de cada repetición sobre el reposo
-    arriba: false,
-    pico: 0,
-    picoIdx: 0,
-    refAmp: 0.3 * EJERCICIOS[tipo].ref,
+    det: crearDetector({ tipoUmbral: 'imu', ref: EJERCICIOS[tipo].ref }),
   };
   mv.transporte.enviar(`EJ,${tipo},${objetivo}`);
   renderMonitorControles();
 }
 
+// Paso medido con EMG: cuenta las contracciones del músculo; el reposo es la media de las últimas
+// muestras con EMG (o 0 si no hay, porque el dispositivo ya resta el reposo).
+function iniciarEjercicioEmg(musculo, objetivo) {
+  objetivo = Math.max(1, parseInt(objetivo, 10) || 10);
+  if (!mv.conectado || mv.ej || !MUSCULOS.includes(musculo)) return;
+  if (!mv.sesion) mv.sesion = nuevaSesion();
+  const reposo = mv.buffer.slice(-25).filter((m) => m.emg).map((m) => m.emg[musculo]);
+  mv.ej = {
+    musculo, objetivo,
+    base: reposo.length ? prom(reposo) : 0,
+    inicio: Date.now(),
+    tiempos: [],
+    valores: [],
+    det: crearDetector({ tipoUmbral: 'emg' }),
+  };
+  mv.transporte.enviar(`EJ,emg-${musculo},${objetivo}`);
+  renderMonitorControles();
+}
+
 function procesarMuestraEjercicio(m) {
   const e = mv.ej;
-  const v = e.signo * m[e.canal];
-  const i = e.valores.length;
+  if (e.musculo && !m.emg) return;
+  const v = e.musculo ? m.emg[e.musculo] : e.signo * m[e.canal];
   e.tiempos.push(m.t);
   e.valores.push(v);
-  const rel = v - e.base;
-  const { alto, bajo } = umbrales(e);
-  if (!e.arriba) {
-    if (rel > alto) { e.arriba = true; e.pico = rel; e.picoIdx = i; }
-  } else {
-    if (rel > e.pico) { e.pico = rel; e.picoIdx = i; }
-    if (rel < bajo) {
-      e.arriba = false;
-      e.picos.push(e.picoIdx);
-      e.picosRel.push(e.pico);
-      e.refAmp = mediana(e.picosRel);
-      if (e.picos.length === e.objetivo) toast(`Objetivo alcanzado: ${e.objetivo} repeticiones.`);
-    }
-  }
+  if (e.det.agregar(v - e.base) && e.det.picos.length === e.objetivo) toast(`Objetivo alcanzado: ${e.objetivo} repeticiones.`);
 }
 
 function finalizarEjercicio() {
@@ -350,6 +359,20 @@ function finalizarEjercicio() {
   const n = e.valores.length;
   const dur = n > 1 ? e.tiempos[n - 1] - e.tiempos[0] : 0;
   if (n < 25 || dur < 1) { toast('Ejercicio demasiado corto: no se registró.'); return null; }
+  const { picos, picosRel } = e.det;
+
+  if (e.musculo) {
+    return {
+      repeticiones: picos.length,
+      duracionS: Math.round(dur),
+      emg: {
+        musculo: e.musculo,
+        repeticiones: picos.length,
+        activacionMedia: picosRel.length ? Math.round(prom(picosRel)) : null,
+        activacionMax: Math.round(maximo(e.valores)),
+      },
+    };
+  }
 
   let suma = 0, cuenta = 0;
   for (let i = 2; i < n; i++) {
@@ -358,14 +381,14 @@ function finalizarEjercicio() {
     const w = Math.abs(e.valores[i] - e.valores[i - 2]) / dt;
     if (w > 5) { suma += w; cuenta++; }
   }
-  const amps = e.picosRel;
+  const amps = picosRel;
   const media = prom(amps);
   const cv = amps.length >= 2 ? (Math.sqrt(prom(amps.map((a) => (a - media) ** 2))) / media) * 100 : null;
 
   const registro = {
     tipo: e.tipo,
     repeticionesObjetivo: e.objetivo,
-    repeticiones: e.picos.length,
+    repeticiones: picos.length,
     repeticionesManual: null,
     anguloMax: r1(maximo(e.valores)),
     anguloMin: r1(minimo(e.valores)),
@@ -373,7 +396,7 @@ function finalizarEjercicio() {
     variabilidadPct: cv == null ? null : r1(cv),
     duracionS: Math.round(dur),
     senal: { fs: r1((n - 1) / dur), angulos: e.valores.map(r1) },
-    picos: e.picos,
+    picos,
   };
   const ejs = mv.sesion.ejercicios;
   const previo = ejs.findIndex((x) => x.tipo === e.tipo);
@@ -389,12 +412,40 @@ function iniciarSesionRutina(etapa) {
   renderMonitorControles();
 }
 
+const TEXTO_PASO_SIN_EMG = 'Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.';
+
+// medicion: cómo se cuenta el paso hoy (rutinas.js), o null si se cuenta a mano. Los pasos IMU con
+// `recalibrar` piden CAL en la postura del paso y empiezan a contar cuando el dispositivo responde.
 function iniciarPasoRutina(paso) {
   if (mv.paso) finalizarPasoRutina();
-  mv.paso = { paso, muestras: [] };
-  if (paso.tipo && mv.conectado) iniciarEjercicio(paso.tipo, paso.reps);
+  const chequeo = typeof chequeoPendiente !== 'undefined' ? chequeoPendiente : null;
+  let medicion = mv.conectado ? medicionDelPaso(paso, chequeo) : null;
+  let sinEmg = false;
+  if (medicion?.fuente === 'emg' && !mv.conEmg) { medicion = null; sinEmg = true; }
+  // Sin calibración válida (y sin una en curso) no se puede medir el ángulo: conteo manual.
+  if (medicion?.fuente === 'imu' && !paso.recalibrar && mv.calInicio == null && !mv.cal?.ok) medicion = null;
+  mv.paso = { paso, muestras: [], medicion, sinEmg, esperandoCal: false };
+  if (medicion?.fuente === 'imu' && (paso.recalibrar || mv.calInicio != null)) {
+    // Espera la calibración: la que pide este paso o la que sigue en curso desde el anterior.
+    mv.paso.esperandoCal = true;
+    mv.transporte.enviar('EJ,-').catch(() => {});
+    if (mv.calInicio == null) {
+      mv.calInicio = performance.now();
+      mv.cal = null;
+      mv.transporte.enviar('CAL');
+    }
+  } else if (medicion?.fuente === 'imu') iniciarEjercicio(medicion.tipo, paso.reps);
+  else if (medicion?.fuente === 'emg') iniciarEjercicioEmg(medicion.musculo, paso.reps);
   else mv.transporte?.enviar('EJ,-').catch(() => {});
   renderMonitorControles();
+}
+
+// Para el contador de la rutina: 'calibrando' | 'medido' | 'sin-emg' | 'manual' (null sin paso).
+function medicionEnCurso() {
+  if (!mv.paso) return null;
+  if (mv.paso.esperandoCal) return 'calibrando';
+  if (mv.ej) return 'medido';
+  return mv.paso.sinEmg ? 'sin-emg' : 'manual';
 }
 
 function finalizarPasoRutina() {
@@ -414,18 +465,20 @@ function finalizarPasoRutina() {
     id: paso.id,
     nombre: paso.nombre,
     tipo: paso.tipo ?? null,
+    medicion: registro ? actual.medicion : null,
     repeticionesObjetivo: paso.reps,
     repeticiones: registro?.repeticiones ?? null,
     repeticionesManual: null,
     duracionS: registro?.duracionS ?? resumen.duracionS,
   };
+  if (registro?.emg) reg.emg = registro.emg;
   // Sin registro medido (paso sin tipo, o el ejercicio no llegó a iniciarse): se guarda la señal cruda.
   if (!registro) reg.senal = resumen.senal;
   mv.sesion.rutina.pasos = guardarRegistroPaso(mv.sesion.rutina.pasos, reg);
 }
 
 function repeticionesEnCurso() {
-  return mv.ej ? mv.ej.picos.length : null;
+  return mv.ej ? mv.ej.det.picos.length : null;
 }
 
 function estadoDispositivo() {
@@ -468,7 +521,7 @@ function guardarSesionRutina({ dolor = null, notas = '', manuales = {}, proximaC
   const eva = dolor == null || dolor === '' || !isFinite(Number(dolor)) ? null : Math.min(10, Math.max(0, Math.round(Number(dolor))));
   const pasos = (mv.sesion.rutina?.pasos ?? []).map((r) => ({ ...r, repeticionesManual: conteoManual(manuales[r.id]) }));
   const ejercicios = mv.sesion.ejercicios.map((e) => {
-    const r = pasos.find((x) => x.tipo === e.tipo);
+    const r = pasos.find((x) => x.tipo === e.tipo && x.medicion?.fuente === 'imu');
     return r ? { ...e, repeticionesManual: r.repeticionesManual } : e;
   });
   const rec = (mv.stats?.recibidas ?? 0) - mv.sesion.base.recibidas;
@@ -576,6 +629,7 @@ function alPerderConexion(motivo) {
   mv.conectado = false;
   mv.transporte = null;
   mv.calInicio = null;
+  if (mv.paso?.esperandoCal) { mv.paso.esperandoCal = false; mv.paso.medicion = null; }
   clearInterval(mv.timer);
   renderMonitor();
 }
@@ -658,6 +712,7 @@ function refrescar() {
   if (mv.calInicio != null && (performance.now() - mv.calInicio) / 1000 > CAL_TIMEOUT_S) {
     mv.cal = { tiempoS: CAL_TIMEOUT_S, ok: false, motivo: `el dispositivo no respondió en ${CAL_TIMEOUT_S} s` };
     mv.calInicio = null;
+    if (mv.paso?.esperandoCal) { mv.paso.esperandoCal = false; mv.paso.medicion = null; }
     renderMonitorControles();
   }
   if (estado.seccion !== 'ejercicios') return;
@@ -688,14 +743,19 @@ function refrescar() {
   if (e) {
     const actual = e.valores.length ? e.valores[e.valores.length - 1] : null;
     const max = e.valores.length ? maximo(e.valores) : null;
-    const pct = Math.min(100, (e.picos.length / e.objetivo) * 100);
+    const n = e.det.picos.length;
+    const pct = Math.min(100, (n / e.objetivo) * 100);
     const seg = Math.floor((Date.now() - e.inicio) / 1000);
-    $('#mv-lecturas').innerHTML = `
+    const reps = `<div class="readout"><div class="readout-label">Repeticiones</div><div class="readout-value">${n} <small>/ ${e.objetivo}</small></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(${e.musculo ? COLOR_MUSCULO[e.musculo] : EJERCICIOS[e.tipo].color})"></div></div></div>`;
+    const tiempo = `<div class="readout"><div class="readout-label">Tiempo</div><div class="readout-value">${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}</div></div>`;
+    $('#mv-lecturas').innerHTML = e.musculo ? `
+      <div class="readout"><div class="readout-label">${NOMBRES_MUSCULO[e.musculo]} — activación actual</div><div class="readout-value">${fmt(actual, 0)}</div></div>
+      <div class="readout"><div class="readout-label">Máxima</div><div class="readout-value">${fmt(max, 0)}</div></div>
+      ${reps}${tiempo}` : `
       <div class="readout"><div class="readout-label">${EJERCICIOS[e.tipo].corto} — ángulo actual</div><div class="readout-value">${fmt(actual, 0)}°</div></div>
       <div class="readout"><div class="readout-label">Máximo alcanzado</div><div class="readout-value">${fmt(max, 0)}° <small>${fmt((max / EJERCICIOS[e.tipo].ref) * 100)} % ref.</small></div></div>
-      <div class="readout"><div class="readout-label">Repeticiones</div><div class="readout-value">${e.picos.length} <small>/ ${e.objetivo}</small></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(${EJERCICIOS[e.tipo].color})"></div></div></div>
-      <div class="readout"><div class="readout-label">Tiempo</div><div class="readout-value">${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}</div></div>`;
+      ${reps}${tiempo}`;
   } else {
     $('#mv-lecturas').innerHTML = Object.entries(CANALES).map(([k, c]) =>
       `<div class="readout"><div class="readout-label"><span class="swatch" style="background:var(${c.color})"></span>${c.nombre}</div><div class="readout-value">${ult ? fmt(ult[k], 0) + '°' : '—'}</div></div>`).join('');
@@ -740,7 +800,20 @@ function actualizarChartVivo() {
   const e = mv.ej;
   const claves = Object.keys(CANALES);
 
-  if (e) {
+  if (e?.musculo) {
+    // Paso EMG: la activación del músculo en el lugar del primer canal.
+    claves.forEach((k, i) => {
+      ds[i].hidden = i !== 0;
+      ds[i].data = i === 0 ? b.filter((m) => m.emg).map((m) => ({ x: m.t - tUlt, y: m.emg[e.musculo] })) : [];
+    });
+    ds[0].label = `${NOMBRES_MUSCULO[e.musculo]} (EMG)`;
+    ds[0].borderColor = ds[0].backgroundColor = css(COLOR_MUSCULO[e.musculo]);
+    ds[3].hidden = ds[4].hidden = false;
+    ds[3].backgroundColor = css(COLOR_MUSCULO[e.musculo]);
+    ds[3].data = e.det.picos.map((idx) => ({ x: e.tiempos[idx] - tUlt, y: e.valores[idx] })).filter((p) => p.x >= -VENTANA_S);
+    const y = e.base + e.det.umbrales().alto;
+    ds[4].data = [{ x: -VENTANA_S, y }, { x: 0, y }];
+  } else if (e) {
     const ex = EJERCICIOS[e.tipo];
     claves.forEach((k, i) => {
       const activo = k === e.canal;
@@ -750,9 +823,9 @@ function actualizarChartVivo() {
     });
     ds[3].hidden = false;
     ds[3].backgroundColor = css(ex.color);
-    ds[3].data = e.picos.map((idx) => ({ x: e.tiempos[idx] - tUlt, y: e.valores[idx] })).filter((p) => p.x >= -VENTANA_S);
+    ds[3].data = e.det.picos.map((idx) => ({ x: e.tiempos[idx] - tUlt, y: e.valores[idx] })).filter((p) => p.x >= -VENTANA_S);
     ds[4].hidden = false;
-    const y = e.base + umbrales(e).alto;
+    const y = e.base + e.det.umbrales().alto;
     ds[4].data = [{ x: -VENTANA_S, y }, { x: 0, y }];
   } else {
     claves.forEach((k, i) => {

@@ -83,7 +83,7 @@ function renderTarjetaRutina() {
   $('#rt-etapa-sug').textContent = textoSugerida(diasDesdeCirugia(p));
   $('#rt-pasos').innerHTML = e.pasos.map((x) => `
     <li><span class="rt-paso-nombre">${esc(x.nombre)}</span>
-      <span class="rt-paso-meta"><span>${esc(textoReps(x))}</span>${x.tipo ? '<span class="rt-medido">Medido por el dispositivo</span>' : ''}</span></li>`).join('');
+      <span class="rt-paso-meta"><span>${esc(textoReps(x))}</span>${x.medicion ? `<span class="rt-medido">Medido con ${x.medicion.fuente === 'emg' ? 'EMG' : 'el sensor de movimiento'}</span>` : ''}</span></li>`).join('');
   $('#rt-cuidado-gral').innerHTML = listaHTML(e.cuidado);
 }
 
@@ -95,7 +95,7 @@ function registroDePaso(paso) {
 }
 
 function textoRegistro(r) {
-  if (r.tipo && !r.senal) return `Detectadas: ${r.repeticiones ?? '—'} / ${r.repeticionesObjetivo}`;
+  if (r.medicion || (r.tipo && !r.senal)) return `Detectadas: ${r.repeticiones ?? '—'} / ${r.repeticionesObjetivo}`;
   return 'Señal grabada';
 }
 
@@ -138,13 +138,13 @@ function actualizarContador() {
   if (modoRutina !== 'grabacion' || !rt || !mv.paso) return;
   const paso = rt.actual();
   const el = $('#rt-contador');
-  el.classList.toggle('medido', !!paso.tipo);
-  if (paso.tipo) {
-    const n = repeticionesEnCurso();
-    el.textContent = `Detectadas: ${n ?? '—'} / ${paso.reps}`;
-  } else {
-    el.textContent = 'Cuente las repeticiones; las anotará al final.';
-  }
+  const modo = medicionEnCurso();
+  el.classList.toggle('medido', modo === 'medido');
+  el.classList.toggle('aviso', modo === 'sin-emg');
+  if (modo === 'medido') el.textContent = `Detectadas: ${repeticionesEnCurso() ?? '—'} / ${paso.reps}`;
+  else if (modo === 'calibrando') el.textContent = 'Calibrando… mantenga la mano quieta en la posición del ejercicio.';
+  else if (modo === 'sin-emg') el.textContent = TEXTO_PASO_SIN_EMG;
+  else el.textContent = 'Cuente las repeticiones; las anotará al final.';
 }
 
 function abrirDlgRutina(modo) {
@@ -309,7 +309,7 @@ function abrirFin() {
     <tr>
       <td>${esc(r.nombre)}</td>
       <td class="num">${r.repeticionesObjetivo}</td>
-      <td class="num">${r.tipo && r.repeticiones != null ? r.repeticiones : '—'}</td>
+      <td class="num">${r.repeticiones ?? '—'}</td>
       <td class="num"><input type="number" class="input-manual" min="0" step="1" data-id="${esc(r.id)}" aria-label="Conteo manual de ${esc(r.nombre)}"></td>
     </tr>`).join('');
   $('#fin-dolor').value = '';
