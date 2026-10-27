@@ -904,6 +904,8 @@ function init() {
   $('#lista-sesiones').addEventListener('click', (e) => {
     const ver = e.target.closest('.btn-ver');
     if (ver) { estado.sesionId = ver.dataset.id; irA('seguimiento', 'sesion'); return; }
+    const pdf = e.target.closest('.btn-pdf');
+    if (pdf) { descargarPdfDeSesion(pdf.dataset.id); return; }
     const notas = e.target.closest('.btn-notas');
     if (notas) { estado.sesionId = notas.dataset.id; renderHistorial(paciente()); $('#nota').focus(); }
   });
@@ -922,6 +924,7 @@ function init() {
   });
 
   $('#btn-csv').addEventListener('click', () => paciente() && exportarCSV(paciente()));
+  $('#btn-pdf-sesion').addEventListener('click', () => descargarPdfDeSesion(estado.sesionId));
   $('#btn-exportar').addEventListener('click', () => descargar(`kinemo_${hoyISO()}.json`, JSON.stringify(estado.db, null, 2), 'application/json'));
   $('#btn-importar').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', async (e) => {

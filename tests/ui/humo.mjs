@@ -11,6 +11,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CHART_LOCAL = path.join(RAIZ, 'node_modules', 'chart.js', 'dist', 'chart.umd.js');
+const JSPDF_LOCAL = path.join(RAIZ, 'node_modules', 'jspdf', 'dist', 'jspdf.umd.min.js');
 const TIPOS = { '.png': 'image/png', '.jpg': 'image/jpeg', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.mp4': 'video/mp4', '.json': 'application/json' };
 
 const servidor = http.createServer((req, res) => {
@@ -30,7 +31,7 @@ const SESION_PRUEBA = { nombre: 'Prueba', profesion: 'Fisioterapeuta', correo: '
 
 // ruta: '' es el panel. sesion: la que se siembra una sola vez por pestaña (null = sin sesión).
 // abrirPaciente: tras cargar el panel (que empieza en el Inicio) abre el primer paciente de la lista.
-async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {}, abrirPaciente = true } = {}) {
+async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {}, abrirPaciente = true, sinJsPdf = false } = {}) {
   const ctx = await navegador.newContext({ viewport, acceptDownloads: true });
   if (sesion) {
     await ctx.addInitScript((s) => {
@@ -43,6 +44,9 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   await ctx.route('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/**', (r) =>
     fs.existsSync(CHART_LOCAL) ? r.fulfill({ path: CHART_LOCAL, contentType: 'text/javascript' }) : r.continue());
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  // jsPDF: copia local si existe; sinJsPdf simula que no hay internet.
+  await ctx.route('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/**', (r) =>
+    sinJsPdf ? r.abort() : fs.existsSync(JSPDF_LOCAL) ? r.fulfill({ path: JSPDF_LOCAL, contentType: 'text/javascript' }) : r.continue());
   // rutas: { 'archivo.js': contenido } reemplaza archivos del sitio (p. ej. para simular que no cargó).
   for (const [archivo, cuerpo] of Object.entries(rutas)) {
     await ctx.route(new RegExp(`/${archivo.replace('.', '\\.')}$`), (r) => r.fulfill({ body: cuerpo, contentType: 'text/javascript' }));
@@ -806,6 +810,54 @@ await verificar('nota tras importar va a la sesión importada', async (page) => 
   afirmar(JSON.stringify(r) === '["2020-01-01"]', `nota guardada en: ${r}`);
 });
 
+/* ---------- PDF de cada sesión ---------- */
+async function descargarPdf(page, selector) {
+  const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click(selector)]);
+  const buf = fs.readFileSync(await d.path());
+  return { nombre: d.suggestedFilename(), bytes: buf.length, texto: buf.toString('latin1'), paginas: (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length };
+}
+
+await verificar('pdf: descarga', async (page) => {
+  await irReporte(page);
+  const r0 = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    const s = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha)).pop();
+    return { id: p.id, fecha: s.fecha, apellido: p.nombre.split(' ').pop() };
+  });
+  const pdf = await descargarPdf(page, '#lista-sesiones .btn-pdf >> nth=0');
+  afirmar(pdf.nombre === `${r0.id}_sesion_${r0.fecha}.pdf`, `nombre: ${pdf.nombre}`);
+  afirmar(pdf.texto.startsWith('%PDF'), 'no es un PDF');
+  afirmar(pdf.texto.includes('Reporte de sesi') && pdf.texto.includes(r0.apellido), 'el PDF no tiene el título o el paciente');
+  afirmar(pdf.bytes < 1024 * 1024, `el PDF pesa ${Math.round(pdf.bytes / 1024)} KB`);
+});
+
+await verificar('pdf: desde una sesión', async (page) => {
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  const fecha = await page.evaluate(() => estado.db.pacientes.find((x) => x.id === estado.pacienteId).sesiones.find((s) => s.id === estado.sesionId).fecha);
+  const pdf = await descargarPdf(page, '#btn-pdf-sesion');
+  afirmar(pdf.nombre.includes(fecha), `nombre: ${pdf.nombre}`);
+});
+
+await verificar('pdf: notas largas', async (page) => {
+  await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha)).pop().notas = 'Nota larga de seguimiento con tildes y eñes. '.repeat(140);
+  });
+  await irReporte(page);
+  const pdf = await descargarPdf(page, '#lista-sesiones .btn-pdf >> nth=0');
+  afirmar(pdf.paginas >= 2, `páginas: ${pdf.paginas}`);
+});
+
+await verificar('pdf: sin conexión', async (page) => {
+  await irReporte(page);
+  let descargas = 0;
+  page.on('download', () => descargas++);
+  await page.click('#lista-sesiones .btn-pdf >> nth=0');
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('No se pudo generar el PDF: revise la conexión a internet.'));
+  await page.waitForTimeout(500);
+  afirmar(descargas === 0, 'hubo una descarga');
+}, { sinJsPdf: true });
+
 /* ---------- Mejora muscular (EMG) ---------- */
 const sesionImportada = (fecha, extra = {}) => ({ sesion: { fecha, ejercicios: [{ tipo: 'flexion', repeticiones: 10, repeticionesObjetivo: 10, anguloMax: 40 }], ...extra } });
 async function importar(page, datos) {
@@ -875,6 +927,12 @@ await verificar('importar: dolor no numérico rechazado', async (page) => {
   afirmar(page.dialogos.some((m) => m.includes('No se pudo importar')), `diálogos: ${page.dialogos}`);
   await page.click('#nav-inicio');
   afirmar(await page.evaluate(() => window.__xss) === undefined, 'se ejecutó código del archivo importado');
+});
+
+await verificar('pdf: sesión importada', async (page) => {
+  await importar(page, sesionImportada('2026-10-26'));
+  const pdf = await descargarPdf(page, '#lista-sesiones li[data-id] >> nth=0 >> .btn-pdf');
+  afirmar(pdf.texto.startsWith('%PDF') && pdf.nombre.endsWith('_sesion_2026-10-26.pdf'), `nombre: ${pdf.nombre}`);
 });
 
 /* ---------- Pulido ---------- */

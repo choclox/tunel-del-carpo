@@ -44,9 +44,13 @@ La pantalla tiene tres secciones. Lo técnico o secundario queda plegado ("Ver f
 |---|---|
 | **Ejercicios** (hacer la rutina) | Tres pasos: **1 Conecte el dispositivo**, **2 Elija la fase** (Fase 1, 2 o 3, sugerida según los días desde la cirugía; "Ver los ejercicios de esta fase" muestra la lista, los cuidados y **Ver videos**) y **3 Empiece la rutina**. "Empezar rutina" abre "¿Listos para empezar?" (conexión y calibración automáticas) y luego graba ejercicio por ejercicio. Si no hay dispositivo conectado se usa el simulador y la sesión queda marcada como simulada. Al terminar, "Rutina terminada" pide dolor EVA, notas y conteos manuales, guarda la sesión y abre su detalle en Seguimiento. **Datos técnicos del dispositivo** (plegado) tiene el origen, la velocidad, la calibración manual, los indicadores de comunicación y la señal en tiempo real. |
 | **Seguimiento** (cómo avanza) | **Resumen**: tres tarjetas (Avance, Dolor, Última sesión), la gráfica del ángulo máximo por sesión (en grados o % de lo normal), los 3 avisos automáticos más importantes ("Ver N más") y, plegado, **Más indicadores** (cumplimiento, dolor, velocidad, variabilidad o duración). **Una sesión**: tabla por ejercicio (con "Mostrar todas las columnas"), una insignia de calidad ("✓ Datos confiables" o los avisos que fallen), la tarjeta **Rutina: Fase N** si se grabó desde la rutina y, plegada, **Ver señal del sensor**. **Comparar**: dos sesiones lado a lado. Si el paciente no tiene sesiones, se ofrece "Ir a Ejercicios". |
-| **Reporte** (historial y archivos) | Historial de sesiones (⚠ marca las que tienen pérdida de datos o calibración fallida), notas por sesión y **Archivos**: tabla para Excel (CSV), copia de seguridad de todos los pacientes y cargar archivo de sesión. "Restablecer datos de demostración" está en **Opciones de prueba**. |
+| **Reporte** (lectura y archivos) | **Lectura rápida**: una frase general y 4 áreas con semáforo y palabra (Bien / Atención / Revisar / Sin datos): Movimiento (% de lo normal y cambio desde la primera sesión), Dolor, Músculo (índice del nervio mediano) y Constancia (sesiones, última sesión, próxima cita). **Sesiones**: línea de tiempo con chips de cada sesión frente a la anterior, una frase de qué cambió y los botones Ver detalle, Notas y **Descargar PDF**. Debajo, notas de la sesión y **Archivos** (CSV, copia de seguridad, cargar sesión; "Restablecer datos de demostración" en Opciones de prueba). |
 
 Los datos se guardan en el navegador (`localStorage`). Use **Reporte › Copia de seguridad** para respaldarlos.
+
+### PDF de cada sesión
+
+"Descargar PDF" (en Reporte › Sesiones y en Seguimiento › Una sesión) genera `<ID>_sesion_<fecha>.pdf` (con `_2`, `_3` si hay varias el mismo día): datos del paciente y de la sesión, lectura de la sesión, chequeo de seguridad, ejercicios medidos con su cambio, gráfica de evolución, rutina grabada, prueba de fuerza EMG, avisos, notas y próxima cita, con número de página. Usa jsPDF 2.5.1, que se carga del CDN solo al descargar (si no hay internet, se avisa). Los símbolos que la letra del PDF no tiene se escriben como texto (`->`, `>=`, `OK`).
 
 ## Formato de archivo de sesión (lo que debe generar el dispositivo o el software de adquisición)
 
@@ -167,6 +171,8 @@ La colocación exacta la define el equipo con el profesional. Use siempre el mis
 - `inicio.js`: Inicio del profesional (atención, citas, sesiones recientes, nueva sesión).
 - `chequeo.js`: chequeo de seguridad antes de la rutina.
 - `resumen-sesion.js`: resumen de la sesión y hoja imprimible para el paciente.
+- `reporte.js`: lectura rápida y línea de tiempo de Reporte (semáforos).
+- `reporte-pdf.js`: PDF de cada sesión.
 - `navegacion.js`: secciones (Ejercicios, Seguimiento, Reporte), vistas de Seguimiento y recorte de avisos; funciones puras con pruebas.
 - `tests/ui/humo.mjs`: prueba de humo de la interfaz en Chromium.
 - `videos/`: un `.mp4` por ejercicio de la rutina (ver [videos/LEEME.md](videos/LEEME.md)).
