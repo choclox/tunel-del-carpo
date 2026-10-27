@@ -16,7 +16,7 @@ test('músculos', () => {
 });
 
 test('parsearMuestra sin y con EMG', () => {
-  assert.deepStrictEqual(p('D,7,140,1.5,-2,8'), { seq: 7, t: 0.14, fe: 1.5, rc: -2, mcf: 8, emg: null });
+  assert.deepStrictEqual(p('D,7,140,1.5,-2,8'), { seq: 7, t: 0.14, fe: 1.5, rc: -2, ps: 8, emg: null });
   assert.deepStrictEqual(p('D,7,140,1.5,-2,8,410,96,30').emg, { tenar: 410, flexores: 96, extensores: 30 });
 });
 

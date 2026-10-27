@@ -144,7 +144,7 @@ function resumenSenal(muestras) {
       fs: r1(fsReal / k),
       fe: elegidas.map((m) => r1(m.fe)),
       rc: elegidas.map((m) => r1(m.rc)),
-      mcf: elegidas.map((m) => r1(m.mcf)),
+      ps: elegidas.map((m) => r1(m.ps)),
     },
   };
 }

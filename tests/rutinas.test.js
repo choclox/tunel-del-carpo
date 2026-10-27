@@ -63,23 +63,23 @@ test('guardarRegistroPaso reemplaza por id', () => {
 });
 
 test('resumenSenal', () => {
-  const m = Array.from({ length: 51 }, (_, i) => ({ t: i * 0.02, fe: i, rc: 0, mcf: 1.26 }));
+  const m = Array.from({ length: 51 }, (_, i) => ({ t: i * 0.02, fe: i, rc: 0, ps: 1.26 }));
   const r = resumenSenal(m);
   assert.strictEqual(r.duracionS, 1);
   // Diezmada a ~10 Hz: una muestra de cada 5 (índices 0, 5, …, 50).
   assert.strictEqual(r.senal.fs, 10);
   assert.strictEqual(r.senal.fe.length, 11);
   assert.strictEqual(r.senal.rc.length, 11);
-  assert.strictEqual(r.senal.mcf.length, 11);
+  assert.strictEqual(r.senal.ps.length, 11);
   assert.deepStrictEqual(r.senal.fe, [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]);
-  assert.strictEqual(r.senal.mcf[0], 1.3);
+  assert.strictEqual(r.senal.ps[0], 1.3);
   assert.strictEqual(resumenSenal(m.slice(0, 24)), null);
-  const corto = Array.from({ length: 30 }, (_, i) => ({ t: (i * 0.5) / 29, fe: 0, rc: 0, mcf: 0 }));
+  const corto = Array.from({ length: 30 }, (_, i) => ({ t: (i * 0.5) / 29, fe: 0, rc: 0, ps: 0 }));
   assert.strictEqual(resumenSenal(corto), null);
 });
 
 test('resumenSenal a 10 Hz conserva todas las muestras', () => {
-  const m = Array.from({ length: 30 }, (_, i) => ({ t: i * 0.1, fe: i + 0.04, rc: -i, mcf: 0 }));
+  const m = Array.from({ length: 30 }, (_, i) => ({ t: i * 0.1, fe: i + 0.04, rc: -i, ps: 0 }));
   const r = resumenSenal(m);
   assert.strictEqual(r.senal.fs, 10);
   assert.strictEqual(r.senal.fe.length, 30);

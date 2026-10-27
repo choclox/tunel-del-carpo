@@ -10,6 +10,7 @@ AngulosMuneca angulosRelativos(const Cuaternion& qCal, const Cuaternion& qAhora,
   AngulosMuneca a;
   a.fe = asinf(s) * aGrados;
   a.rc = atan2f(2.0f * (r.w * r.z + r.x * r.y), 1.0f - 2.0f * (r.y * r.y + r.z * r.z)) * aGrados;
-  if (manoIzquierda) a.rc = -a.rc;
+  a.ps = atan2f(2.0f * (r.w * r.x + r.y * r.z), 1.0f - 2.0f * (r.x * r.x + r.y * r.y)) * aGrados;
+  if (manoIzquierda) { a.rc = -a.rc; a.ps = -a.ps; }
   return a;
 }

@@ -4,11 +4,11 @@
  * PROTOCOLO (texto ASCII, un mensaje por línea terminada en \n)
  *
  *   Dispositivo → PC
- *     D,<seq>,<t_ms>,<fe>,<rc>,<mcf>   Muestra. seq: contador creciente (detecta pérdidas),
+ *     D,<seq>,<t_ms>,<fe>,<rc>,<ps>    Muestra. seq: contador creciente (detecta pérdidas),
  *                                      t_ms: tiempo del dispositivo en ms,
  *                                      fe:  flexo-extensión de muñeca en grados (+flexión / −extensión),
  *                                      rc:  desviación en grados (+radial / −cubital),
- *                                      mcf: flexión de dedos (metacarpofalángica) en grados.
+ *                                      ps:  prono-supinación (+supinación/−pronación) en grados.
  *     CAL,OK,<ms>                      Calibración terminada (ms que tardó en el dispositivo).
  *     CAL,ERR,<motivo>                 Calibración fallida.
  *     BAT,<porcentaje>                 Nivel de batería (opcional).
@@ -30,7 +30,7 @@ const CAL_TIMEOUT_S = 30;    // criterio de calibración
 const CANALES = {
   fe:  { nombre: 'Flexo-extensión', color: '--s1' },
   rc:  { nombre: 'Desv. radio-cubital', color: '--s3' },
-  mcf: { nombre: 'Flexión MCF', color: '--s5' },
+  ps: { nombre: 'Prono-supinación', color: '--s5' },
 };
 
 const mv = {
@@ -42,7 +42,7 @@ const mv = {
   calInicio: null,       // performance.now() al pedir la calibración
   bateria: null,
   stats: null,
-  buffer: [],            // [{ t (s, reloj del dispositivo), fe, rc, mcf, emg: {tenar, flexores, extensores} | null }]
+  buffer: [],            // [{ t (s, reloj del dispositivo), fe, rc, ps, emg: {tenar, flexores, extensores} | null }]
   conEmg: false,         // llegó al menos una línea D con EMG en esta conexión
   ej: null,              // ejercicio en curso
   paso: null,            // paso de rutina en curso: { paso, muestras, registro? }
@@ -162,13 +162,13 @@ class TransporteSimulado {
       if (this.rand() < 0.003) continue; // pérdida simulada de ~0,3 %
       const a = this._angulos(t);
       const emg = this.emg ? ',' + this._emg(t).join(',') : '';
-      this.onLinea?.(`D,${this.seq},${t},${a.fe.toFixed(1)},${a.rc.toFixed(1)},${a.mcf.toFixed(1)}${emg}`);
+      this.onLinea?.(`D,${this.seq},${t},${a.fe.toFixed(1)},${a.rc.toFixed(1)},${a.ps.toFixed(1)}${emg}`);
     }
   }
 
   _angulos(t) {
     const ruido = () => (this.rand() - 0.5) * 1.2;
-    const a = { fe: 2 + ruido(), rc: ruido(), mcf: 8 + ruido() };
+    const a = { fe: 2 + ruido(), rc: ruido(), ps: ruido() };
     const ej = this.ejercicio;
     if (ej) {
       const { canal, signo } = EJERCICIOS[ej.tipo];
@@ -211,12 +211,12 @@ function procesarLinea(linea) {
     case 'D': {
       const d = parsearMuestra(partes);
       if (!d) { st.malformadas++; return; }
-      const { seq, t, fe, rc, mcf, emg } = d;
+      const { seq, t, fe, rc, ps, emg } = d;
       if (st.ultimoSeq != null && seq > st.ultimoSeq + 1) st.perdidas += seq - st.ultimoSeq - 1;
       st.ultimoSeq = seq;
       st.recibidas++;
       st.ultimaRx = performance.now();
-      const m = { t, fe, rc, mcf, emg };
+      const m = { t, fe, rc, ps, emg };
       if (emg) {
         mv.conEmg = true;
         if (mv.sesion) mv.sesion.conEmg = true;
