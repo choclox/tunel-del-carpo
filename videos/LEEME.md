@@ -23,7 +23,7 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 | `pelota.mp4` | Apretar pelota terapéutica | 3 | Adjunto |
 | `pinza.mp4` | Pinza pulgar-índice | 3 | Adjunto |
 | `extension_carga.mp4` | Extensión de muñeca con peso ligero | 3 | Adjunto |
-| `flexion_carga.mp4` | Flexión de muñeca con peso ligero | 3 | No adjuntado |
+| `flexion_carga.mp4` | Flexión de muñeca con peso ligero | 3 | Adjunto |
 | `pronosup_martillo.mp4` | Prono-supinación con martillo | 3 | No adjuntado |
 
 **Formato:** `.mp4` (H.264), sin audio. Conviene que empiece y termine en la misma posición para que el bucle no se note. Cualquier proporción sirve: el video se ajusta a la ventana sin recortarse.
