@@ -98,7 +98,7 @@ toward the table. No wrist flexion or extension, no forearm rotation. Hold brief
 slowly return to neutral straight alignment.
 ```
 
-### Pronación de antebrazo (`pronacion`, ref. 80°) — falta
+### Pronación de antebrazo (`pronacion`, ref. 80°)
 ```
 [STYLE BLOCK]
 Camera: front view, forearm pointing toward the camera, wrist centered.

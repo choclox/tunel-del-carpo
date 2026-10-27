@@ -17,7 +17,7 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 | `extension.mp4` | Extensión de muñeca | 2 | Adjunto |
 | `desv_radial.mp4` | Desviación radial | 2 | Adjunto (grabado con el antebrazo vertical y el dorso de la mano a la cámara; la rutina pide la mano de canto) |
 | `desv_cubital.mp4` | Desviación cubital | 2 | Adjunto (grabado con el antebrazo vertical y el dorso de la mano a la cámara; la rutina pide la mano de canto) |
-| `pronacion.mp4` | Pronación de antebrazo | 2 | No adjuntado (el anterior mostraba una supinación y pasó a `supinacion.mp4`) |
+| `pronacion.mp4` | Pronación de antebrazo | 2 | Adjunto |
 | `supinacion.mp4` | Supinación de antebrazo | 2 | Adjunto |
 | `pulgar_abduccion.mp4` | Abducción del pulgar | 2 | Adjunto |
 | `pelota.mp4` | Apretar pelota terapéutica | 3 | Adjunto |
@@ -30,6 +30,6 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 
 **Dónde está el contenido de las rutinas:** las etapas, sus ejercicios, repeticiones, tiempos de sostén, indicaciones y mensajes de cuidado están en `ETAPAS`, en [rutinas.js](../rutinas.js). Para adjuntar un video basta con copiarlo aquí con el nombre `<id>.mp4` de la tabla. Para agregar un ejercicio, añada un paso a la etapa en `rutinas.js` con un `id` sin espacios ni tildes y, si existe, copie su video aquí. El campo `medicion` de cada paso dice cómo se cuenta: con el sensor de movimiento (`{ fuente: 'imu', tipo }`, una clave de `EJERCICIOS` en `data.js`), con EMG (`{ fuente: 'emg', musculo }`) o a mano (`null`); dentro de una misma etapa cada `tipo` IMU aparece como máximo una vez.
 
-**Videos por rehacer o grabar con postura nueva:** `pronacion.mp4` falta (el video que había mostraba una supinación y ahora es `supinacion.mp4`). `desv_radial.mp4` y `desv_cubital.mp4` se graban con la mano de canto (pulgar hacia arriba, antebrazo apoyado), que es la postura que usa la rutina para medirlas. Los prompts están en [prompts-videos-ejercicios.md](../prompts-videos-ejercicios.md).
+**Videos por rehacer o grabar con postura nueva:** `desv_radial.mp4` y `desv_cubital.mp4` se graban con la mano de canto (pulgar hacia arriba, antebrazo apoyado), que es la postura que usa la rutina para medirlas. Los prompts están en [prompts-videos-ejercicios.md](../prompts-videos-ejercicios.md).
 
 Cómo generar videos nuevos con el mismo estilo: [prompts-videos-ejercicios.md](../prompts-videos-ejercicios.md).
