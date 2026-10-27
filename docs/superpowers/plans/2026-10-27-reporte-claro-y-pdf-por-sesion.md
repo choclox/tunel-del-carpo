@@ -148,3 +148,69 @@ Fuera de alcance: PDF de todo el historial, enviar el PDF por correo, firmas.
 - [ ] **Step 4: Implementar.** Para la gráfica: canvas de 800 × 360 fuera del documento visible, `animation: false`, `devicePixelRatio: 2`, tema claro fijo; `toDataURL('image/png')`; destruir el chart después. Tablas con `doc.text` y líneas (sin plugins de jsPDF). Salto de página cuando `y` pase de 280 mm. Título en el color de marca `#1e6895`.
 - [ ] **Step 5: Correr** `node --test && node tests/ui/humo.mjs` → verde; abrir un PDF generado (leerlo como documento) y revisar que se lea bien.
 - [ ] **Step 6: Commit** `git commit -m "Descarga en PDF del reporte de cada sesión"`
+
+---
+
+# Parte B — Qué mide cada ejercicio (pedido del 2026-10-27)
+
+**Pedido del usuario:** Fase 1: toda la fase con EMG (mano recta, puño en gancho, puño completo). Fase 2: desviación radial y cubital "no midió bien" (analizar si se mejora con código o umbrales en el ESP); pronación y supinación las mide el IMU; rehacer el video de supinación; puño completo con EMG; abducción del pulgar → EMG del tenar (respuesta). Fase 3: pelota y pinza con EMG. Resto: propuesta aceptada.
+
+## Decisiones (hacen de spec)
+
+| Fase | Paso | Hoy | Después |
+|---|---|---|---|
+| 1 | Mano recta, puño en gancho, puño completo, mesa, puño recto | sin medir / IMU (puño) | **EMG flexores** |
+| 1 | Oposición del pulgar | sin medir | **EMG tenar**, salvo si el chequeo marcó la herida distinta de "Bien": entonces conteo manual (el electrodo del tenar queda junto a la incisión) |
+| 1 | Deslizamiento del nervio mediano | sin medir | sin medir (no hay contracción) |
+| 2 | Flexión, extensión | IMU | IMU |
+| 2 | Desviación radial y cubital | IMU (yaw, mal medido) | **IMU con postura nueva** (ver análisis) |
+| 2 | Pronación, supinación | sin medir | **IMU, ángulo nuevo `ps`** |
+| 2 | Puño completo | IMU (`mcf`, nunca medido de verdad) | **EMG flexores** |
+| 2 | Abducción del pulgar | sin medir | **EMG tenar** |
+| 3 | Pelota | IMU (`mcf`) | **EMG flexores** |
+| 3 | Pinza | sin medir | **EMG tenar** |
+| 3 | Flexión / extensión con peso | IMU | IMU |
+| 3 | Prono-supinación con martillo | sin medir | **IMU `ps`** |
+
+**Análisis de la desviación radial/cubital.** Con la palma sobre la mesa la desviación es un giro alrededor del eje vertical (`rc`, guiñada): la gravedad no cambia, el acelerómetro no lo corrige y queda en manos del giroscopio (deriva) y del magnetómetro (perturbado por metal y el propio ESP32). Mejoras:
+1. **Postura:** desviaciones con la mano de canto, pulgar hacia arriba, antebrazo apoyado; **recalibrar (`CAL`) en esa postura al empezar el paso**. Así el giro cambia la gravedad en el marco del sensor y la fusión lo corrige con el acelerómetro. Nueva indicación: "Mano de canto, pulgar hacia arriba y antebrazo apoyado. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital)." El firmware no cambia de cálculo.
+2. **Detector (interfaz):** media móvil de 5 muestras (~100 ms) antes de contar, para todos los ejercicios IMU; para rangos pequeños (`ref` ≤ 30°) umbral de subida mínimo **5°** (hoy 8°) y de bajada mínimo **2°** (hoy 3°).
+3. **Validación en banco (equipo, con el sensor real):** goniómetro, 10 repeticiones por lado en la postura nueva; criterio error ≤ 3° y conteo ≥ 95 %. Si no se cumple, las desviaciones pasan a conteo manual (opción que queda documentada).
+
+**Modelo de medición por paso** (en `rutinas.js`): cada paso tiene `medicion`: `{ fuente: 'imu', tipo }` (tipo de `EJERCICIOS`), `{ fuente: 'emg', musculo }` (`tenar`|`flexores`|`extensores`) o `null`; `tipo` se mantiene solo para compatibilidad con sesiones guardadas. Pasos IMU con `recalibrar: true` (las desviaciones) piden `CAL` al empezar.
+
+**Ángulo de prono-supinación:** el firmware ya descompone la orientación en Z-Y-X; el giro X (alrededor del antebrazo) se envía en el **tercer campo** de la línea `D`, que hasta hoy era `mcf` y siempre valía 0. Se renombra `ps` (positivo = supinación). `EJERCICIOS` gana `pronacion` (`canal: 'ps', signo: -1, ref: 80`) y `supinacion` (`canal: 'ps', signo: 1, ref: 80`); `puno` queda solo para leer sesiones antiguas.
+
+**Medición con EMG en un paso:** el detector de repeticiones trabaja sobre la activación del músculo del paso (umbral de subida = reposo + máx(60, 50 % de la mediana de los picos previos), bajada = reposo + máx(25, 25 %…)); el registro del paso guarda `emg: { musculo, repeticiones, activacionMedia, activacionMax }`. El PC envía `EJ,emg-<musculo>,<objetivo>` (informativo; el simulador contrae ese músculo a ritmo de repeticiones). Sin EMG en la conexión, el paso cae a conteo manual con el aviso "Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.".
+
+**Videos:** `videos/LEEME.md` marca `supinacion.mp4` como **"Rehacer"** (lo graba el equipo; mismo estilo, `prompts-videos-ejercicios.md`), y `desv_radial.mp4` / `desv_cubital.mp4` deben grabarse ya con la postura nueva.
+
+**Reporte (Parte A):** el PDF y la línea de tiempo muestran en la rutina grabada la columna/etiqueta **"Medido con"**: IMU, EMG (músculo) o Manual; la lectura de Movimiento usa solo pasos IMU.
+
+## Tareas de la Parte B (después de las Tareas 1–3)
+
+### Task 4: Firmware: ángulo de prono-supinación en el tercer campo
+- Modify: `firmware/carpo_esp32/src/nucleo/angulos.{h,cpp}` (`AngulosMuneca` gana `ps`), `carpo_esp32.ino` (envía `ps` donde iba `0.0f`), `README.md`/`monitoreo.js` (protocolo: `mcf` → `ps`).
+- [ ] Prueba que falla en `test_angulos.cpp`: rotación pura de +30° alrededor de X → `ps ≈ 30` (±0,5), `fe ≈ 0`, `rc ≈ 0`; con `manoIzquierda`, `ps ≈ -30`; rotaciones puras en Y y Z dejan `ps ≈ 0`.
+- [ ] Correr `python3 firmware/pruebas/correr.py angulos` → falla; implementar `ps = atan2(2(wx + yz), 1 − 2(x² + y²))`; correr → verde; compilar el `.ino` con los sustitutos (como en la tarea EMG). Commit.
+
+### Task 5: Medición por paso en las rutinas
+- Modify: `rutinas.js` (`medicion` y `recalibrar` en cada paso según la tabla; nuevas indicaciones de desviaciones), `data.js` (`pronacion`, `supinacion`; `CANALES.mcf` → `ps` "Prono-supinación"), `tests/rutinas.test.js`.
+- [ ] Pruebas que fallan: cada paso de las 3 fases tiene la `medicion` de la tabla (comparar contra un objeto esperado por `id`); `desv_radial` y `desv_cubital` con `recalibrar: true` y la indicación nueva exacta; ningún paso usa `tipo: 'puno'`; dentro de una fase cada `medicion` IMU `tipo` aparece como mucho una vez (regla existente).
+- [ ] Implementar; `node --test` verde. Commit.
+
+### Task 6: Detector mejorado y pasos medidos con EMG
+- Create: `detector.js` (puro) + `tests/detector.test.js`; Modify: `monitoreo.js` (usa `detector.js`; pasos EMG; `EJ,emg-<musculo>,<n>`; recalibración al empezar pasos `recalibrar`), `rutina.js` (contador "Detectadas" también para EMG; aviso sin EMG), simulador (contracciones EMG por paso, `ps` en pronación/supinación).
+- Produces: `crearDetector({ tipoUmbral: 'imu'|'emg', refAmp }) -> { agregar(valor) -> boolean /*true = repetición nueva*/, picos, picosRel }`; `suavizar(valores, n = 5)`.
+- [ ] Pruebas unitarias que fallan: señal senoidal de 10 repeticiones de 12° con ruido ±1,5° → 10 repeticiones con `ref` 20 (hoy cuenta mal); la misma sin suavizar con ruido en el umbral no cuenta dobles; EMG reposo 20 con 8 contracciones a 300 → 8; EMG sin contracciones (plano 20 ± 5) → 0.
+- [ ] Comprobaciones de humo: `'fase 1 con EMG'` (rutina Fase 1 con simulador → los pasos guardan `emg.repeticiones > 0` y `medicion.fuente === 'emg'`); `'fase 1 herida → oposición manual'` (chequeo con herida "Enrojecida" + continuar bajo criterio → el paso de oposición queda sin medir); `'pronación con IMU'` (Fase 2 → paso pronación con `repeticiones > 0`); `'desviación pide recalibrar'` (al llegar a desviación radial se envía `CAL` y el contador espera "Calibrando…"); `'paso EMG sin electrodos'` (`SIMULADOR_SIN_EMG` → aviso y conteo manual).
+- [ ] Implementar; `node --test && node tests/ui/humo.mjs` verde. Commit.
+
+### Task 7: Reporte y PDF con la fuente de medición; videos y README
+- Modify: `reporte.js`, `reporte-pdf.js` (columna "Medido con"), `videos/LEEME.md` (supinación "Rehacer"; desviaciones con la postura nueva), `README.md` (tabla de qué mide cada ejercicio, análisis de desviaciones y protocolo `ps`), `prompts-videos-ejercicios.md` (prompt de desviación de canto).
+- [ ] Pruebas que fallan: `datosReporteSesion` de una sesión Fase 1 → filas de rutina con `medidoCon: 'EMG (flexores)'`; paso sin medir → `'Manual'`; IMU → `'IMU'`. Humo: el PDF de una sesión Fase 1 contiene "EMG (flexores)".
+- [ ] Implementar; todo verde. Commit.
+
+### Task 8 (equipo, con el sensor real — no la hace el agente)
+- [ ] Validación en banco de desviación radial/cubital en la postura nueva (goniómetro, 10 repeticiones por lado; error ≤ 3°, conteo ≥ 95 %). Anotar resultado en el README. Si falla: cambiar `medicion` de las desviaciones a `null` (conteo manual).
+- [ ] Grabar de nuevo `supinacion.mp4` y los videos de desviación con la postura nueva.
