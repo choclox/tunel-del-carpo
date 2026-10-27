@@ -15,7 +15,7 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 | `nervio_mediano.mp4` | Deslizamiento del nervio mediano | 1 | Adjunto |
 | `flexion.mp4` | Flexión de muñeca | 2 | Adjunto |
 | `extension.mp4` | Extensión de muñeca | 2 | Adjunto |
-| `desv_radial.mp4` | Desviación radial | 2 | No adjuntado (grabar con la mano de canto) |
+| `desv_radial.mp4` | Desviación radial | 2 | Adjunto (grabado con el antebrazo vertical y el dorso de la mano a la cámara; la rutina pide la mano de canto) |
 | `desv_cubital.mp4` | Desviación cubital | 2 | Adjunto (grabado con el antebrazo vertical y el dorso de la mano a la cámara; la rutina pide la mano de canto) |
 | `pronacion.mp4` | Pronación de antebrazo | 2 | No adjuntado (el anterior mostraba una supinación y pasó a `supinacion.mp4`) |
 | `supinacion.mp4` | Supinación de antebrazo | 2 | Adjunto |
