@@ -55,3 +55,8 @@ test('la hoja no da por hechas repeticiones que nadie contó', () => {
   const s = { fecha: '2026-10-24', ejercicios: [], rutina: { etapa: 1, pasos: [{ id: 'mesa', nombre: 'Mesa', repeticiones: null, repeticionesManual: null, repeticionesObjetivo: 10 }] } };
   assert.deepStrictEqual(datosHojaPaciente({ nombre: 'X', fechaCirugia: '2026-10-10', sesiones: [s] }, s).hizo, [{ nombre: 'Mesa', reps: null }]);
 });
+
+test('sin cambio de ángulo dice "igual"', () => {
+  const a = { fecha: '2026-10-01', ejercicios: [{ tipo: 'flexion', anguloMax: 50 }] }, b = { fecha: '2026-10-05', ejercicios: [{ tipo: 'flexion', anguloMax: 50.2 }] };
+  assert.deepStrictEqual(comparacionConAnterior({ sesiones: [a, b] }, b), ['Flexión de muñeca: 50° (igual que la sesión anterior)']);
+});

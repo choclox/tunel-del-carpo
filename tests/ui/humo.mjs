@@ -95,7 +95,7 @@ await verificar('arranca en seguimiento', async (page) => {
 
 await verificar('cambiar a reporte', async (page) => {
   await page.click('.nav-seccion[data-seccion="reporte"]');
-  afirmar(await page.isVisible('#tabla-historial'), '#tabla-historial no visible');
+  afirmar(await page.isVisible('#lista-sesiones'), '#lista-sesiones no visible');
 });
 
 await verificar('barra superior limpia', async (page) => {
@@ -722,10 +722,53 @@ await verificar('videos nuevos de la fase 1', async (page) => {
 /* ---------- Reporte ---------- */
 const irReporte = (page) => page.click('.nav-seccion[data-seccion="reporte"]');
 
-await verificar('historial corto', async (page) => {
+await verificar('reporte: lectura rápida', async (page) => {
   await irReporte(page);
-  const ths = await page.$$eval('#tabla-historial thead th', (t) => t.map((x) => x.textContent.trim()));
-  afirmar(JSON.stringify(ths) === JSON.stringify(['#', 'Fecha', 'Días desde la cirugía', 'Cumplimiento', 'Dolor', 'Nota', '']), `columnas: ${ths}`);
+  afirmar((await page.textContent('#lectura-general')).trim().length > 0, 'sin frase general');
+  const areas = await page.$$eval('#lectura-areas .area', (as) => as.map((a) => [a.querySelector('.area-titulo').textContent.trim(), a.dataset.estado]));
+  afirmar(JSON.stringify(areas.map((a) => a[0])) === JSON.stringify(['Movimiento', 'Dolor', 'Músculo', 'Constancia']), `áreas: ${areas}`);
+  afirmar(areas.every((a) => ['bien', 'atencion', 'revisar', 'sin-datos'].includes(a[1])), `estados: ${areas}`);
+  afirmar((await page.textContent('section.seccion[data-seccion="reporte"]')).includes('Lectura orientativa'), 'sin aviso de lectura orientativa');
+});
+
+await verificar('reporte: línea de tiempo', async (page) => {
+  await irReporte(page);
+  const r = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const lis = [...document.querySelectorAll('#lista-sesiones li[data-id]')];
+    return {
+      n: ses.length, lis: lis.length, primera: lis[0]?.dataset.id, ultima: ses[ses.length - 1].id,
+      completas: lis.every((li) => li.querySelector('.btn-ver') && li.querySelector('.btn-notas') && li.querySelector('.btn-pdf') && li.querySelector('.chip')),
+    };
+  });
+  afirmar(r.n === r.lis && r.primera === r.ultima && r.completas, JSON.stringify(r));
+});
+
+await verificar('reporte: notas desde la lista', async (page) => {
+  await irReporte(page);
+  const id = await page.getAttribute('#lista-sesiones li[data-id] >> nth=1', 'data-id');
+  await page.click('#lista-sesiones li[data-id] >> nth=1 >> .btn-notas');
+  afirmar(await page.getAttribute(`#lista-sesiones li[data-id="${id}"]`, 'class') === 'seleccionada', 'no quedó seleccionada');
+  await page.fill('#nota', 'Nota de prueba');
+  await page.waitForTimeout(700);
+  const nota = await page.evaluate((id) => estado.db.pacientes.find((x) => x.id === estado.pacienteId).sesiones.find((s) => s.id === id).notas, id);
+  afirmar(nota === 'Nota de prueba', `nota: ${nota}`);
+});
+
+await verificar('reporte: sin sesiones', async (page) => {
+  await page.click('#btn-nuevo');
+  await page.fill('#form-paciente [name=nombre]', 'Paciente Nuevo');
+  await page.fill('#form-paciente [name=documento]', '77');
+  await page.fill('#form-paciente [name=edad]', '40');
+  await page.fill('#form-paciente [name=fechaCirugia]', '2026-10-20');
+  await page.click('#form-paciente button[value=ok]');
+  await page.waitForFunction(() => estado.db.pacientes.some((p) => p.nombre === 'Paciente Nuevo' && p.id === estado.pacienteId));
+  await irReporte(page);
+  const estados = await page.$$eval('#lectura-areas .area', (as) => as.map((a) => a.dataset.estado));
+  afirmar(JSON.stringify(estados) === JSON.stringify(['sin-datos', 'sin-datos', 'sin-datos', 'sin-datos']), `estados: ${estados}`);
+  afirmar((await page.textContent('#lista-sesiones')).includes('Aún no hay sesiones.'), 'sin mensaje de vacío');
+  afirmar(await page.locator('.btn-pdf').count() === 0, 'hay botones de PDF');
 });
 
 await verificar('archivos en reporte', async (page) => {
@@ -737,7 +780,7 @@ await verificar('archivos en reporte', async (page) => {
 
 await verificar('ver detalle', async (page) => {
   await irReporte(page);
-  await page.click('.btn-ver >> nth=0');
+  await page.click('#lista-sesiones .btn-ver >> nth=0');
   afirmar(await seccionActiva(page) === 'seguimiento', 'no fue a Seguimiento');
   afirmar(await page.evaluate(() => estado.vista) === 'sesion', 'la vista no es Una sesión');
 });

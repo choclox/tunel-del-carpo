@@ -119,4 +119,45 @@ function lecturaSesion(p, s) {
   return { chips, frase: comparar(p, s)[0] };
 }
 
+/* ======================= Pantalla ======================= */
+
+const ETIQUETA_ESTADO = { bien: 'Bien', atencion: 'Atención', revisar: 'Revisar', 'sin-datos': 'Sin datos' };
+
+function htmlChip(c) {
+  return `<span class="chip-estado chip" data-estado="${c.estado}" title="${esc(ETIQUETA_ESTADO[c.estado])}">
+    <span class="semaforo" aria-hidden="true"></span>${esc(c.titulo)}: <b>${esc(c.texto)}</b></span>`;
+}
+
+// Lectura rápida y línea de tiempo de la sección Reporte.
+function renderReporte(p) {
+  const l = lecturaPaciente(p, hoyISO());
+  $('#lectura-general').textContent = l.general;
+  $('#lectura-areas').innerHTML = l.areas.map((a) => `<li class="area" data-estado="${a.estado}">
+      <span class="semaforo" aria-hidden="true"></span>
+      <div><div class="area-titulo">${esc(a.titulo)}</div><div class="area-estado">${ETIQUETA_ESTADO[a.estado]}</div>
+      <p>${esc(a.frase)}</p></div></li>`).join('');
+
+  const ses = sesionesOrdenadas(p);
+  $('#lista-sesiones').innerHTML = ses.map((s, i) => {
+    const ls = lecturaSesion(p, s);
+    const marcas = [];
+    if (s.perdidaDatosPct >= 1 || (s.calibracion && (!s.calibracion.ok || s.calibracion.tiempoS > 30))) marcas.push('<span class="marca marca-alerta" title="Se perdieron datos o la calibración falló">⚠ datos</span>');
+    if (s.origen === 'simulador') marcas.push('<span class="marca">Simulador</span>');
+    if (s.notas) marcas.push('<span class="marca marca-nota">Nota</span>');
+    return `<li data-id="${esc(s.id)}" class="${s.id === estado.sesionId ? 'seleccionada' : ''}">
+      <div class="ses-cabecera">
+        <div><b>${fmtFecha(s.fecha)}</b> <span class="muted">· Sesión ${i + 1} · ${s.rutina ? `Fase ${esc(s.rutina.etapa)}` : 'Sin rutina'}</span></div>
+        <div class="ses-marcas">${marcas.join('')}</div>
+      </div>
+      <div class="ses-chips">${ls.chips.map(htmlChip).join('')}</div>
+      <p class="ses-frase">${esc(ls.frase)}</p>
+      <div class="ses-acciones">
+        <button class="btn btn-ghost btn-ver" data-id="${esc(s.id)}">Ver detalle</button>
+        <button class="btn btn-ghost btn-notas" data-id="${esc(s.id)}">Notas</button>
+        <button class="btn btn-pdf" data-id="${esc(s.id)}"><svg class="ic"><use href="#i-download"/></svg>Descargar PDF</button>
+      </div>
+    </li>`;
+  }).reverse().join('') || '<li class="muted">Aún no hay sesiones.</li>';
+}
+
 if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal };

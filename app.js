@@ -713,27 +713,7 @@ function renderComparar(p) {
 function renderHistorial(p) {
   const ses = sesionesOrdenadas(p);
   if (!ses.some((s) => s.id === estado.sesionId) && ses.length) estado.sesionId = ses[ses.length - 1].id;
-  const filas = ses.map((s, i) => {
-    const m = metricas(s);
-    // Solo se marca lo que hay que revisar: pérdida de datos o calibración fallida.
-    const problemas = [];
-    if (s.perdidaDatosPct >= 1) problemas.push(`se perdió el ${fmt(s.perdidaDatosPct, 1)} % de los datos`);
-    if (s.calibracion && (!s.calibracion.ok || s.calibracion.tiempoS > 30)) problemas.push('la calibración falló o fue lenta');
-    const aviso = problemas.length ? ` <span class="aviso-fila" title="Revisar: ${problemas.join(' y ')}">⚠</span>` : '';
-    return `<tr data-id="${esc(s.id)}" class="${s.id === estado.sesionId ? 'selected' : ''}">
-      <td>${i + 1}</td>
-      <td>${fmtFecha(s.fecha)}${aviso}</td>
-      <td class="num">${dias(p.fechaCirugia, s.fecha)}</td>
-      <td class="num">${m.cumplimiento == null ? '—' : fmt(m.cumplimiento) + ' %'}</td>
-      <td class="num">${s.dolorEVA ?? '—'}</td>
-      <td>${s.notas ? 'Sí' : ''}</td>
-      <td><button class="btn btn-ghost btn-ver" data-id="${esc(s.id)}">Ver</button></td>
-    </tr>`;
-  }).reverse().join('');
-  $('#tabla-historial').innerHTML = `<thead><tr>
-      <th>#</th><th>Fecha</th><th class="num">Días desde la cirugía</th><th class="num">Cumplimiento</th>
-      <th class="num">Dolor</th><th>Nota</th><th></th>
-    </tr></thead><tbody>${filas || '<tr><td colspan="7" class="muted">Sin sesiones</td></tr>'}</tbody>`;
+  renderReporte(p);
 
   const s = ses.find((x) => x.id === estado.sesionId);
   $('#nota').disabled = !s;
@@ -921,11 +901,11 @@ function init() {
   $('#cmp-a').addEventListener('change', (e) => { estado.cmpA = e.target.value; renderComparar(paciente()); });
   $('#cmp-b').addEventListener('change', (e) => { estado.cmpB = e.target.value; renderComparar(paciente()); });
 
-  $('#tabla-historial').addEventListener('click', (e) => {
+  $('#lista-sesiones').addEventListener('click', (e) => {
     const ver = e.target.closest('.btn-ver');
     if (ver) { estado.sesionId = ver.dataset.id; irA('seguimiento', 'sesion'); return; }
-    const tr = e.target.closest('tr[data-id]');
-    if (tr) { estado.sesionId = tr.dataset.id; renderHistorial(paciente()); }
+    const notas = e.target.closest('.btn-notas');
+    if (notas) { estado.sesionId = notas.dataset.id; renderHistorial(paciente()); $('#nota').focus(); }
   });
 
   let notaTimer;
@@ -937,8 +917,7 @@ function init() {
     clearTimeout(notaTimer);
     notaTimer = setTimeout(() => {
       $('#nota-estado').textContent = guardarDB() ? 'Nota guardada.' : 'No se pudo guardar en este navegador.';
-      const fila = document.querySelector(`#tabla-historial tr[data-id="${CSS.escape(s.id)}"] td:nth-child(6)`);
-      if (fila) fila.textContent = s.notas ? 'Sí' : '';
+      renderReporte(paciente()); // la marca "Nota" de la sesión
     }, 500);
   });
 
