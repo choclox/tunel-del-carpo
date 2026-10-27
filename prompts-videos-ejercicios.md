@@ -98,13 +98,13 @@ toward the table. No wrist flexion or extension, no forearm rotation. Hold brief
 slowly return to neutral straight alignment.
 ```
 
-### Supinación de antebrazo (`supinacion`, ref. 80°) — rehacer
+### Pronación de antebrazo (`pronacion`, ref. 80°) — falta
 ```
 [STYLE BLOCK]
 Camera: front view, forearm pointing toward the camera, wrist centered.
 Elbow bent at 90 degrees and tucked against the side of the body, forearm horizontal,
 starting with the thumb pointing up and fingers relaxed together. The forearm slowly
-rotates so the palm turns to face up, reaching about 80 degrees of supination. The elbow
+rotates so the palm turns to face down, reaching about 80 degrees of pronation. The elbow
 stays against the body and does not move; no wrist bending. Hold briefly, then slowly
 return to thumb-up.
 ```
