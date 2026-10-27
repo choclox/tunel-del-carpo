@@ -6,9 +6,14 @@
  * desde la 6.ª. El profesional debe validar el contenido.
  * Rutina orientativa. El profesional debe ajustarla a cada paciente.
  *
- * `tipo` es una clave de EJERCICIOS (monitoreo) y se mide con el detector; `null` guarda
- * la señal cruda y el conteo es solo manual.
+ * `medicion` dice cómo se cuenta cada paso: `{ fuente: 'imu', tipo }` (ángulo, tipo de EJERCICIOS),
+ * `{ fuente: 'emg', musculo }` (activación del músculo) o `null` (conteo manual). `tipo` repite el
+ * tipo IMU (o `null`) para las sesiones guardadas. `recalibrar`: pide CAL al empezar el paso.
  */
+
+const IMU = (tipo) => ({ fuente: 'imu', tipo });
+const EMG = (musculo) => ({ fuente: 'emg', musculo });
+const INDICACION_DESVIACION = 'Mano de canto, pulgar hacia arriba y antebrazo apoyado. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
 
 const ETAPAS = [
   {
@@ -23,19 +28,19 @@ const ETAPAS = [
       'Entre ejercicios, mantenga la mano elevada para reducir la hinchazón.',
     ],
     pasos: [
-      { id: 'tendon_recto', nombre: 'Deslizamiento tendinoso: mano recta', tipo: null, reps: 10, sostenerS: 5,
+      { id: 'tendon_recto', nombre: 'Deslizamiento tendinoso: mano recta', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
         indicacion: 'Dedos extendidos y juntos, muñeca neutra.', cuidado: [] },
-      { id: 'puno_gancho', nombre: 'Deslizamiento tendinoso: puño en gancho', tipo: null, reps: 10, sostenerS: 5,
+      { id: 'puno_gancho', nombre: 'Deslizamiento tendinoso: puño en gancho', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
         indicacion: 'Doble las articulaciones medias y finales; los nudillos quedan rectos.', cuidado: [] },
-      { id: 'puno_completo', nombre: 'Deslizamiento tendinoso: puño completo', tipo: 'puno', reps: 10, sostenerS: 5,
+      { id: 'puno_completo', nombre: 'Deslizamiento tendinoso: puño completo', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
         indicacion: 'Cierre la mano por completo sin apretar.', cuidado: ['No apriete el puño.'] },
-      { id: 'mesa', nombre: 'Deslizamiento tendinoso: posición de mesa', tipo: null, reps: 10, sostenerS: 5,
+      { id: 'mesa', nombre: 'Deslizamiento tendinoso: posición de mesa', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
         indicacion: 'Doble solo los nudillos con los dedos rectos.', cuidado: [] },
-      { id: 'puno_recto', nombre: 'Deslizamiento tendinoso: puño recto', tipo: null, reps: 10, sostenerS: 5,
+      { id: 'puno_recto', nombre: 'Deslizamiento tendinoso: puño recto', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
         indicacion: 'Doble nudillos y articulaciones medias; las puntas tocan la palma.', cuidado: [] },
-      { id: 'pulgar_oposicion', nombre: 'Oposición del pulgar', tipo: null, reps: 10, sostenerS: 2,
+      { id: 'pulgar_oposicion', nombre: 'Oposición del pulgar', tipo: null, medicion: { ...EMG('tenar'), manualSiHerida: true }, reps: 10, sostenerS: 2,
         indicacion: 'Toque con el pulgar la punta de cada dedo.', cuidado: [] },
-      { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, reps: 5, sostenerS: 3,
+      { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, medicion: null, reps: 5, sostenerS: 3,
         indicacion: 'Siga la secuencia indicada por el profesional, sin forzar.',
         cuidado: ['Si siente hormigueo, haga el movimiento más corto.'] },
     ],
@@ -52,21 +57,21 @@ const ETAPAS = [
       'Aún no levante objetos pesados.',
     ],
     pasos: [
-      { id: 'flexion', nombre: 'Flexión de muñeca', tipo: 'flexion', reps: 10, sostenerS: 5,
+      { id: 'flexion', nombre: 'Flexión de muñeca', tipo: 'flexion', medicion: IMU('flexion'), reps: 10, sostenerS: 5,
         indicacion: 'Antebrazo apoyado, palma hacia abajo; baje la mano.', cuidado: [] },
-      { id: 'extension', nombre: 'Extensión de muñeca', tipo: 'extension', reps: 10, sostenerS: 5,
+      { id: 'extension', nombre: 'Extensión de muñeca', tipo: 'extension', medicion: IMU('extension'), reps: 10, sostenerS: 5,
         indicacion: 'Antebrazo apoyado, palma hacia abajo; suba la mano.', cuidado: [] },
-      { id: 'desv_radial', nombre: 'Desviación radial', tipo: 'desv_radial', reps: 10, sostenerS: 3,
-        indicacion: 'Palma apoyada; lleve la mano hacia el pulgar.', cuidado: [] },
-      { id: 'desv_cubital', nombre: 'Desviación cubital', tipo: 'desv_cubital', reps: 10, sostenerS: 3,
-        indicacion: 'Palma apoyada; lleve la mano hacia el meñique.', cuidado: [] },
-      { id: 'pronacion', nombre: 'Pronación de antebrazo', tipo: null, reps: 10, sostenerS: 3,
+      { id: 'desv_radial', nombre: 'Desviación radial', tipo: 'desv_radial', medicion: IMU('desv_radial'), recalibrar: true, reps: 10, sostenerS: 3,
+        indicacion: INDICACION_DESVIACION, cuidado: [] },
+      { id: 'desv_cubital', nombre: 'Desviación cubital', tipo: 'desv_cubital', medicion: IMU('desv_cubital'), recalibrar: true, reps: 10, sostenerS: 3,
+        indicacion: INDICACION_DESVIACION, cuidado: [] },
+      { id: 'pronacion', nombre: 'Pronación de antebrazo', tipo: 'pronacion', medicion: IMU('pronacion'), reps: 10, sostenerS: 3,
         indicacion: 'Codo pegado al cuerpo a 90°; gire la palma hacia abajo.', cuidado: [] },
-      { id: 'supinacion', nombre: 'Supinación de antebrazo', tipo: null, reps: 10, sostenerS: 3,
+      { id: 'supinacion', nombre: 'Supinación de antebrazo', tipo: 'supinacion', medicion: IMU('supinacion'), reps: 10, sostenerS: 3,
         indicacion: 'Codo pegado al cuerpo a 90°; gire la palma hacia arriba.', cuidado: [] },
-      { id: 'puno_completo', nombre: 'Puño completo', tipo: 'puno', reps: 10, sostenerS: 3,
+      { id: 'puno_completo', nombre: 'Puño completo', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 3,
         indicacion: 'Cierre la mano por completo y ábrala del todo.', cuidado: ['No apriete el puño.'] },
-      { id: 'pulgar_abduccion', nombre: 'Abducción del pulgar', tipo: null, reps: 10, sostenerS: 3,
+      { id: 'pulgar_abduccion', nombre: 'Abducción del pulgar', tipo: null, medicion: EMG('tenar'), reps: 10, sostenerS: 3,
         indicacion: 'Separe el pulgar de la palma hacia arriba.', cuidado: [] },
     ],
   },
@@ -82,18 +87,18 @@ const ETAPAS = [
       'Deténgase si aparece hormigueo o adormecimiento en los dedos.',
     ],
     pasos: [
-      { id: 'pelota', nombre: 'Apretar pelota terapéutica', tipo: 'puno', reps: 10, sostenerS: 3,
+      { id: 'pelota', nombre: 'Apretar pelota terapéutica', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 3,
         indicacion: 'Apriete la pelota con toda la mano y suelte despacio.',
         cuidado: ['Apriete sin llegar al dolor.'] },
-      { id: 'pinza', nombre: 'Pinza pulgar-índice', tipo: null, reps: 10, sostenerS: 3,
+      { id: 'pinza', nombre: 'Pinza pulgar-índice', tipo: null, medicion: EMG('tenar'), reps: 10, sostenerS: 3,
         indicacion: 'Apriete masilla o una pinza de ropa entre pulgar e índice.', cuidado: [] },
-      { id: 'extension_carga', nombre: 'Extensión de muñeca con peso ligero', tipo: 'extension', reps: 10, sostenerS: 2,
+      { id: 'extension_carga', nombre: 'Extensión de muñeca con peso ligero', tipo: 'extension', medicion: IMU('extension'), reps: 10, sostenerS: 2,
         indicacion: 'Antebrazo apoyado, palma hacia abajo; suba el peso despacio.',
         cuidado: ['Use 0,5 kg al principio.'] },
-      { id: 'flexion_carga', nombre: 'Flexión de muñeca con peso ligero', tipo: 'flexion', reps: 10, sostenerS: 2,
+      { id: 'flexion_carga', nombre: 'Flexión de muñeca con peso ligero', tipo: 'flexion', medicion: IMU('flexion'), reps: 10, sostenerS: 2,
         indicacion: 'Antebrazo apoyado, palma hacia arriba; suba el peso despacio.',
         cuidado: ['Use 0,5 kg al principio.'] },
-      { id: 'pronosup_martillo', nombre: 'Prono-supinación con martillo', tipo: null, reps: 10, sostenerS: 2,
+      { id: 'pronosup_martillo', nombre: 'Prono-supinación con martillo', tipo: 'supinacion', medicion: IMU('supinacion'), reps: 10, sostenerS: 2,
         indicacion: 'Sujete un martillo por el mango y gírelo despacio a cada lado.',
         cuidado: ['Agarre más cerca de la cabeza si cuesta.'] },
     ],
@@ -114,6 +119,15 @@ function etapaSugerida(fechaCirugiaISO, hoyISO) {
   const dias = Math.round((h - c) / 86400000);
   if (!Number.isFinite(dias) || dias < 14) return 1;
   return dias < 42 ? 2 : 3;
+}
+
+// Medición que se usa hoy en el paso: con la herida distinta de "Bien" en el chequeo, los pasos
+// marcados `manualSiHerida` (electrodo del tenar junto a la incisión) se cuentan a mano.
+function medicionDelPaso(paso, chequeo) {
+  const m = paso.medicion ?? null;
+  if (!m) return null;
+  if (m.manualSiHerida) return chequeo && chequeo.herida !== 'bien' ? null : { fuente: m.fuente, musculo: m.musculo };
+  return m;
 }
 
 // Devuelve un arreglo nuevo: reemplaza el registro con el mismo id o lo agrega al final.
@@ -149,4 +163,4 @@ function resumenSenal(muestras) {
   };
 }
 
-if (typeof module !== 'undefined') module.exports = { ETAPAS, etapaPorNumero, etapaSugerida, guardarRegistroPaso, resumenSenal };
+if (typeof module !== 'undefined') module.exports = { ETAPAS, etapaPorNumero, etapaSugerida, medicionDelPaso, guardarRegistroPaso, resumenSenal };

@@ -1,9 +1,10 @@
 // interfaz-medico/tests/rutinas.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { ETAPAS, etapaPorNumero, etapaSugerida, guardarRegistroPaso, resumenSenal } = require('../rutinas.js');
+const { ETAPAS, etapaPorNumero, etapaSugerida, guardarRegistroPaso, resumenSenal, medicionDelPaso } = require('../rutinas.js');
+const { EJERCICIOS } = require('../data.js');
 
-const TIPOS = ['flexion', 'extension', 'desv_radial', 'desv_cubital', 'puno'];
+const TIPOS = ['flexion', 'extension', 'desv_radial', 'desv_cubital', 'pronacion', 'supinacion'];
 
 test('hay 3 etapas con pasos', () => {
   assert.deepStrictEqual(ETAPAS.map((e) => e.numero), [1, 2, 3]);
@@ -19,8 +20,60 @@ test('tipos válidos y sin repetir por etapa', () => {
     const tipos = e.pasos.map((p) => p.tipo).filter((t) => t !== null);
     for (const t of tipos) assert.ok(TIPOS.includes(t), `${e.numero}: ${t}`);
     assert.strictEqual(new Set(tipos).size, tipos.length);
-    assert.ok(tipos.length >= 1);
   }
+});
+
+const IMU = (tipo) => ({ fuente: 'imu', tipo });
+const EMG = (musculo) => ({ fuente: 'emg', musculo });
+const MEDICION_ESPERADA = {
+  1: { tendon_recto: EMG('flexores'), puno_gancho: EMG('flexores'), puno_completo: EMG('flexores'), mesa: EMG('flexores'),
+    puno_recto: EMG('flexores'), pulgar_oposicion: { ...EMG('tenar'), manualSiHerida: true }, nervio_mediano: null },
+  2: { flexion: IMU('flexion'), extension: IMU('extension'), desv_radial: IMU('desv_radial'), desv_cubital: IMU('desv_cubital'),
+    pronacion: IMU('pronacion'), supinacion: IMU('supinacion'), puno_completo: EMG('flexores'), pulgar_abduccion: EMG('tenar') },
+  3: { pelota: EMG('flexores'), pinza: EMG('tenar'), extension_carga: IMU('extension'), flexion_carga: IMU('flexion'),
+    pronosup_martillo: IMU('supinacion') },
+};
+
+test('cada paso tiene la medición de la tabla', () => {
+  for (const e of ETAPAS) {
+    const real = Object.fromEntries(e.pasos.map((p) => [p.id, p.medicion]));
+    assert.deepStrictEqual(real, MEDICION_ESPERADA[e.numero], `Fase ${e.numero}`);
+  }
+});
+
+test('tipo sigue a la medición IMU y ningún paso usa puño', () => {
+  for (const e of ETAPAS) for (const p of e.pasos) {
+    assert.strictEqual(p.tipo, p.medicion?.fuente === 'imu' ? p.medicion.tipo : null, p.id);
+    assert.notStrictEqual(p.tipo, 'puno');
+    if (p.medicion?.fuente === 'imu') assert.ok(EJERCICIOS[p.medicion.tipo], p.id);
+  }
+});
+
+test('desviaciones: recalibrar y postura de canto', () => {
+  const ind = 'Mano de canto, pulgar hacia arriba y antebrazo apoyado. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
+  for (const id of ['desv_radial', 'desv_cubital']) {
+    const p = etapaPorNumero(2).pasos.find((x) => x.id === id);
+    assert.strictEqual(p.recalibrar, true);
+    assert.strictEqual(p.indicacion, ind);
+  }
+  const otros = ETAPAS.flatMap((e) => e.pasos).filter((p) => p.recalibrar);
+  assert.deepStrictEqual(otros.map((p) => p.id), ['desv_radial', 'desv_cubital']);
+});
+
+test('pronación y supinación por el canal ps', () => {
+  assert.deepStrictEqual([EJERCICIOS.pronacion.canal, EJERCICIOS.pronacion.signo, EJERCICIOS.pronacion.ref], ['ps', -1, 80]);
+  assert.deepStrictEqual([EJERCICIOS.supinacion.canal, EJERCICIOS.supinacion.signo, EJERCICIOS.supinacion.ref], ['ps', 1, 80]);
+});
+
+test('medicionDelPaso: herida distinta de bien pasa la oposición a manual', () => {
+  const op = etapaPorNumero(1).pasos.find((x) => x.id === 'pulgar_oposicion');
+  assert.deepStrictEqual(medicionDelPaso(op, { herida: 'bien' }), EMG('tenar'));
+  assert.deepStrictEqual(medicionDelPaso(op, null), EMG('tenar'));
+  assert.strictEqual(medicionDelPaso(op, { herida: 'roja' }), null);
+  const pelota = etapaPorNumero(3).pasos.find((x) => x.id === 'pelota');
+  assert.deepStrictEqual(medicionDelPaso(pelota, { herida: 'roja' }), EMG('flexores'));
+  const flex = etapaPorNumero(2).pasos.find((x) => x.id === 'flexion');
+  assert.deepStrictEqual(medicionDelPaso(flex, { herida: 'roja' }), IMU('flexion'));
 });
 
 test('ids únicos por etapa y reps positivas', () => {
