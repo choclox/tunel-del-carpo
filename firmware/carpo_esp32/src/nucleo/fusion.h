@@ -17,6 +17,23 @@ Cuaternion orientacionDesdeAcelMag(const Vec3& acel, const Vec3& mag);
 // Ángulo entre dos vectores en grados [0; 180]; 0 si alguno es cero.
 float anguloEntreGrados(const Vec3& a, const Vec3& b);
 
+// Orientación sin giroscopio: acel y mag suavizados con un paso bajo exponencial
+// (x = x + alfa * (nuevo - x)) y convertidos con orientacionDesdeAcelMag. La primera muestra
+// tras construir o reiniciar se toma tal cual. Con mag = {0,0,0} solo hay inclinación (rumbo 0).
+class FiltroSinGiro {
+ public:
+  explicit FiltroSinGiro(float alfa = 0.2f);
+  void reiniciar();
+  void actualizar(const Vec3& acel, const Vec3& mag);
+  Cuaternion orientacion() const;
+
+ private:
+  float alfa_;
+  bool vacio_ = true;
+  Vec3 acel_{0, 0, 0};
+  Vec3 mag_{0, 0, 0};
+};
+
 // Filtro de Madgwick (2010): AHRS de 9 ejes e IMU de 6 ejes.
 class FiltroMadgwick {
  public:

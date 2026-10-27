@@ -39,14 +39,16 @@ bool Gy85::iniciar(TwoWire& wire) {
   if (!escribir(DIR_ADXL, 0x31, 0x0B)) return false;   // resolución completa, ±16 g
   if (!escribir(DIR_ADXL, 0x2D, 0x08)) return false;   // medición
 
-  // ITG3205: 0x68 o 0x69
-  uint8_t quien = 0;
-  if (leerBytes(0x68, 0x00, &quien, 1)) dirGiro_ = 0x68;
-  else if (leerBytes(0x69, 0x00, &quien, 1)) dirGiro_ = 0x69;
-  else return false;
-  if (!escribir(dirGiro_, 0x3E, 0x01)) return false;   // PLL con giro X
-  if (!escribir(dirGiro_, 0x15, 0x09)) return false;   // 100 Hz
-  if (!escribir(dirGiro_, 0x16, 0x1B)) return false;   // ±2000 °/s, DLPF 42 Hz
+  // ITG3205: 0x68 o 0x69 (se omite con USAR_GIROSCOPIO = false)
+  if (USAR_GIROSCOPIO) {
+    uint8_t quien = 0;
+    if (leerBytes(0x68, 0x00, &quien, 1)) dirGiro_ = 0x68;
+    else if (leerBytes(0x69, 0x00, &quien, 1)) dirGiro_ = 0x69;
+    else return false;
+    if (!escribir(dirGiro_, 0x3E, 0x01)) return false;   // PLL con giro X
+    if (!escribir(dirGiro_, 0x15, 0x09)) return false;   // 100 Hz
+    if (!escribir(dirGiro_, 0x16, 0x1B)) return false;   // ±2000 °/s, DLPF 42 Hz
+  }
 
   // Magnetómetro: primero HMC5883L, luego QMC5883L
   uint8_t ident[3] = {0, 0, 0};
@@ -70,8 +72,8 @@ bool Gy85::iniciar(TwoWire& wire) {
 // POWER_CTL del ADXL345 en medición y DLPF_FS del ITG3205 como se configuraron.
 bool Gy85::configuracionIntacta() {
   uint8_t potencia = 0, dlpf = 0;
-  return leerBytes(DIR_ADXL, 0x2D, &potencia, 1) && potencia == 0x08 &&
-         leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B;
+  if (!leerBytes(DIR_ADXL, 0x2D, &potencia, 1) || potencia != 0x08) return false;
+  return !USAR_GIROSCOPIO || (leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B);
 }
 
 bool Gy85::leer(Vec3& acel, Vec3& giro, Vec3& mag) {
@@ -85,8 +87,11 @@ bool Gy85::leer(Vec3& acel, Vec3& giro, Vec3& mag) {
   Vec3 a = decodificarAdxl345(r);
   if (esCero(a)) { iniciado_ = false; return false; }   // ADXL345 en reposo tras un corte
   acel = corregirAcel(aplicarMontaje(a, MONTAJE_ACEL), DESFASE_ACEL, ESCALA_ACEL);
-  if (!leerBytes(dirGiro_, 0x1D, r, 6)) { iniciado_ = false; return false; }
-  giro = aplicarMontaje(decodificarItg3205(r), MONTAJE_GIRO);
+  giro = Vec3{0, 0, 0};
+  if (USAR_GIROSCOPIO) {
+    if (!leerBytes(dirGiro_, 0x1D, r, 6)) { iniciado_ = false; return false; }
+    giro = aplicarMontaje(decodificarItg3205(r), MONTAJE_GIRO);
+  }
 
   mag = Vec3{0, 0, 0};
   if (tipoMag_ == TipoMag::Hmc) {

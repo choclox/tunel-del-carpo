@@ -17,6 +17,7 @@
 
 static Gy85 gy85;
 static FiltroMadgwick filtro(BETA_NORMAL);
+static FiltroSinGiro filtroSinGiro(ALFA_SIN_GIRO);  // con USAR_GIROSCOPIO = false
 static Calibrador calibrador;
 static CalibradorMag calibradorMag;
 static VigilanteSensor vigilante;
@@ -60,6 +61,10 @@ static bool sensorDisponible() { return detectado && !vigilante.perdido(); }
 
 // Fusión de 9 ejes solo con un magnetómetro presente y calibrado (MAG) para este montaje.
 static bool usarMag() { return USAR_MAGNETOMETRO && gy85.tieneMagnetometro() && magCalibrado; }
+
+static Cuaternion orientacionActual() {
+  return USAR_GIROSCOPIO ? filtro.orientacion() : filtroSinGiro.orientacion();
+}
 
 static Vec3 restarDesfaseMag(const Vec3& mag) {
   return Vec3{mag.x - desfaseMag.x, mag.y - desfaseMag.y, mag.z - desfaseMag.z};
@@ -214,7 +219,7 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
     }
     filtro.fijarBeta(calibrador.asentando(ahora) ? BETA_NORMAL : BETA_CONVERGENCIA);
   } else if (despues == EstadoCal::Listo) {
-    qCal = filtro.orientacion();
+    qCal = orientacionActual();
     filtro.fijarBeta(BETA_NORMAL);
     calibrando = false;
     if (USAR_EMG) reposoEmg.terminar();
@@ -268,7 +273,7 @@ static void muestrearEmgCrudo(uint32_t ahora) {
 }
 
 static void enviarMuestra(uint32_t ahora) {
-  AngulosMuneca a = angulosRelativos(qCal, filtro.orientacion(), manoIzquierda);
+  AngulosMuneca a = angulosRelativos(qCal, orientacionActual(), manoIzquierda);
   char buf[80];
   if (USAR_EMG) {
     uint16_t emg[3];
@@ -313,6 +318,14 @@ static void vigilarSensor(bool ok, uint32_t ahora) {
 // En 9 ejes la siembra espera a una lectura con magnetómetro para fijar el rumbo.
 static void actualizarFiltro(const Vec3& giro, const Vec3& acel, const Vec3& mag, float dt) {
   Vec3 magC = magParaFiltro(mag);
+  if (!USAR_GIROSCOPIO) {  // sin giroscopio: orientación directa desde acel/mag suavizados
+    if (sembrarPendiente) {
+      filtroSinGiro.reiniciar();
+      sembrarPendiente = false;
+    }
+    filtroSinGiro.actualizar(acel, magC);
+    return;
+  }
   if (sembrarPendiente && (!usarMag() || !esCero(magC))) {
     filtro.reiniciar(orientacionDesdeAcelMag(acel, magC));
     sembrarPendiente = false;
@@ -367,6 +380,7 @@ void setup() {
     Serial.print("#Carpo ESP32 listo, magnetometro: ");
     Serial.println(gy85.nombreMagnetometro());
     if (!gy85.tieneMagnetometro()) Serial.println("#Sin magnetometro: rc puede derivar");
+    if (!USAR_GIROSCOPIO) Serial.println("#Modo sin giroscopio: angulos solo desde acelerometro y magnetometro");
     evaluarMag();
   } else {
     Serial.println("#GY-85 no detectado");
