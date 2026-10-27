@@ -253,7 +253,7 @@ function procesarLinea(linea) {
         ? { tiempoS, ok: tiempoS <= CAL_TIMEOUT_S }
         : { tiempoS, ok: false, motivo: partes.slice(2).join(',') || 'error del dispositivo' };
       mv.calInicio = null;
-      // Calibración pedida por un paso en su propia postura (mano de canto, pulgar arriba): solo vale
+      // Calibración pedida por un paso en su propia postura (antebrazo vertical, pulgar arriba…): solo vale
       // para ese tipo de paso; los demás y la sesión siguiente vuelven a calibrar en posición neutra.
       if (mv.cal.ok && mv.calEnPostura) mv.cal.postura = 'paso';
       // Las muestras anteriores usan el cero viejo: el reposo del ejercicio no puede salir de ellas.
@@ -264,7 +264,7 @@ function procesarLinea(linea) {
           mv.paso.esperandoCal = false;
           mv.paso.medicion = null; // sin calibración: conteo manual
         } else if (mv.cal.postura && !mv.paso.paso.recalibrar) {
-          pedirCalibracion(false); // terminó la del paso anterior, de canto: falta la neutra
+          pedirCalibracion(false); // terminó la del paso anterior, en su postura: falta la neutra
         } else {
           mv.paso.esperandoCal = false;
           iniciarEjercicio(mv.paso.medicion.tipo, mv.paso.paso.reps);
@@ -440,7 +440,7 @@ function iniciarPasoRutina(paso) {
   const calDeOtraPostura = !paso.recalibrar && !!mv.cal?.postura;
   if (medicion?.fuente === 'imu' && (paso.recalibrar || mv.calInicio != null || calDeOtraPostura)) {
     // Espera la calibración: la que pide este paso (en su postura, o neutra si la vigente es de
-    // canto) o la que sigue en curso desde el anterior.
+    // la postura de otro paso) o la que sigue en curso desde el anterior.
     mv.paso.esperandoCal = true;
     mv.transporte.enviar('EJ,-').catch(() => {});
     if (mv.calInicio == null) pedirCalibracion(!!paso.recalibrar);
@@ -497,7 +497,7 @@ function estadoDispositivo() {
     conectado: mv.conectado,
     origen: mv.conectado ? mv.origen : null,
     calibrando: mv.calInicio != null,
-    calOk: !!cal?.ok && !cal.postura, // la de un paso (mano de canto) no vale para empezar
+    calOk: !!cal?.ok && !cal.postura, // la de un paso (en su postura) no vale para empezar
     calMotivo: cal && !cal.ok ? cal.motivo || `tardó ${fmt(cal.tiempoS, 1)} s (> ${CAL_TIMEOUT_S} s)` : null,
     calTiempoS: cal ? cal.tiempoS : null,
     conEmg: mv.conEmg,

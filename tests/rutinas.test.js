@@ -49,8 +49,8 @@ test('tipo sigue a la medición IMU y ningún paso usa puño', () => {
   }
 });
 
-test('desviaciones: recalibrar y postura de canto', () => {
-  const ind = 'Mano de canto, pulgar hacia arriba y antebrazo apoyado. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
+test('desviaciones: recalibrar y antebrazo vertical', () => {
+  const ind = 'Codo apoyado en la mesa, antebrazo vertical, dedos hacia arriba y la palma hacia usted. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
   for (const id of ['desv_radial', 'desv_cubital']) {
     const p = etapaPorNumero(2).pasos.find((x) => x.id === id);
     assert.strictEqual(p.recalibrar, true);

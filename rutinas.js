@@ -13,7 +13,7 @@
 
 const IMU = (tipo) => ({ fuente: 'imu', tipo });
 const EMG = (musculo) => ({ fuente: 'emg', musculo });
-const INDICACION_DESVIACION = 'Mano de canto, pulgar hacia arriba y antebrazo apoyado. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
+const INDICACION_DESVIACION = 'Codo apoyado en la mesa, antebrazo vertical, dedos hacia arriba y la palma hacia usted. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
 
 const ETAPAS = [
   {

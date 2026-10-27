@@ -75,27 +75,26 @@ wrist extension. Fingers stay relaxed and straight, not spread. Hold briefly, th
 slowly return to neutral straight alignment.
 ```
 
-Las desviaciones se hacen con la **mano de canto** (pulgar hacia arriba, antebrazo apoyado sobre el borde cubital): así el sensor mide el giro con ayuda de la gravedad. La rutina recalibra en esta postura al empezar el paso.
+Las desviaciones se hacen con el **antebrazo vertical** (codo apoyado, dedos hacia arriba, palma hacia el paciente; la cámara ve el dorso de la mano): así el sensor mide el giro con ayuda de la gravedad. La rutina recalibra en esta postura al empezar el paso.
 
 ### Desviación radial (`desv_radial`, ref. 20°)
 ```
 [STYLE BLOCK]
-Camera: front view facing the palm side edge-on, wrist centered.
-Forearm resting on the table on its little-finger edge, hand on edge with the thumb pointing
-up, fingers together and straight. The hand slowly tilts upward at the wrist toward the thumb
-side, reaching about 20 degrees of radial deviation. No wrist flexion or extension, no
-forearm rotation. Hold briefly, then slowly return to neutral straight alignment.
+Camera: front view facing the back of the hand, wrist centered.
+Elbow resting on the table, forearm vertical, fingers pointing up and together, palm facing
+the person (back of the hand toward the camera). The hand slowly tilts sideways at the wrist toward
+the thumb side, reaching about 20 degrees of radial deviation. No wrist flexion or extension,
+no forearm rotation. Hold briefly, then slowly return to neutral straight alignment.
 ```
 
 ### Desviación cubital (`desv_cubital`, ref. 30°)
 ```
 [STYLE BLOCK]
-Camera: front view facing the palm side edge-on, wrist centered.
-Forearm resting on the table on its little-finger edge, hand on edge with the thumb pointing
-up, fingers together and straight. The hand slowly tilts downward at the wrist toward the
-little-finger side, reaching about 30 degrees of ulnar deviation, the little finger moving
-toward the table. No wrist flexion or extension, no forearm rotation. Hold briefly, then
-slowly return to neutral straight alignment.
+Camera: front view facing the back of the hand, wrist centered.
+Elbow resting on the table, forearm vertical, fingers pointing up and together, palm facing
+the person (back of the hand toward the camera). The hand slowly tilts sideways at the wrist toward
+the little-finger side, reaching about 30 degrees of ulnar deviation. No wrist flexion or
+extension, no forearm rotation. Hold briefly, then slowly return to neutral straight alignment.
 ```
 
 ### Pronación de antebrazo (`pronacion`, ref. 80°)
