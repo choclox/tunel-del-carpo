@@ -22,7 +22,7 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 | `pulgar_abduccion.mp4` | Abducción del pulgar | 2 | Adjunto |
 | `pelota.mp4` | Apretar pelota terapéutica | 3 | Adjunto |
 | `pinza.mp4` | Pinza pulgar-índice | 3 | Adjunto |
-| `extension_carga.mp4` | Extensión de muñeca con peso ligero | 3 | No adjuntado |
+| `extension_carga.mp4` | Extensión de muñeca con peso ligero | 3 | Adjunto |
 | `flexion_carga.mp4` | Flexión de muñeca con peso ligero | 3 | No adjuntado |
 | `pronosup_martillo.mp4` | Prono-supinación con martillo | 3 | No adjuntado |
 
