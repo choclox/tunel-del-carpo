@@ -6,19 +6,19 @@ const NOMBRES_MUSCULO = { tenar: 'Pulgar (tenar)', flexores: 'Flexores', extenso
 
 const enRangoEmg = (v) => Number.isInteger(v) && v >= 0 && v <= 1000;
 
-// "D,seq,t_ms,fe,rc,mcf" (6 campos) o con ",emg1,emg2,emg3" (9 campos, enteros 0–1000).
+// "D,seq,t_ms,fe,rc,ps" (6 campos) o con ",emg1,emg2,emg3" (9 campos, enteros 0–1000).
 function parsearMuestra(partes) {
   if (partes.length !== 6 && partes.length !== 9) return null;
   const n = partes.slice(1).map((x) => (x.trim() === '' ? NaN : Number(x)));
-  const [seq, tms, fe, rc, mcf] = n;
-  if ([seq, tms, fe, rc, mcf].some((x) => !isFinite(x))) return null;
+  const [seq, tms, fe, rc, ps] = n;
+  if ([seq, tms, fe, rc, ps].some((x) => !isFinite(x))) return null;
   let emg = null;
   if (partes.length === 9) {
     const [tenar, flexores, extensores] = n.slice(5);
     if (![tenar, flexores, extensores].every(enRangoEmg)) return null;
     emg = { tenar, flexores, extensores };
   }
-  return { seq, t: tms / 1000, fe, rc, mcf, emg };
+  return { seq, t: tms / 1000, fe, rc, ps, emg };
 }
 
 function picoContraccion(valores) {

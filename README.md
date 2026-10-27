@@ -44,9 +44,13 @@ La pantalla tiene tres secciones. Lo técnico o secundario queda plegado ("Ver f
 |---|---|
 | **Ejercicios** (hacer la rutina) | Tres pasos: **1 Conecte el dispositivo**, **2 Elija la fase** (Fase 1, 2 o 3, sugerida según los días desde la cirugía; "Ver los ejercicios de esta fase" muestra la lista, los cuidados y **Ver videos**) y **3 Empiece la rutina**. "Empezar rutina" abre "¿Listos para empezar?" (conexión y calibración automáticas) y luego graba ejercicio por ejercicio. Si no hay dispositivo conectado se usa el simulador y la sesión queda marcada como simulada. Al terminar, "Rutina terminada" pide dolor EVA, notas y conteos manuales, guarda la sesión y abre su detalle en Seguimiento. **Datos técnicos del dispositivo** (plegado) tiene el origen, la velocidad, la calibración manual, los indicadores de comunicación y la señal en tiempo real. |
 | **Seguimiento** (cómo avanza) | **Resumen**: tres tarjetas (Avance, Dolor, Última sesión), la gráfica del ángulo máximo por sesión (en grados o % de lo normal), los 3 avisos automáticos más importantes ("Ver N más") y, plegado, **Más indicadores** (cumplimiento, dolor, velocidad, variabilidad o duración). **Una sesión**: tabla por ejercicio (con "Mostrar todas las columnas"), una insignia de calidad ("✓ Datos confiables" o los avisos que fallen), la tarjeta **Rutina: Fase N** si se grabó desde la rutina y, plegada, **Ver señal del sensor**. **Comparar**: dos sesiones lado a lado. Si el paciente no tiene sesiones, se ofrece "Ir a Ejercicios". |
-| **Reporte** (historial y archivos) | Historial de sesiones (⚠ marca las que tienen pérdida de datos o calibración fallida), notas por sesión y **Archivos**: tabla para Excel (CSV), copia de seguridad de todos los pacientes y cargar archivo de sesión. "Restablecer datos de demostración" está en **Opciones de prueba**. |
+| **Reporte** (lectura y archivos) | **Lectura rápida**: una frase general y 4 áreas con semáforo y palabra (Bien / Atención / Revisar / Sin datos): Movimiento (% de lo normal y cambio desde la primera sesión), Dolor, Músculo (índice del nervio mediano) y Constancia (sesiones, última sesión, próxima cita). **Sesiones**: línea de tiempo con chips de cada sesión frente a la anterior, una frase de qué cambió y los botones Ver detalle, Notas y **Descargar PDF**. Debajo, notas de la sesión y **Archivos** (CSV, copia de seguridad, cargar sesión; "Restablecer datos de demostración" en Opciones de prueba). |
 
 Los datos se guardan en el navegador (`localStorage`). Use **Reporte › Copia de seguridad** para respaldarlos.
+
+### PDF de cada sesión
+
+"Descargar PDF" (en Reporte › Sesiones y en Seguimiento › Una sesión) genera `<ID>_sesion_<fecha>.pdf` (con `_2`, `_3` si hay varias el mismo día): datos del paciente y de la sesión, lectura de la sesión, chequeo de seguridad, ejercicios medidos con su cambio, gráfica de evolución, rutina grabada, prueba de fuerza EMG, avisos, notas y próxima cita, con número de página. Usa jsPDF 2.5.1, que se carga del CDN solo al descargar (si no hay internet, se avisa). Los símbolos que la letra del PDF no tiene se escriben como texto (`->`, `>=`, `OK`).
 
 ## Formato de archivo de sesión (lo que debe generar el dispositivo o el software de adquisición)
 
@@ -82,7 +86,7 @@ Los datos se guardan en el navegador (`localStorage`). Use **Reporte › Copia d
 - Valores de `tipo`: `flexion`, `extension`, `desv_radial`, `desv_cubital`, `puno`. Se configuran en `EJERCICIOS` dentro de [data.js](data.js).
 - `senal` (opcional): la señal angular cruda en grados a `fs` Hz. Si no viene, la gráfica muestra una señal representativa reconstruida a partir de los indicadores, y lo indica en pantalla.
 - `origen` (lo agrega el panel al guardar desde la rutina): `"usb"` o `"simulador"`. Las sesiones del simulador se marcan en el detalle.
-- `rutina` (opcional, lo agrega el panel al guardar desde la rutina): `{ "etapa": 1, "pasos": [ ... ] }`. `etapa` es 1, 2 o 3 y `pasos` debe ser una lista (al importar se rechaza si no). Cada paso grabado tiene `id`, `nombre`, `tipo` (clave de `EJERCICIOS` o `null` si no se mide), `repeticionesObjetivo`, `repeticiones` (detectadas; `null` si no se midió), `repeticionesManual` (o `null`) y `duracionS`. Los pasos sin medición incluyen `senal: { fs, fe, rc, mcf }` con la señal cruda de los 3 canales reducida a ~10 Hz (`fs` indica la frecuencia efectiva). Los pasos medidos aparecen además en `ejercicios`. Las sesiones sin `rutina` se muestran igual que antes.
+- `rutina` (opcional, lo agrega el panel al guardar desde la rutina): `{ "etapa": 1, "pasos": [ ... ] }`. `etapa` es 1, 2 o 3 y `pasos` debe ser una lista (al importar se rechaza si no). Cada paso grabado tiene `id`, `nombre`, `tipo` (clave de `EJERCICIOS` o `null` si no se mide), `repeticionesObjetivo`, `repeticiones` (detectadas; `null` si no se midió), `repeticionesManual` (o `null`) y `duracionS`. Los pasos sin medición incluyen `senal: { fs, fe, rc, ps }` con la señal cruda de los 3 canales reducida a ~10 Hz (`fs` indica la frecuencia efectiva). Los pasos medidos aparecen además en `ejercicios`. Las sesiones sin `rutina` se muestran igual que antes.
 - `emg` (opcional, lo agrega el panel si el dispositivo envía EMG): `{ "prueba": { "tenar": { "picos": [410, 425, 401], "media": 412 }, "flexores": { "picos": [...], "media": ..., "extensoresDuranteFlexores": 96 }, "extensores": { ... } }, "senal": { "fs": 2, "tenar": [...], "flexores": [...], "extensores": [...] } }` (`senal`: máximo de cada medio segundo de los pasos de la rutina). `prueba` es `null` si no se hizo la prueba de fuerza (Fase 1, omitida o incompleta). Al importar, cada músculo debe traer `picos` con 3 números; si falta `media`, se calcula.
 - También se aceptan `"sesiones": [ ... ]` para importar varias sesiones a la vez, o un respaldo completo con `"pacientes": [ ... ]`.
 
@@ -95,23 +99,41 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 - **Origen** (en *Datos técnicos del dispositivo*). Elija *Dispositivo USB* para el prototipo real: el navegador pedirá elegir el puerto COM. Elija *Simulador* para probar sin hardware. Las sesiones del simulador quedan marcadas como tales.
 - **Indicadores de comunicación.** Muestran la frecuencia de muestreo, la pérdida de datos (criterio < 1 %, calculada con el número de secuencia) y el tiempo desde el último dato (criterio ≤ 0,5 s). La pantalla se actualiza cada 100 ms.
 - **Calibración.** Se mide desde que la PC envía `CAL` hasta que el dispositivo responde `CAL,OK`. Si pasa de 30 s, se marca como fallida. No se puede iniciar un ejercicio sin calibración válida.
-- **Conteo automático.** Detecta cada repetición con umbrales con histéresis, relativos a la posición de reposo al iniciar el ejercicio. Los umbrales se adaptan a la amplitud de las repeticiones anteriores. La línea punteada de la gráfica muestra el umbral.
+- **Conteo automático.** Detecta cada repetición con umbrales con histéresis, relativos a la posición de reposo al iniciar el ejercicio, sobre una media móvil de 5 muestras (~100 ms). Los umbrales se adaptan a la amplitud de las repeticiones anteriores. Con el sensor de movimiento el umbral de subida es máx(8°, 50 % de la amplitud típica) y el de bajada máx(3°, 25 %); en rangos de 30° o menos (desviaciones) los mínimos bajan a 5° y 2°. Con EMG, la subida es máx(60, 50 % de la mediana de los picos) y la bajada máx(25, 25 %), con 300 como mediana inicial. La línea punteada de la gráfica muestra el umbral (`detector.js`).
 - **Conteo manual.** Escríbalo en la ventana "Rutina terminada" para calcular la exactitud del conteo automático (criterio ≥ 95 %). Sirve como evidencia para las pruebas FAT y SAT.
-- **Ejercicios medidos y sin medir.** Los ejercicios de la rutina con `tipo` (flexión, extensión, desviaciones, puño) se miden y cuentan repeticiones con el detector. Los demás guardan la señal cruda de los 3 canales y su conteo es solo manual.
+- **Qué mide cada ejercicio.** Cada paso de la rutina se cuenta con el sensor de movimiento (IMU), con EMG o a mano:
+
+  | Fase | Ejercicio | Medido con |
+  |---|---|---|
+  | 1 | Deslizamientos tendinosos (mano recta, puño en gancho, puño completo, mesa, puño recto) | EMG (flexores) |
+  | 1 | Oposición del pulgar | EMG (tenar); a mano si en el chequeo la herida no está "Bien", porque el electrodo del tenar queda junto a la incisión |
+  | 1 | Deslizamiento del nervio mediano | A mano |
+  | 2 | Flexión, extensión | IMU (`fe`) |
+  | 2 | Desviación radial y cubital | IMU (`rc`), con la mano de canto y recalibrando al empezar el paso |
+  | 2 | Pronación, supinación | IMU (`ps`), recalibrando con el pulgar hacia arriba al empezar el paso |
+  | 2 | Puño completo | EMG (flexores) |
+  | 2 | Abducción del pulgar | EMG (tenar) |
+  | 3 | Pelota | EMG (flexores) |
+  | 3 | Pinza | EMG (tenar) |
+  | 3 | Flexión y extensión con peso | IMU (`fe`) |
+  | 3 | Prono-supinación con martillo | IMU (`ps`, cuenta los giros hacia la supinación), recalibrando con el pulgar hacia arriba |
+
+  Un paso EMG sin electrodos conectados se cuenta a mano, con el aviso "Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.". Los pasos sin medir guardan la señal cruda de los 3 canales. El reporte y el PDF dicen en la columna "Medido con" cómo se contó cada paso.
+- **Desviaciones radial y cubital.** Con la palma sobre la mesa, la desviación es un giro alrededor del eje vertical: la gravedad no cambia, el acelerómetro no puede corregirlo y el ángulo depende del giroscopio (deriva) y del magnetómetro (perturbado por metal y por el propio ESP32). Por eso se hacen con la mano de canto, pulgar hacia arriba, y la rutina envía `CAL` al empezar el paso: así el giro cambia la gravedad en el marco del sensor y la fusión lo corrige con el acelerómetro. Esa calibración solo vale para los pasos que la piden: el siguiente ejercicio de muñeca, o la sesión siguiente, vuelve a calibrar en posición neutra (si no, la flexión quedaría medida desde la mano de canto). Tras cada calibración, el reposo del ejercicio se toma con las muestras nuevas. La prono-supinación también recalibra con el pulgar hacia arriba, para que el giro no pase de ±180°. Falta validarlo en banco con el sensor real (goniómetro, 10 repeticiones por lado, error ≤ 3° y conteo ≥ 95 %); si no se cumple, las desviaciones deben pasar a conteo manual.
 - **Al guardar,** la sesión incluye la señal cruda, los picos detectados y el registro de la rutina (campo `rutina`), y aparece en Evolución, Detalle, Comparar e Historial. Una sesión puede guardarse aunque ningún ejercicio grabado sea medido; en ese caso sus indicadores de movimiento se muestran como "—".
 
 ### Protocolo serie (115200 baudios, texto, una línea por mensaje)
 
 | Sentido | Mensaje | Significado |
 |---|---|---|
-| Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<mcf>` | Muestra (~50 Hz). `seq` es un contador creciente, `t_ms` el tiempo del dispositivo. Los ángulos van en grados: `fe` flexo-extensión (+flexión/−extensión), `rc` desviación (+radial/−cubital), `mcf` flexión de dedos. |
-| Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<mcf>,<emg1>,<emg2>,<emg3>` | Igual, con EMG: `emg1` tenar, `emg2` flexores, `emg3` extensores, enteros de 0 a 1000 ya sin el reposo. Otro número de campos o un EMG fuera de 0–1000 cuenta como línea no válida. |
+| Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<ps>` | Muestra (~50 Hz). `seq` es un contador creciente, `t_ms` el tiempo del dispositivo. Los ángulos van en grados: `fe` flexo-extensión (+flexión/−extensión), `rc` desviación (+radial/−cubital), `ps` prono-supinación (+supinación/−pronación), el giro del antebrazo alrededor de su eje. |
+| Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<ps>,<emg1>,<emg2>,<emg3>` | Igual, con EMG: `emg1` tenar, `emg2` flexores, `emg3` extensores, enteros de 0 a 1000 ya sin el reposo. Otro número de campos o un EMG fuera de 0–1000 cuenta como línea no válida. |
 | Dispositivo → PC | `CAL,OK,<ms>` / `CAL,ERR,<motivo>` | Resultado de la calibración. |
 | Dispositivo → PC | `BAT,<pct>` | Batería (opcional). |
 | Dispositivo → PC | `#texto` | Depuración (se ignora). |
 | PC → Dispositivo | `START` / `STOP` | Iniciar o detener la transmisión. |
 | PC → Dispositivo | `CAL` | Calibrar (posición neutra = 0°). |
-| PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). |
+| PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). En los pasos medidos con EMG, `<tipo>` es `emg-<músculo>` (`emg-tenar`, `emg-flexores`, `emg-extensores`). |
 | PC → Dispositivo | `PR,<musculo>` / `PR,-` | Contracción de la prueba de fuerza EMG en curso (informativo; el simulador la usa). |
 
 [firmware/plantilla_protocolo/plantilla_protocolo.ino](firmware/plantilla_protocolo/plantilla_protocolo.ino) implementa este protocolo para Arduino y ESP32. Solo hay que reemplazar `leerAngulosCrudos()` por la lectura real de los sensores. Mientras tanto envía una señal de prueba. Cierre el monitor serie del IDE de Arduino antes de conectar desde la interfaz, porque el puerto solo admite un programa a la vez.
@@ -138,7 +160,7 @@ La colocación exacta la define el equipo con el profesional. Use siempre el mis
 
 ### Firmware real (ESP32 + GY-85)
 
-[firmware/carpo_esp32/](firmware/carpo_esp32/) implementa el protocolo con un ESP32 y un solo GY-85 sujeto al dorso de la mano, con el antebrazo apoyado e inmóvil. `mcf` se envía siempre como 0, porque todavía no se mide.
+[firmware/carpo_esp32/](firmware/carpo_esp32/) implementa el protocolo con un ESP32 y un solo GY-85 sujeto al dorso de la mano, con el antebrazo apoyado (en prono-supinación el antebrazo solo gira sobre su eje). `ps` es el giro alrededor del eje X del sensor (eje del antebrazo) respecto a la calibración; con la mano izquierda cambia de signo, como `rc`. Las sesiones guardadas antes de este cambio pueden traer `mcf` en la señal cruda: era siempre 0.
 
 - **Comandos de preparación (además de los del protocolo).** Se envían desde el monitor serie del IDE de Arduino (115200 baudios, con salto de línea) y hay que cerrarlo antes de conectar la interfaz, porque el puerto solo admite un programa a la vez. `MAG`: gire la mano en todas las direcciones durante unos 20 s para calibrar el magnetómetro; responde `#MAG,OK,...` o `#MAG,ERR,...` (`#MAG,ERR,sensor` si el GY-85 no responde) y el resultado queda guardado junto con el chip y el montaje. Repita `MAG` si cambia `MONTAJE_MAG` o la placa: mientras no haya un `MAG` válido para ese chip y montaje, el firmware usa fusión de 6 ejes (sin magnetómetro) y lo avisa al arrancar con `#Magnetometro sin calibrar: envie MAG`. `RAW`: activa o desactiva la salida `#RAW,...` a 5 Hz para comprobar los ejes. `MANO,D` / `MANO,I`: mano derecha o izquierda (queda guardado).
 - **Comprobar los ejes con `RAW`.** Cada línea es `#RAW,ax,ay,az,gx,gy,gz,mx,my,mz,incl`: aceleración (g), giro (rad/s), campo magnético montado (µT) e `incl`, el ángulo entre la aceleración y el campo con el desfase de `MAG` restado (grados). Gire la mano alrededor de X (hacia los dedos) en sentido antihorario visto desde los dedos: `gx` debe ser positivo; si es negativo, corrija el signo en `MONTAJE_GIRO`. Después de `MAG`, `incl` debe mantenerse constante (± unos grados) en cualquier posición de la mano; si cambia al girarla, `MONTAJE_MAG` no coincide con `MONTAJE_ACEL`.
@@ -167,6 +189,8 @@ La colocación exacta la define el equipo con el profesional. Use siempre el mis
 - `inicio.js`: Inicio del profesional (atención, citas, sesiones recientes, nueva sesión).
 - `chequeo.js`: chequeo de seguridad antes de la rutina.
 - `resumen-sesion.js`: resumen de la sesión y hoja imprimible para el paciente.
+- `reporte.js`: lectura rápida y línea de tiempo de Reporte (semáforos).
+- `reporte-pdf.js`: PDF de cada sesión.
 - `navegacion.js`: secciones (Ejercicios, Seguimiento, Reporte), vistas de Seguimiento y recorte de avisos; funciones puras con pruebas.
 - `tests/ui/humo.mjs`: prueba de humo de la interfaz en Chromium.
 - `videos/`: un `.mp4` por ejercicio de la rutina (ver [videos/LEEME.md](videos/LEEME.md)).

@@ -274,9 +274,9 @@ static void enviarMuestra(uint32_t ahora) {
     uint16_t emg[3];
     leerEmg(emg);
     reposoEmg.restar(emg);
-    formatearMuestraEmg(buf, sizeof(buf), seq, ahora, a.fe, a.rc, 0.0f, emg);
+    formatearMuestraEmg(buf, sizeof(buf), seq, ahora, a.fe, a.rc, a.ps, emg);
   } else {
-    formatearMuestra(buf, sizeof(buf), seq, ahora, a.fe, a.rc, 0.0f);
+    formatearMuestra(buf, sizeof(buf), seq, ahora, a.fe, a.rc, a.ps);
   }
   Serial.println(buf);
 }

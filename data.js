@@ -6,13 +6,16 @@
 
 /* canal/signo: qué canal del dispositivo mide el ejercicio y en qué sentido
  * (ver protocolo en monitoreo.js). fe = flexo-extensión, rc = desviación
- * radio-cubital, mcf = flexión de dedos. */
+ * radio-cubital, ps = prono-supinación. `puno` (canal mcf, nunca medido) queda solo para leer
+ * sesiones antiguas: ningún paso de las rutinas lo usa. */
 const EJERCICIOS = {
   flexion:      { nombre: 'Flexión de muñeca',      corto: 'Flexión',       ref: 80, color: '--s1', canal: 'fe',  signo: 1 },
   extension:    { nombre: 'Extensión de muñeca',    corto: 'Extensión',     ref: 70, color: '--s2', canal: 'fe',  signo: -1 },
   desv_radial:  { nombre: 'Desviación radial',      corto: 'Desv. radial',  ref: 20, color: '--s3', canal: 'rc',  signo: 1 },
   desv_cubital: { nombre: 'Desviación cubital',     corto: 'Desv. cubital', ref: 30, color: '--s4', canal: 'rc',  signo: -1 },
   puno:         { nombre: 'Cierre de puño (MCF)',   corto: 'Puño (MCF)',    ref: 90, color: '--s5', canal: 'mcf', signo: 1 },
+  pronacion:    { nombre: 'Pronación de antebrazo', corto: 'Pronación',     ref: 80, color: '--s6', canal: 'ps',  signo: -1 },
+  supinacion:   { nombre: 'Supinación de antebrazo', corto: 'Supinación',   ref: 80, color: '--s7', canal: 'ps',  signo: 1 },
 };
 const ORDEN_EJERCICIOS = Object.keys(EJERCICIOS);
 

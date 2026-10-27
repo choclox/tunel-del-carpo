@@ -75,24 +75,38 @@ wrist extension. Fingers stay relaxed and straight, not spread. Hold briefly, th
 slowly return to neutral straight alignment.
 ```
 
+Las desviaciones se hacen con la **mano de canto** (pulgar hacia arriba, antebrazo apoyado sobre el borde cubital): así el sensor mide el giro con ayuda de la gravedad. La rutina recalibra en esta postura al empezar el paso.
+
 ### Desviación radial (`desv_radial`, ref. 20°)
 ```
 [STYLE BLOCK]
-Camera: top-down view directly above the hand, wrist centered.
-Forearm pronated, palm flat facing down, fingers together and straight. Keeping the palm
-parallel to the table, the hand slowly pivots sideways at the wrist toward the thumb side,
-reaching about 20 degrees of radial deviation. No wrist flexion or extension, no forearm
-rotation. Hold briefly, then slowly return to neutral straight alignment.
+Camera: front view facing the palm side edge-on, wrist centered.
+Forearm resting on the table on its little-finger edge, hand on edge with the thumb pointing
+up, fingers together and straight. The hand slowly tilts upward at the wrist toward the thumb
+side, reaching about 20 degrees of radial deviation. No wrist flexion or extension, no
+forearm rotation. Hold briefly, then slowly return to neutral straight alignment.
 ```
 
 ### Desviación cubital (`desv_cubital`, ref. 30°)
 ```
 [STYLE BLOCK]
-Camera: top-down view directly above the hand, wrist centered.
-Forearm pronated, palm flat facing down, fingers together and straight. Keeping the palm
-parallel to the table, the hand slowly pivots sideways at the wrist toward the little-finger
-side, reaching about 30 degrees of ulnar deviation. No wrist flexion or extension, no
-forearm rotation. Hold briefly, then slowly return to neutral straight alignment.
+Camera: front view facing the palm side edge-on, wrist centered.
+Forearm resting on the table on its little-finger edge, hand on edge with the thumb pointing
+up, fingers together and straight. The hand slowly tilts downward at the wrist toward the
+little-finger side, reaching about 30 degrees of ulnar deviation, the little finger moving
+toward the table. No wrist flexion or extension, no forearm rotation. Hold briefly, then
+slowly return to neutral straight alignment.
+```
+
+### Pronación de antebrazo (`pronacion`, ref. 80°) — falta
+```
+[STYLE BLOCK]
+Camera: front view, forearm pointing toward the camera, wrist centered.
+Elbow bent at 90 degrees and tucked against the side of the body, forearm horizontal,
+starting with the thumb pointing up and fingers relaxed together. The forearm slowly
+rotates so the palm turns to face down, reaching about 80 degrees of pronation. The elbow
+stays against the body and does not move; no wrist bending. Hold briefly, then slowly
+return to thumb-up.
 ```
 
 ### Cierre de puño (`puno`, ref. 90° en MCF)

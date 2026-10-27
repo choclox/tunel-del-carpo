@@ -29,5 +29,16 @@ PRUEBA(angulos_finitos_en_90) {
   AngulosMuneca a = angulosRelativos({}, q, false);
   VERIFICAR(isfinite(a.fe) && isfinite(a.rc)); CERCA(a.fe, 90, 0.1f);
 }
+PRUEBA(pronosupinacion_en_x_y_mano_izquierda) {
+  Cuaternion qCal = desdeEjeAngulo({1,1,0}, 40 * GRAD);
+  Cuaternion q = multiplicar(qCal, desdeEjeAngulo({1,0,0}, 30 * GRAD));
+  AngulosMuneca a = angulosRelativos(qCal, q, false);
+  CERCA(a.ps, 30, 0.5f); CERCA(a.fe, 0, 0.5f); CERCA(a.rc, 0, 0.5f);
+  CERCA(angulosRelativos(qCal, q, true).ps, -30, 0.5f);
+}
+PRUEBA(pronosupinacion_cero_en_y_y_z) {
+  CERCA(angulosRelativos({}, desdeEjeAngulo({0,1,0}, 30 * GRAD), false).ps, 0, 0.5f);
+  CERCA(angulosRelativos({}, desdeEjeAngulo({0,0,1}, 30 * GRAD), false).ps, 0, 0.5f);
+}
 
 int main() { return correrPruebas(); }

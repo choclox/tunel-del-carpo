@@ -29,7 +29,7 @@ function comparacionConAnterior(p, s) {
     const a = (prev.ejercicios ?? []).find((x) => x.tipo === e.tipo)?.anguloMax;
     if (a == null || !EJ[e.tipo]) return null;
     const d = Math.round(e.anguloMax - a);
-    return { puntaje: d / EJ[e.tipo].ref, texto: `${EJ[e.tipo].nombre}: ${Math.round(e.anguloMax)}° (${conSigno(d)}° que la sesión anterior)` };
+    return { puntaje: d / EJ[e.tipo].ref, texto: `${EJ[e.tipo].nombre}: ${Math.round(e.anguloMax)}° (${d === 0 ? 'igual que' : `${conSigno(d)}° que`} la sesión anterior)` };
   }).filter(Boolean).sort((x, y) => y.puntaje - x.puntaje);
 
   const otras = [];

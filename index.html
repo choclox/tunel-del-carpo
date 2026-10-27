@@ -214,7 +214,10 @@
                 <h2>Sesión</h2>
                 <p class="muted" id="sesion-meta"></p>
               </div>
-              <select id="sesion-select" aria-label="Sesión"></select>
+              <div class="sesion-acciones">
+                <select id="sesion-select" aria-label="Sesión"></select>
+                <button class="btn" id="btn-pdf-sesion"><svg class="ic"><use href="#i-download"/></svg>Descargar PDF</button>
+              </div>
             </div>
             <div class="badges" id="sesion-calidad"></div>
             <div class="table-wrap">
@@ -280,12 +283,20 @@
 
         <!-- ===== REPORTE ===== -->
         <section class="seccion tab-panel" data-seccion="reporte" hidden>
+          <div class="card lectura">
+            <div>
+              <h2>Lectura rápida</h2>
+              <p class="lectura-general" id="lectura-general"></p>
+            </div>
+            <ul class="lectura-areas" id="lectura-areas"></ul>
+            <p class="muted">Lectura orientativa calculada con los datos registrados. No es un diagnóstico.</p>
+          </div>
           <div class="card">
             <div>
-              <h2>Historial</h2>
-              <p class="muted">Toque una fila para escribir su nota. "Ver" abre el detalle.</p>
+              <h2>Sesiones</h2>
+              <p class="muted">La más reciente arriba. Los colores comparan cada sesión con la anterior.</p>
             </div>
-            <div class="table-wrap"><table class="table table-hover" id="tabla-historial"></table></div>
+            <ul class="lista-sesiones" id="lista-sesiones"></ul>
           </div>
           <div class="card">
             <h2>Notas de la sesión <span id="nota-sesion-label" class="muted"></span></h2>
@@ -613,10 +624,13 @@
   <script src="app.js"></script>
   <script src="emg.js"></script>
   <script src="inicio.js"></script>
+  <script src="detector.js"></script>
   <script src="monitoreo.js"></script>
   <script src="rutina.js"></script>
   <script src="chequeo.js"></script>
   <script src="resumen-sesion.js"></script>
+  <script src="reporte.js"></script>
+  <script src="reporte-pdf.js"></script>
   <script src="prueba-emg.js"></script>
 </body>
 </html>

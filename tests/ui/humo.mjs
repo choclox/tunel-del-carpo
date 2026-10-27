@@ -11,6 +11,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CHART_LOCAL = path.join(RAIZ, 'node_modules', 'chart.js', 'dist', 'chart.umd.js');
+const JSPDF_LOCAL = path.join(RAIZ, 'node_modules', 'jspdf', 'dist', 'jspdf.umd.min.js');
 const TIPOS = { '.png': 'image/png', '.jpg': 'image/jpeg', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.mp4': 'video/mp4', '.json': 'application/json' };
 
 const servidor = http.createServer((req, res) => {
@@ -30,7 +31,7 @@ const SESION_PRUEBA = { nombre: 'Prueba', profesion: 'Fisioterapeuta', correo: '
 
 // ruta: '' es el panel. sesion: la que se siembra una sola vez por pestaña (null = sin sesión).
 // abrirPaciente: tras cargar el panel (que empieza en el Inicio) abre el primer paciente de la lista.
-async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {}, abrirPaciente = true } = {}) {
+async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta = '', sesion = SESION_PRUEBA, rutas = {}, abrirPaciente = true, sinJsPdf = false } = {}) {
   const ctx = await navegador.newContext({ viewport, acceptDownloads: true });
   if (sesion) {
     await ctx.addInitScript((s) => {
@@ -43,6 +44,9 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   await ctx.route('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/**', (r) =>
     fs.existsSync(CHART_LOCAL) ? r.fulfill({ path: CHART_LOCAL, contentType: 'text/javascript' }) : r.continue());
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  // jsPDF: copia local si existe; sinJsPdf simula que no hay internet.
+  await ctx.route('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/**', (r) =>
+    sinJsPdf ? r.abort() : fs.existsSync(JSPDF_LOCAL) ? r.fulfill({ path: JSPDF_LOCAL, contentType: 'text/javascript' }) : r.continue());
   // rutas: { 'archivo.js': contenido } reemplaza archivos del sitio (p. ej. para simular que no cargó).
   for (const [archivo, cuerpo] of Object.entries(rutas)) {
     await ctx.route(new RegExp(`/${archivo.replace('.', '\\.')}$`), (r) => r.fulfill({ body: cuerpo, contentType: 'text/javascript' }));
@@ -64,7 +68,9 @@ async function nuevaPagina({ viewport = { width: 1366, height: 900 }, init, ruta
   return page;
 }
 
+// HUMO_SOLO=<texto>: corre solo las comprobaciones cuyo nombre lo contiene (para depurar).
 async function verificar(nombre, fn, opciones) {
+  if (process.env.HUMO_SOLO && !nombre.includes(process.env.HUMO_SOLO)) return;
   const page = await nuevaPagina(opciones);
   try {
     await fn(page);
@@ -95,7 +101,7 @@ await verificar('arranca en seguimiento', async (page) => {
 
 await verificar('cambiar a reporte', async (page) => {
   await page.click('.nav-seccion[data-seccion="reporte"]');
-  afirmar(await page.isVisible('#tabla-historial'), '#tabla-historial no visible');
+  afirmar(await page.isVisible('#lista-sesiones'), '#lista-sesiones no visible');
 });
 
 await verificar('barra superior limpia', async (page) => {
@@ -473,6 +479,133 @@ await verificar('rutina completa con simulador', async (page) => {
   afirmar(r.vista === 'sesion' && r.sel === r.nueva, JSON.stringify(r));
 });
 
+// Empieza una rutina con el simulador y avanza hasta el paso `id` (sin terminar la rutina).
+async function rutinaHastaPaso(page, etapa, id, { herida } = {}) {
+  await irEjercicios(page);
+  await page.click(`#rt-etapas [data-etapa="${etapa}"]`);
+  await page.click('#rt-iniciar');
+  await page.waitForSelector('#dlg-chequeo[open]');
+  await page.fill('#ch-dolor', '2');
+  if (herida) {
+    await page.selectOption('#ch-herida', herida);
+    await page.check('#ch-criterio');
+    await page.click('#ch-continuar-criterio');
+  } else {
+    await page.click('#ch-continuar');
+  }
+  await page.waitForSelector('#ls-empezar:not([disabled])', { timeout: 35000 });
+  await page.click('#ls-empezar');
+  await page.waitForSelector('#dlg-rutina[open]');
+  await page.evaluate(() => {
+    window.comandos = [];
+    const t = mv.transporte, enviar = t.enviar.bind(t);
+    t.enviar = (c) => { window.comandos.push(c); return enviar(c); };
+  });
+  const nombre = await page.evaluate(({ etapa, id }) => etapaPorNumero(etapa).pasos.find((x) => x.id === id).nombre, { etapa, id });
+  for (let i = 0; i < 20 && (await page.textContent('#rt-nombre')).trim() !== nombre; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(450);
+  }
+}
+// Desde el paso actual: pasa por el resto, termina y guarda (omitiendo la prueba de fuerza).
+async function terminarYGuardar(page) {
+  for (let i = 0; i < 20 && (await page.textContent('#rt-siguiente-txt')).trim() !== 'Terminar rutina'; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(450);
+  }
+  await page.click('#rt-siguiente');
+  if (await page.isVisible('#pr-omitir')) await page.click('#pr-omitir');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  return ultimaSesion(page);
+}
+const pasoGuardado = (s, id) => s.rutina.pasos.find((x) => x.id === id);
+const esperarDetectadas = (page) => page.waitForFunction(() => /^Detectadas: [1-9]/.test(document.querySelector('#rt-contador').textContent), null, { timeout: 15000 });
+
+await verificar('fase 1 con EMG', async (page) => {
+  await rutinaHastaPaso(page, 1, 'tendon_recto');
+  await esperarDetectadas(page);
+  afirmar(await page.evaluate(() => mv.ej?.musculo) === 'flexores', 'el paso no mide los flexores');
+  afirmar(await page.evaluate(() => { terminarRutina(); return document.querySelector('#fin-tabla td:nth-child(3)').textContent; }) !== '—', 'la tabla final no muestra las detectadas por EMG');
+  await page.click('#fin-guardar');
+  await page.waitForTimeout(300);
+  const s = await ultimaSesion(page);
+  const r = pasoGuardado(s, 'tendon_recto');
+  afirmar(r.medicion?.fuente === 'emg' && r.emg?.musculo === 'flexores' && r.emg.repeticiones > 0 && r.repeticiones === r.emg.repeticiones, JSON.stringify(r).slice(0, 200));
+  afirmar(!s.ejercicios.length, 'un paso EMG no debe entrar en los ejercicios con ángulo');
+});
+
+await verificar('fase 1 herida → oposición manual', async (page) => {
+  await rutinaHastaPaso(page, 1, 'pulgar_oposicion', { herida: 'enrojecida' });
+  await page.waitForTimeout(600);
+  afirmar((await page.textContent('#rt-contador')).startsWith('Cuente las repeticiones'), await page.textContent('#rt-contador'));
+  afirmar(await page.evaluate(() => mv.ej) === null, 'se está midiendo la oposición');
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'pulgar_oposicion');
+  afirmar(r.medicion === null && r.repeticiones === null && s.chequeo.herida === 'enrojecida', JSON.stringify(r).slice(0, 200));
+});
+
+await verificar('pronación con IMU', async (page) => {
+  await rutinaHastaPaso(page, 2, 'pronacion');
+  await esperarDetectadas(page);
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'pronacion');
+  afirmar(r.medicion?.fuente === 'imu' && r.tipo === 'pronacion' && r.repeticiones > 0, JSON.stringify(r).slice(0, 200));
+  afirmar(s.ejercicios.some((e) => e.tipo === 'pronacion' && e.anguloMax > 20), 'sin ángulo de pronación');
+});
+
+await verificar('desviación pide recalibrar', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  afirmar(await page.evaluate(() => window.comandos.includes('CAL')), 'no envió CAL');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), await page.textContent('#rt-contador'));
+  await esperarDetectadas(page);
+});
+
+await verificar('calibración de canto no vale para flexión', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 15000 });
+  afirmar(await page.evaluate(() => !estadoDispositivo().calOk), 'la calibración de canto cuenta como válida para la sesión');
+  const cal0 = await page.evaluate(() => window.comandos.filter((c) => c === 'CAL').length);
+  await page.click('#rt-anterior');
+  await page.waitForTimeout(450);
+  await page.click('#rt-anterior');
+  await page.waitForTimeout(450);
+  afirmar((await page.textContent('#rt-nombre')).trim() === 'Flexión de muñeca', await page.textContent('#rt-nombre'));
+  // Si la flexión ya quedó grabada se vuelve a grabar; si no, empieza sola al volver.
+  if (await page.isVisible('#rt-regrabar')) await page.click('#rt-regrabar');
+  await page.waitForTimeout(200);
+  afirmar(await page.evaluate((n) => window.comandos.filter((c) => c === 'CAL').length > n, cal0), 'no recalibró en la postura neutra');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), await page.textContent('#rt-contador'));
+  await page.waitForFunction(() => mv.ej?.tipo === 'flexion', null, { timeout: 15000 });
+  afirmar(await page.evaluate(() => estadoDispositivo().calOk), 'tras calibrar en neutro la calibración no vuelve a ser válida');
+});
+
+await verificar('reposo tomado después de recalibrar', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), 'no está calibrando');
+  // Muestras con el cero anterior (mano de canto con la muñeca algo flexionada): rc ≈ 30.
+  // Se meten justo antes de que llegue CAL,OK, como las que el dispositivo sigue enviando mientras calibra.
+  await page.evaluate(() => {
+    const t = mv.transporte, onLinea = t.onLinea;
+    t.onLinea = (l) => {
+      if (l.startsWith('CAL,OK')) { const u = mv.buffer[mv.buffer.length - 1]; for (let i = 0; i < 25; i++) mv.buffer.push({ ...u, rc: 30 }); }
+      onLinea(l);
+    };
+  });
+  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 15000 });
+  const base = await page.evaluate(() => mv.ej.base);
+  afirmar(Math.abs(base) < 3, `reposo ${base}: usa muestras de antes de la calibración`);
+});
+
+await verificar('paso EMG sin electrodos', async (page) => {
+  await rutinaHastaPaso(page, 1, 'tendon_recto');
+  await page.waitForTimeout(1500); // un paso necesita ≥ 1 s para guardarse
+  afirmar((await page.textContent('#rt-contador')).trim() === 'Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.', await page.textContent('#rt-contador'));
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'tendon_recto');
+  afirmar(r.medicion === null && r.repeticiones === null && r.senal, JSON.stringify(r).slice(0, 200));
+}, { init: () => { window.SIMULADOR_SIN_EMG = true; } });
+
 const PRUEBA_RAPIDA = () => { window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; };
 
 /* ---------- Chequeo de seguridad y pasos ---------- */
@@ -722,10 +855,53 @@ await verificar('videos nuevos de la fase 1', async (page) => {
 /* ---------- Reporte ---------- */
 const irReporte = (page) => page.click('.nav-seccion[data-seccion="reporte"]');
 
-await verificar('historial corto', async (page) => {
+await verificar('reporte: lectura rápida', async (page) => {
   await irReporte(page);
-  const ths = await page.$$eval('#tabla-historial thead th', (t) => t.map((x) => x.textContent.trim()));
-  afirmar(JSON.stringify(ths) === JSON.stringify(['#', 'Fecha', 'Días desde la cirugía', 'Cumplimiento', 'Dolor', 'Nota', '']), `columnas: ${ths}`);
+  afirmar((await page.textContent('#lectura-general')).trim().length > 0, 'sin frase general');
+  const areas = await page.$$eval('#lectura-areas .area', (as) => as.map((a) => [a.querySelector('.area-titulo').textContent.trim(), a.dataset.estado]));
+  afirmar(JSON.stringify(areas.map((a) => a[0])) === JSON.stringify(['Movimiento', 'Dolor', 'Músculo', 'Constancia']), `áreas: ${areas}`);
+  afirmar(areas.every((a) => ['bien', 'atencion', 'revisar', 'sin-datos'].includes(a[1])), `estados: ${areas}`);
+  afirmar((await page.textContent('section.seccion[data-seccion="reporte"]')).includes('Lectura orientativa'), 'sin aviso de lectura orientativa');
+});
+
+await verificar('reporte: línea de tiempo', async (page) => {
+  await irReporte(page);
+  const r = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const lis = [...document.querySelectorAll('#lista-sesiones li[data-id]')];
+    return {
+      n: ses.length, lis: lis.length, primera: lis[0]?.dataset.id, ultima: ses[ses.length - 1].id,
+      completas: lis.every((li) => li.querySelector('.btn-ver') && li.querySelector('.btn-notas') && li.querySelector('.btn-pdf') && li.querySelector('.chip')),
+    };
+  });
+  afirmar(r.n === r.lis && r.primera === r.ultima && r.completas, JSON.stringify(r));
+});
+
+await verificar('reporte: notas desde la lista', async (page) => {
+  await irReporte(page);
+  const id = await page.getAttribute('#lista-sesiones li[data-id] >> nth=1', 'data-id');
+  await page.click('#lista-sesiones li[data-id] >> nth=1 >> .btn-notas');
+  afirmar(await page.getAttribute(`#lista-sesiones li[data-id="${id}"]`, 'class') === 'seleccionada', 'no quedó seleccionada');
+  await page.fill('#nota', 'Nota de prueba');
+  await page.waitForTimeout(700);
+  const nota = await page.evaluate((id) => estado.db.pacientes.find((x) => x.id === estado.pacienteId).sesiones.find((s) => s.id === id).notas, id);
+  afirmar(nota === 'Nota de prueba', `nota: ${nota}`);
+});
+
+await verificar('reporte: sin sesiones', async (page) => {
+  await page.click('#btn-nuevo');
+  await page.fill('#form-paciente [name=nombre]', 'Paciente Nuevo');
+  await page.fill('#form-paciente [name=documento]', '77');
+  await page.fill('#form-paciente [name=edad]', '40');
+  await page.fill('#form-paciente [name=fechaCirugia]', '2026-10-20');
+  await page.click('#form-paciente button[value=ok]');
+  await page.waitForFunction(() => estado.db.pacientes.some((p) => p.nombre === 'Paciente Nuevo' && p.id === estado.pacienteId));
+  await irReporte(page);
+  const estados = await page.$$eval('#lectura-areas .area', (as) => as.map((a) => a.dataset.estado));
+  afirmar(JSON.stringify(estados) === JSON.stringify(['sin-datos', 'sin-datos', 'sin-datos', 'sin-datos']), `estados: ${estados}`);
+  afirmar((await page.textContent('#lista-sesiones')).includes('Aún no hay sesiones.'), 'sin mensaje de vacío');
+  afirmar(await page.locator('.btn-pdf').count() === 0, 'hay botones de PDF');
 });
 
 await verificar('archivos en reporte', async (page) => {
@@ -737,7 +913,7 @@ await verificar('archivos en reporte', async (page) => {
 
 await verificar('ver detalle', async (page) => {
   await irReporte(page);
-  await page.click('.btn-ver >> nth=0');
+  await page.click('#lista-sesiones .btn-ver >> nth=0');
   afirmar(await seccionActiva(page) === 'seguimiento', 'no fue a Seguimiento');
   afirmar(await page.evaluate(() => estado.vista) === 'sesion', 'la vista no es Una sesión');
 });
@@ -762,6 +938,54 @@ await verificar('nota tras importar va a la sesión importada', async (page) => 
   });
   afirmar(JSON.stringify(r) === '["2020-01-01"]', `nota guardada en: ${r}`);
 });
+
+/* ---------- PDF de cada sesión ---------- */
+async function descargarPdf(page, selector) {
+  const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click(selector)]);
+  const buf = fs.readFileSync(await d.path());
+  return { nombre: d.suggestedFilename(), bytes: buf.length, texto: buf.toString('latin1'), paginas: (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length };
+}
+
+await verificar('pdf: descarga', async (page) => {
+  await irReporte(page);
+  const r0 = await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    const s = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha)).pop();
+    return { id: p.id, fecha: s.fecha, apellido: p.nombre.split(' ').pop() };
+  });
+  const pdf = await descargarPdf(page, '#lista-sesiones .btn-pdf >> nth=0');
+  afirmar(pdf.nombre === `${r0.id}_sesion_${r0.fecha}.pdf`, `nombre: ${pdf.nombre}`);
+  afirmar(pdf.texto.startsWith('%PDF'), 'no es un PDF');
+  afirmar(pdf.texto.includes('Reporte de sesi') && pdf.texto.includes(r0.apellido), 'el PDF no tiene el título o el paciente');
+  afirmar(pdf.bytes < 1024 * 1024, `el PDF pesa ${Math.round(pdf.bytes / 1024)} KB`);
+});
+
+await verificar('pdf: desde una sesión', async (page) => {
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  const fecha = await page.evaluate(() => estado.db.pacientes.find((x) => x.id === estado.pacienteId).sesiones.find((s) => s.id === estado.sesionId).fecha);
+  const pdf = await descargarPdf(page, '#btn-pdf-sesion');
+  afirmar(pdf.nombre.includes(fecha), `nombre: ${pdf.nombre}`);
+});
+
+await verificar('pdf: notas largas', async (page) => {
+  await page.evaluate(() => {
+    const p = estado.db.pacientes.find((x) => x.id === estado.pacienteId);
+    [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha)).pop().notas = 'Nota larga de seguimiento con tildes y eñes. '.repeat(140);
+  });
+  await irReporte(page);
+  const pdf = await descargarPdf(page, '#lista-sesiones .btn-pdf >> nth=0');
+  afirmar(pdf.paginas >= 2, `páginas: ${pdf.paginas}`);
+});
+
+await verificar('pdf: sin conexión', async (page) => {
+  await irReporte(page);
+  let descargas = 0;
+  page.on('download', () => descargas++);
+  await page.click('#lista-sesiones .btn-pdf >> nth=0');
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('No se pudo generar el PDF: revise la conexión a internet.'));
+  await page.waitForTimeout(500);
+  afirmar(descargas === 0, 'hubo una descarga');
+}, { sinJsPdf: true });
 
 /* ---------- Mejora muscular (EMG) ---------- */
 const sesionImportada = (fecha, extra = {}) => ({ sesion: { fecha, ejercicios: [{ tipo: 'flexion', repeticiones: 10, repeticionesObjetivo: 10, anguloMax: 40 }], ...extra } });
@@ -832,6 +1056,25 @@ await verificar('importar: dolor no numérico rechazado', async (page) => {
   afirmar(page.dialogos.some((m) => m.includes('No se pudo importar')), `diálogos: ${page.dialogos}`);
   await page.click('#nav-inicio');
   afirmar(await page.evaluate(() => window.__xss) === undefined, 'se ejecutó código del archivo importado');
+});
+
+await verificar('pdf: sesión importada', async (page) => {
+  await importar(page, sesionImportada('2026-10-26'));
+  const pdf = await descargarPdf(page, '#lista-sesiones li[data-id] >> nth=0 >> .btn-pdf');
+  afirmar(pdf.texto.startsWith('%PDF') && pdf.nombre.endsWith('_sesion_2026-10-26.pdf'), `nombre: ${pdf.nombre}`);
+});
+
+await verificar('pdf: medido con EMG', async (page) => {
+  const pasos = [
+    { id: 'tendon_recto', nombre: 'Deslizamiento tendinoso: mano recta', tipo: null, medicion: { fuente: 'emg', musculo: 'flexores' }, repeticionesObjetivo: 10, repeticiones: 9, repeticionesManual: null, duracionS: 40, emg: { musculo: 'flexores', repeticiones: 9, activacionMedia: 280, activacionMax: 340 } },
+    { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, medicion: null, repeticionesObjetivo: 5, repeticiones: null, repeticionesManual: 5, duracionS: 30 },
+  ];
+  await importar(page, { sesion: { fecha: '2026-10-26', ejercicios: [], rutina: { etapa: 1, pasos } } });
+  const etiqueta = await page.textContent('#lista-sesiones li[data-id] >> nth=0 >> .ses-medicion');
+  afirmar(etiqueta.trim() === 'Medido con: EMG 1 · Manual 1', `etiqueta: ${etiqueta}`);
+  const pdf = await descargarPdf(page, '#lista-sesiones li[data-id] >> nth=0 >> .btn-pdf');
+  const texto = pdf.texto.replace(/\\([()])/g, '$1'); // el PDF escapa los paréntesis
+  afirmar(texto.includes('Medido con') && texto.includes('EMG (flexores)') && texto.includes('Manual'), 'el PDF no dice con qué se midió cada paso');
 });
 
 /* ---------- Pulido ---------- */
