@@ -61,3 +61,18 @@ test('sin cambio de ángulo la columna dice 0°', () => {
   const b = { id: 'B', fecha: '2026-10-05', ejercicios: [{ tipo: 'flexion', anguloMax: 50.2, repeticiones: 10, repeticionesObjetivo: 10 }] };
   assert.strictEqual(datosReporteSesion({ id: 'P', nombre: 'X', sesiones: [a, b] }, b, '2026-10-27', () => []).ejercicios[0].cambio, '0°');
 });
+
+test('datosReporteSesion: la rutina dice con qué se midió cada paso', () => {
+  const f1 = {
+    id: 'F1', fecha: '2026-10-28', dolorEVA: 2, perdidaDatosPct: 0, ejercicios: [],
+    rutina: { etapa: 1, pasos: [
+      { id: 'tendon_recto', nombre: 'Mano recta', tipo: null, medicion: { fuente: 'emg', musculo: 'flexores' }, repeticionesObjetivo: 10, repeticiones: 8, repeticionesManual: null, emg: { musculo: 'flexores', repeticiones: 8 } },
+      { id: 'pulgar_oposicion', nombre: 'Oposición', tipo: null, medicion: null, repeticionesObjetivo: 10, repeticiones: null, repeticionesManual: 9, senal: {} },
+      { id: 'flexion', nombre: 'Flexión', tipo: 'flexion', medicion: { fuente: 'imu', tipo: 'flexion' }, repeticionesObjetivo: 10, repeticiones: 10, repeticionesManual: null },
+      { id: 'viejo', nombre: 'Paso antiguo medido', tipo: 'flexion', repeticionesObjetivo: 10, repeticiones: 10, repeticionesManual: null },
+      { id: 'viejo2', nombre: 'Paso antiguo sin medir', tipo: null, repeticionesObjetivo: 10, repeticiones: null, repeticionesManual: null, senal: {} },
+    ] },
+  };
+  const d = datosReporteSesion({ ...pac, sesiones: [s1, s2, f1] }, f1, '2026-10-28', avisosDe);
+  assert.deepStrictEqual(d.rutina.map((r) => r.medidoCon), ['EMG (flexores)', 'Manual', 'IMU', 'IMU', 'Manual']);
+});

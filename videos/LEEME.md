@@ -15,10 +15,10 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 | `nervio_mediano.mp4` | Deslizamiento del nervio mediano | 1 | No adjuntado |
 | `flexion.mp4` | Flexión de muñeca | 2 | No adjuntado |
 | `extension.mp4` | Extensión de muñeca | 2 | No adjuntado |
-| `desv_radial.mp4` | Desviación radial | 2 | No adjuntado |
-| `desv_cubital.mp4` | Desviación cubital | 2 | No adjuntado |
+| `desv_radial.mp4` | Desviación radial | 2 | No adjuntado (grabar con la mano de canto) |
+| `desv_cubital.mp4` | Desviación cubital | 2 | No adjuntado (grabar con la mano de canto) |
 | `pronacion.mp4` | Pronación de antebrazo | 2 | Adjunto |
-| `supinacion.mp4` | Supinación de antebrazo | 2 | Adjunto |
+| `supinacion.mp4` | Supinación de antebrazo | 2 | **Rehacer** |
 | `pulgar_abduccion.mp4` | Abducción del pulgar | 2 | Adjunto |
 | `pelota.mp4` | Apretar pelota terapéutica | 3 | Adjunto |
 | `pinza.mp4` | Pinza pulgar-índice | 3 | No adjuntado |
@@ -28,6 +28,8 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 
 **Formato:** `.mp4` (H.264), sin audio. Conviene que empiece y termine en la misma posición para que el bucle no se note. Cualquier proporción sirve: el video se ajusta a la ventana sin recortarse.
 
-**Dónde está el contenido de las rutinas:** las etapas, sus ejercicios, repeticiones, tiempos de sostén, indicaciones y mensajes de cuidado están en `ETAPAS`, en [rutinas.js](../rutinas.js). Para adjuntar un video basta con copiarlo aquí con el nombre `<id>.mp4` de la tabla. Para agregar un ejercicio, añada un paso a la etapa en `rutinas.js` con un `id` sin espacios ni tildes y, si existe, copie su video aquí. Los pasos con `tipo` (una clave de `EJERCICIOS` en `data.js`) se miden con el dispositivo; dentro de una misma etapa cada `tipo` aparece como máximo una vez.
+**Dónde está el contenido de las rutinas:** las etapas, sus ejercicios, repeticiones, tiempos de sostén, indicaciones y mensajes de cuidado están en `ETAPAS`, en [rutinas.js](../rutinas.js). Para adjuntar un video basta con copiarlo aquí con el nombre `<id>.mp4` de la tabla. Para agregar un ejercicio, añada un paso a la etapa en `rutinas.js` con un `id` sin espacios ni tildes y, si existe, copie su video aquí. El campo `medicion` de cada paso dice cómo se cuenta: con el sensor de movimiento (`{ fuente: 'imu', tipo }`, una clave de `EJERCICIOS` en `data.js`), con EMG (`{ fuente: 'emg', musculo }`) o a mano (`null`); dentro de una misma etapa cada `tipo` IMU aparece como máximo una vez.
+
+**Videos por rehacer o grabar con postura nueva:** `supinacion.mp4` se debe rehacer. `desv_radial.mp4` y `desv_cubital.mp4` se graban con la mano de canto (pulgar hacia arriba, antebrazo apoyado), que es la postura que usa la rutina para medirlas. Los prompts están en [prompts-videos-ejercicios.md](../prompts-videos-ejercicios.md).
 
 Cómo generar videos nuevos con el mismo estilo: [prompts-videos-ejercicios.md](../prompts-videos-ejercicios.md).

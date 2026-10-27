@@ -1028,6 +1028,19 @@ await verificar('pdf: sesión importada', async (page) => {
   afirmar(pdf.texto.startsWith('%PDF') && pdf.nombre.endsWith('_sesion_2026-10-26.pdf'), `nombre: ${pdf.nombre}`);
 });
 
+await verificar('pdf: medido con EMG', async (page) => {
+  const pasos = [
+    { id: 'tendon_recto', nombre: 'Deslizamiento tendinoso: mano recta', tipo: null, medicion: { fuente: 'emg', musculo: 'flexores' }, repeticionesObjetivo: 10, repeticiones: 9, repeticionesManual: null, duracionS: 40, emg: { musculo: 'flexores', repeticiones: 9, activacionMedia: 280, activacionMax: 340 } },
+    { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, medicion: null, repeticionesObjetivo: 5, repeticiones: null, repeticionesManual: 5, duracionS: 30 },
+  ];
+  await importar(page, { sesion: { fecha: '2026-10-26', ejercicios: [], rutina: { etapa: 1, pasos } } });
+  const etiqueta = await page.textContent('#lista-sesiones li[data-id] >> nth=0 >> .ses-medicion');
+  afirmar(etiqueta.trim() === 'Medido con: EMG 1 · Manual 1', `etiqueta: ${etiqueta}`);
+  const pdf = await descargarPdf(page, '#lista-sesiones li[data-id] >> nth=0 >> .btn-pdf');
+  const texto = pdf.texto.replace(/\\([()])/g, '$1'); // el PDF escapa los paréntesis
+  afirmar(texto.includes('Medido con') && texto.includes('EMG (flexores)') && texto.includes('Manual'), 'el PDF no dice con qué se midió cada paso');
+});
+
 /* ---------- Pulido ---------- */
 const SECCIONES = ['ejercicios', 'seguimiento', 'reporte'];
 

@@ -99,9 +99,27 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 - **Origen** (en *Datos técnicos del dispositivo*). Elija *Dispositivo USB* para el prototipo real: el navegador pedirá elegir el puerto COM. Elija *Simulador* para probar sin hardware. Las sesiones del simulador quedan marcadas como tales.
 - **Indicadores de comunicación.** Muestran la frecuencia de muestreo, la pérdida de datos (criterio < 1 %, calculada con el número de secuencia) y el tiempo desde el último dato (criterio ≤ 0,5 s). La pantalla se actualiza cada 100 ms.
 - **Calibración.** Se mide desde que la PC envía `CAL` hasta que el dispositivo responde `CAL,OK`. Si pasa de 30 s, se marca como fallida. No se puede iniciar un ejercicio sin calibración válida.
-- **Conteo automático.** Detecta cada repetición con umbrales con histéresis, relativos a la posición de reposo al iniciar el ejercicio. Los umbrales se adaptan a la amplitud de las repeticiones anteriores. La línea punteada de la gráfica muestra el umbral.
+- **Conteo automático.** Detecta cada repetición con umbrales con histéresis, relativos a la posición de reposo al iniciar el ejercicio, sobre una media móvil de 5 muestras (~100 ms). Los umbrales se adaptan a la amplitud de las repeticiones anteriores. Con el sensor de movimiento el umbral de subida es máx(8°, 50 % de la amplitud típica) y el de bajada máx(3°, 25 %); en rangos de 30° o menos (desviaciones) los mínimos bajan a 5° y 2°. Con EMG, la subida es máx(60, 50 % de la mediana de los picos) y la bajada máx(25, 25 %), con 300 como mediana inicial. La línea punteada de la gráfica muestra el umbral (`detector.js`).
 - **Conteo manual.** Escríbalo en la ventana "Rutina terminada" para calcular la exactitud del conteo automático (criterio ≥ 95 %). Sirve como evidencia para las pruebas FAT y SAT.
-- **Ejercicios medidos y sin medir.** Los ejercicios de la rutina con `tipo` (flexión, extensión, desviaciones, puño) se miden y cuentan repeticiones con el detector. Los demás guardan la señal cruda de los 3 canales y su conteo es solo manual.
+- **Qué mide cada ejercicio.** Cada paso de la rutina se cuenta con el sensor de movimiento (IMU), con EMG o a mano:
+
+  | Fase | Ejercicio | Medido con |
+  |---|---|---|
+  | 1 | Deslizamientos tendinosos (mano recta, puño en gancho, puño completo, mesa, puño recto) | EMG (flexores) |
+  | 1 | Oposición del pulgar | EMG (tenar); a mano si en el chequeo la herida no está "Bien", porque el electrodo del tenar queda junto a la incisión |
+  | 1 | Deslizamiento del nervio mediano | A mano |
+  | 2 | Flexión, extensión | IMU (`fe`) |
+  | 2 | Desviación radial y cubital | IMU (`rc`), con la mano de canto y recalibrando al empezar el paso |
+  | 2 | Pronación, supinación | IMU (`ps`) |
+  | 2 | Puño completo | EMG (flexores) |
+  | 2 | Abducción del pulgar | EMG (tenar) |
+  | 3 | Pelota | EMG (flexores) |
+  | 3 | Pinza | EMG (tenar) |
+  | 3 | Flexión y extensión con peso | IMU (`fe`) |
+  | 3 | Prono-supinación con martillo | IMU (`ps`, cuenta los giros hacia la supinación) |
+
+  Un paso EMG sin electrodos conectados se cuenta a mano, con el aviso "Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.". Los pasos sin medir guardan la señal cruda de los 3 canales. El reporte y el PDF dicen en la columna "Medido con" cómo se contó cada paso.
+- **Desviaciones radial y cubital.** Con la palma sobre la mesa, la desviación es un giro alrededor del eje vertical: la gravedad no cambia, el acelerómetro no puede corregirlo y el ángulo depende del giroscopio (deriva) y del magnetómetro (perturbado por metal y por el propio ESP32). Por eso se hacen con la mano de canto, pulgar hacia arriba, y la rutina envía `CAL` al empezar el paso: así el giro cambia la gravedad en el marco del sensor y la fusión lo corrige con el acelerómetro. Falta validarlo en banco con el sensor real (goniómetro, 10 repeticiones por lado, error ≤ 3° y conteo ≥ 95 %); si no se cumple, las desviaciones deben pasar a conteo manual.
 - **Al guardar,** la sesión incluye la señal cruda, los picos detectados y el registro de la rutina (campo `rutina`), y aparece en Evolución, Detalle, Comparar e Historial. Una sesión puede guardarse aunque ningún ejercicio grabado sea medido; en ese caso sus indicadores de movimiento se muestran como "—".
 
 ### Protocolo serie (115200 baudios, texto, una línea por mensaje)
@@ -115,7 +133,7 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 | Dispositivo → PC | `#texto` | Depuración (se ignora). |
 | PC → Dispositivo | `START` / `STOP` | Iniciar o detener la transmisión. |
 | PC → Dispositivo | `CAL` | Calibrar (posición neutra = 0°). |
-| PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). |
+| PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). En los pasos medidos con EMG, `<tipo>` es `emg-<músculo>` (`emg-tenar`, `emg-flexores`, `emg-extensores`). |
 | PC → Dispositivo | `PR,<musculo>` / `PR,-` | Contracción de la prueba de fuerza EMG en curso (informativo; el simulador la usa). |
 
 [firmware/plantilla_protocolo/plantilla_protocolo.ino](firmware/plantilla_protocolo/plantilla_protocolo.ino) implementa este protocolo para Arduino y ESP32. Solo hay que reemplazar `leerAngulosCrudos()` por la lectura real de los sensores. Mientras tanto envía una señal de prueba. Cierre el monitor serie del IDE de Arduino antes de conectar desde la interfaz, porque el puerto solo admite un programa a la vez.

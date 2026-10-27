@@ -6,7 +6,7 @@ const TEXTO_SIN_JSPDF = 'No se pudo generar el PDF: revise la conexión a intern
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsPdf = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior }
+  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./reporte.js'), ...require('./resumen-sesion.js') });
 
 const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≤', '<='], ['–', '-'], ['—', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!']];
@@ -31,7 +31,7 @@ const RECOMENDACION = { ok: 'Todo bien', precaucion: 'Precaución', detener: 'No
 
 // avisosDe(p, sesionesHastaS) -> [{ nivel, texto(HTML) }]; en el navegador es calcularObservaciones.
 function datosReporteSesion(p, s, hoy, avisosDe) {
-  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar } = depsPdf();
+  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido } = depsPdf();
   const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
   const i = ses.indexOf(s);
   const prev = i > 0 ? ses[i - 1] : null;
@@ -70,7 +70,7 @@ function datosReporteSesion(p, s, hoy, avisosDe) {
     lectura: { chips: ls.chips, frases: comparar(p, s) },
     chequeo: s.chequeo ? { ...s.chequeo, recomendacion: RECOMENDACION[s.chequeo.nivel] ?? '—' } : null,
     ejercicios,
-    rutina: s.rutina?.pasos?.length ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, objetivo: num(x.repeticionesObjetivo), detectadas: num(x.repeticiones), manual: num(x.repeticionesManual) })) : null,
+    rutina: s.rutina?.pasos?.length ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, medidoCon: medido(x), objetivo: num(x.repeticionesObjetivo), detectadas: num(x.repeticiones), manual: num(x.repeticionesManual) })) : null,
     emg,
     avisos: (avisosDe(p, ses.slice(0, i + 1)) ?? []).map((o) => sinHtml(o.texto)),
     notas: s.notas ?? '',
@@ -191,7 +191,7 @@ function construirPdf(JsPDF, d, imagen) {
 
   if (d.rutina) {
     titulo('Rutina grabada');
-    tabla(['Ejercicio', 'Objetivo', 'Detectadas', 'Manual'], d.rutina.map((r) => [r.nombre, r.objetivo, r.detectadas, r.manual]), [96, 28, 28, 28]);
+    tabla(['Ejercicio', 'Medido con', 'Objetivo', 'Detectadas', 'Manual'], d.rutina.map((r) => [r.nombre, r.medidoCon, r.objetivo, r.detectadas, r.manual]), [72, 36, 24, 24, 24]);
   }
 
   if (d.emg) {

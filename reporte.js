@@ -29,6 +29,23 @@ function bajoMovimiento(s, prev) {
   });
 }
 
+// Cómo se contó un paso de la rutina: 'IMU', 'EMG (<músculo>)' o 'Manual'. Las sesiones guardadas
+// antes de `medicion` se midieron con el IMU si tenían `tipo` y no guardaron la señal cruda.
+function medidoCon(paso) {
+  const m = paso.medicion;
+  if (m === undefined) return paso.tipo && !paso.senal ? 'IMU' : 'Manual';
+  if (m?.fuente === 'emg') return `EMG (${m.musculo})`;
+  return m?.fuente === 'imu' ? 'IMU' : 'Manual';
+}
+
+// "Medido con: IMU 2 · EMG 2 · Manual 1" para la línea de tiempo ('' si la sesión no tiene rutina).
+function resumenMedicion(s) {
+  const n = { IMU: 0, EMG: 0, Manual: 0 };
+  for (const x of s.rutina?.pasos ?? []) n[medidoCon(x).split(' ')[0]]++;
+  const partes = Object.entries(n).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`);
+  return partes.length ? `Medido con: ${partes.join(' · ')}` : '';
+}
+
 const estadoDolor = (d, antes) => (d >= 7 || (antes != null && d - antes >= 2) ? 'revisar' : d >= 4 ? 'atencion' : 'bien');
 
 // Índices del nervio mediano de las sesiones con prueba EMG (hasta `s` incluida si se da).
@@ -151,6 +168,7 @@ function renderReporte(p) {
       </div>
       <div class="ses-chips">${ls.chips.map(htmlChip).join('')}</div>
       <p class="ses-frase">${esc(ls.frase)}</p>
+      ${s.rutina?.pasos?.length ? `<p class="ses-medicion muted">${esc(resumenMedicion(s))}</p>` : ''}
       <div class="ses-acciones">
         <button class="btn btn-ghost btn-ver" data-id="${esc(s.id)}">Ver detalle</button>
         <button class="btn btn-ghost btn-notas" data-id="${esc(s.id)}">Notas</button>
@@ -160,4 +178,4 @@ function renderReporte(p) {
   }).reverse().join('') || '<li class="muted">Aún no hay sesiones.</li>';
 }
 
-if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal };
+if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal, medidoCon, resumenMedicion };

@@ -78,3 +78,14 @@ test('lectura de una sesión', () => {
   delete p.sesiones[1].emg;
   assert.ok(!lecturaSesion(p, p.sesiones[1]).chips.some((c) => c.id === 'musculo'));
 });
+
+test('resumenMedicion: cuántos pasos se midieron con cada fuente', () => {
+  const { resumenMedicion } = require('../reporte.js');
+  const s = { rutina: { pasos: [
+    { medicion: { fuente: 'emg', musculo: 'flexores' } }, { medicion: { fuente: 'emg', musculo: 'tenar' } },
+    { medicion: { fuente: 'imu', tipo: 'flexion' } }, { medicion: null }, { tipo: 'flexion' },
+  ] } };
+  assert.strictEqual(resumenMedicion(s), 'Medido con: IMU 2 · EMG 2 · Manual 1');
+  assert.strictEqual(resumenMedicion({ rutina: { pasos: [{ medicion: null }] } }), 'Medido con: Manual 1');
+  assert.strictEqual(resumenMedicion({ ejercicios: [] }), '');
+});
