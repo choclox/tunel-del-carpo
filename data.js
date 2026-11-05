@@ -4,6 +4,10 @@
  * (AAOS). Se usan solo como punto de comparación visual, no como meta clínica.
  */
 
+/* Las sesiones del simulador se conservan, pero no cuentan en líneas base, tendencias ni avisos. */
+const esSimulada = (s) => s.origen === 'simulador';
+const sesionesClinicas = (ses) => ses.filter((s) => !esSimulada(s));
+
 /* canal/signo: qué canal del dispositivo mide el ejercicio y en qué sentido
  * (ver protocolo en monitoreo.js). fe = flexo-extensión, rc = desviación
  * radio-cubital, ps = prono-supinación. `puno` (canal mcf, nunca medido) queda solo para leer
@@ -139,7 +143,7 @@ function generarDemo() {
       }
       const { inicio, n, paso, inicioPct, finPct, k, dolor0, seed, meseta, cita, ...datos } = p;
       // Próxima cita relativa a hoy: una hoy, una vencida y dos futuras.
-      return { ...datos, proximaCita: sumarDias(hoyISO(), cita), archivado: false, sesiones };
+      return { ...datos, proximaCita: sumarDias(hoyISO(), cita), archivado: false, ejemplo: true, sesiones };
     }),
   };
 }
@@ -197,4 +201,4 @@ function detectarPicos(angulos, fs, umbralFrac = 0.6) {
   return picos;
 }
 
-if (typeof module !== 'undefined') module.exports = { EJERCICIOS, ORDEN_EJERCICIOS };
+if (typeof module !== 'undefined') module.exports = { EJERCICIOS, ORDEN_EJERCICIOS, esSimulada, sesionesClinicas };

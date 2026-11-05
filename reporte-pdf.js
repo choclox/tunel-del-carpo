@@ -6,7 +6,7 @@ const TEXTO_SIN_JSPDF = 'No se pudo generar el PDF: revise la conexión a intern
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsPdf = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon }
+  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon, esSimulada, sesionesClinicas }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./reporte.js'), ...require('./resumen-sesion.js') });
 
 const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≤', '<='], ['–', '-'], ['—', '-'], ['−', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!'],
@@ -35,10 +35,12 @@ const RECOMENDACION = { ok: 'Todo bien', precaucion: 'Precaución', detener: 'No
 
 // avisosDe(p, sesionesHastaS) -> [{ nivel, texto(HTML) }]; en el navegador es calcularObservaciones.
 function datosReporteSesion(p, s, hoy, avisosDe) {
-  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido } = depsPdf();
+  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido, esSimulada: esSim, sesionesClinicas: clinicas } = depsPdf();
   const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
   const i = ses.indexOf(s);
-  const prev = i > 0 ? ses[i - 1] : null;
+  const simulada = esSim(s);
+  const comparables = simulada ? [] : clinicas(ses);
+  const prev = comparables[comparables.indexOf(s) - 1] ?? null;
   const diasPostop = p.fechaCirugia ? Math.round((new Date(s.fecha + 'T12:00:00') - new Date(p.fechaCirugia + 'T12:00:00')) / 86400000) : null;
 
   const ejercicios = (s.ejercicios ?? []).filter((e) => EJ[e.tipo]).map((e) => {
@@ -66,6 +68,7 @@ function datosReporteSesion(p, s, hoy, avisosDe) {
 
   const ls = lectura(p, s);
   return {
+    simulada,
     encabezado: {
       paciente: { nombre: p.nombre, id: p.id, mano: p.mano ?? '—', fechaCirugia: fechaLargaPdf(p.fechaCirugia) },
       sesion: { fecha: fechaLargaPdf(s.fecha), numero: i + 1, fase: s.rutina?.etapa ?? null, diasPostop, duracionMin: s.duracionMin ?? null, origen: s.origen === 'simulador' ? 'Simulador' : s.origen === 'usb' ? 'Dispositivo USB' : '—' },
@@ -76,7 +79,7 @@ function datosReporteSesion(p, s, hoy, avisosDe) {
     ejercicios,
     rutina: s.rutina?.pasos?.length ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, medidoCon: medido(x), objetivo: num(x.repeticionesObjetivo), detectadas: num(x.repeticiones), manual: num(x.repeticionesManual) })) : null,
     emg,
-    avisos: (avisosDe(p, ses.slice(0, i + 1)) ?? []).map((o) => sinHtml(o.texto)),
+    avisos: (simulada ? [] : avisosDe(p, ses.slice(0, i + 1)) ?? []).map((o) => sinHtml(o.accion ? `${o.texto} Sugerencia: ${o.accion}` : o.texto)),
     notas: s.notas ?? '',
     proximaCita: p.proximaCita ? fechaLargaPdf(p.proximaCita) : 'Por definir',
   };
@@ -169,6 +172,7 @@ function construirPdf(JsPDF, d, imagen) {
   };
 
   doc.setTextColor('#1e6895'); parrafo('Kinemo · Reporte de sesión', { tam: 16, negrita: true }); doc.setTextColor('#000000');
+  if (d.simulada) { doc.setTextColor('#b02a2a'); parrafo('SESIÓN SIMULADA: estos datos no son mediciones reales.', { tam: 12, negrita: true }); doc.setTextColor('#000000'); }
   const { paciente: pa, sesion: se } = d.encabezado;
   parrafo(`${pa.nombre} (${pa.id}) · Mano ${String(pa.mano).toLowerCase()} · Cirugía: ${pa.fechaCirugia}`, { negrita: true });
   parrafo(`Sesión ${se.numero} del ${se.fecha}${se.fase ? ` · Fase ${se.fase}` : ''}${se.diasPostop != null ? ` · ${se.diasPostop} días desde la cirugía` : ''}${se.duracionMin ? ` · ${se.duracionMin} min` : ''} · Origen: ${se.origen}`);
@@ -180,7 +184,7 @@ function construirPdf(JsPDF, d, imagen) {
 
   if (d.chequeo) {
     titulo('Chequeo de seguridad');
-    parrafo(`Dolor antes: ${d.chequeo.dolorAntes}/10 · Hormigueo: ${d.chequeo.hormigueo} · Herida: ${d.chequeo.herida} · Recomendación: ${d.chequeo.recomendacion}${d.chequeo.continuoBajoCriterio ? ' · Continuó bajo criterio del profesional' : ''}`);
+    parrafo(`Dolor antes: ${d.chequeo.dolorAntes}/10 · Hormigueo: ${d.chequeo.hormigueo} · Herida: ${d.chequeo.herida} · Recomendación: ${d.chequeo.recomendacion}${d.chequeo.continuoBajoCriterio ? ' · Continuó bajo criterio del profesional' : ''}${d.chequeo.faseAdelantada ? ` · Fase ${d.chequeo.faseAdelantada.elegida} elegida; sugerida: Fase ${d.chequeo.faseAdelantada.sugerida}` : ''}`);
   }
 
   titulo('Ejercicios medidos');
@@ -199,9 +203,9 @@ function construirPdf(JsPDF, d, imagen) {
   }
 
   if (d.emg) {
-    titulo('Prueba de fuerza muscular (EMG)');
+    titulo('Prueba de activación muscular (EMG)');
     tabla(['Músculo', 'Contracciones', 'Promedio', '% primera prueba'], d.emg.musculos.map((m) => [m.nombre, m.picos, m.media, m.pct]), [50, 60, 30, 40]);
-    parrafo(`Índice del nervio mediano: ${d.emg.indice} · Co-contracción: ${d.emg.cocontraccion}`);
+    parrafo(`Razón tenar/extensores: ${d.emg.indice} · Co-contracción: ${d.emg.cocontraccion}`);
   }
 
   titulo('Avisos');

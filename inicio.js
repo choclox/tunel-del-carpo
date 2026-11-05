@@ -2,12 +2,21 @@
  * sesiones recientes) y "Nueva sesión". Las funciones de cálculo son puras y reciben `hoy` (ISO). */
 
 // Funciones de emg.js: globales en el navegador, require en Node (pruebas).
-const emgDeInicio = () => (typeof medidasEmg === 'function' ? { medidasEmg, lineaBase } : require('./emg.js'));
+const emgDeInicio = () => (typeof medidasEmg === 'function' ? { medidasEmg, lineaBase, sesionesClinicas } : { ...require('./emg.js'), ...require('./data.js') });
 
 const NIVEL_ATENCION = { critical: 0, warning: 1, info: 2 };
 const diasEntre = (desde, hasta) => Math.round((new Date(hasta + 'T12:00:00') - new Date(desde + 'T12:00:00')) / 86400000);
 const fechaCorta = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 const ordenadas = (p) => [...(p.sesiones ?? [])].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+// Sin distinguir acentos ni mayúsculas; en el documento solo cuentan los dígitos.
+const normalizarBusqueda = (t) => String(t ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+function coincideBusqueda(p, q) {
+  const texto = normalizarBusqueda(q).trim();
+  if (!texto) return true;
+  if (normalizarBusqueda(p.nombre).includes(texto) || normalizarBusqueda(p.id).includes(texto)) return true;
+  return /^[\d.\s-]+$/.test(texto) && String(p.documento ?? '').replace(/\D/g, '').includes(texto.replace(/\D/g, ''));
+}
 
 function saludo(hora) {
   if (hora < 12) return 'Buenos días';
@@ -23,28 +32,41 @@ function sesionesDeLaSemana(db, hoy) {
   const d = new Date(hoy + 'T12:00:00');
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   const lunes = d.toISOString().slice(0, 10);
-  return pacientesActivos(db).reduce((n, p) => n + (p.sesiones ?? []).filter((s) => s.fecha >= lunes && s.fecha <= hoy).length, 0);
+  return pacientesActivos(db).reduce((n, p) => n + (p.sesiones ?? []).filter((s) => s.fecha >= lunes && s.fecha <= hoy && s.origen !== 'simulador').length, 0);
 }
 
 function citasDeHoy(db, hoy) {
   return pacientesActivos(db).filter((p) => p.proximaCita === hoy);
 }
 
+// Último "no hacer la sesión" sin una sesión real posterior (o null).
+function noRealizadaPendiente(p, ses) {
+  const n = [...(p.noRealizadas ?? [])].sort((a, b) => a.fecha.localeCompare(b.fecha)).pop();
+  return n && !ses.some((s) => s.fecha >= n.fecha) ? n : null;
+}
+
 // Motivos por los que un paciente requiere atención, el más grave primero (mismos umbrales que los avisos).
+// Las sesiones simuladas no cuentan: no tapan un problema ni crean uno.
 function motivosAtencion(p, hoy) {
-  const ses = ordenadas(p);
+  const ses = emgDeInicio().sesionesClinicas(ordenadas(p));
   const m = [];
-  if (!ses.length) return [{ nivel: 'info', texto: 'Aún sin sesiones' }];
+  const noHecha = noRealizadaPendiente(p, ses);
+  if (noHecha) m.push({ nivel: 'critical', texto: `Sesión no realizada (${fechaCorta(noHecha.fecha)}): ${noHecha.motivos.join('; ')}` });
+  if (!ses.length) return [...m, { nivel: 'info', texto: 'Aún sin sesiones' }];
   const ult = ses[ses.length - 1], prev = ses[ses.length - 2];
 
   if (ult.perdidaDatosPct >= 1) m.push({ nivel: 'critical', texto: 'Se perdieron datos en la última sesión' });
-  if (ult.chequeo?.nivel === 'detener') m.push({ nivel: 'critical', texto: 'El chequeo pidió no hacer la sesión' });
+  if (ult.chequeo?.nivel === 'detener') m.push({ nivel: 'critical', texto: 'Se hizo la sesión aunque el chequeo recomendó no hacerla' });
 
   if (p.proximaCita && p.proximaCita < hoy && !ses.some((s) => s.fecha >= p.proximaCita)) {
     m.push({ nivel: 'warning', texto: `Cita vencida (${fechaCorta(p.proximaCita)})` });
   }
   if (prev && ult.dolorEVA != null && prev.dolorEVA != null && ult.dolorEVA - prev.dolorEVA >= 2) {
     m.push({ nivel: 'warning', texto: `El dolor subió (${prev.dolorEVA} → ${ult.dolorEVA})` });
+  }
+  const dolorAntes = ult.chequeo?.dolorAntes;
+  if (dolorAntes != null && ult.dolorEVA != null && ult.dolorEVA - dolorAntes >= 2) {
+    m.push({ nivel: 'warning', texto: `El dolor subió durante la sesión (${dolorAntes} → ${ult.dolorEVA})` });
   }
   if (prev) {
     const bajaron = (ult.ejercicios ?? []).filter((e) => {
@@ -59,7 +81,7 @@ function motivosAtencion(p, hoy) {
     const b = base(ses);
     const a = medidas(pruebas[pruebas.length - 2].emg.prueba, b).indiceMediano;
     const z = medidas(pruebas[pruebas.length - 1].emg.prueba, b).indiceMediano;
-    if (a && z != null && (a - z) / a > 0.15) m.push({ nivel: 'warning', texto: 'Bajó el índice del nervio mediano' });
+    if (a && z != null && (a - z) / a > 0.15) m.push({ nivel: 'warning', texto: 'Bajó la razón tenar/extensores' });
   }
   const sinSesion = diasEntre(ult.fecha, hoy);
   if (sinSesion > 10) m.push({ nivel: 'info', texto: `Sin sesión hace ${sinSesion} días` });
@@ -114,7 +136,7 @@ function renderInicio() {
       <button class="btn" data-id="${esc(p.id)}" data-accion="empezar">Empezar</button></li>`).join('') || '<li class="muted">No hay citas para hoy.</li>';
   $('#inicio-recientes').innerHTML = sesionesRecientes(db).map(({ paciente: p, sesion: s }) => `<li>
       <button class="inicio-item" data-id="${esc(p.id)}" data-accion="seguimiento">
-        <span><b>${esc(p.nombre)}</b><small>${fmtFecha(s.fecha)} · dolor ${esc(s.dolorEVA ?? '—')}/10</small></span>
+        <span><b>${esc(p.nombre)}</b><small>${fmtFecha(s.fecha)} · ${s.origen === 'simulador' ? 'simulada' : `dolor ${esc(s.dolorEVA ?? '—')}/10`}</small></span>
       </button></li>`).join('') || '<li class="muted">Aún no hay sesiones.</li>';
 }
 
@@ -133,9 +155,9 @@ function empezarSesionCon(id) {
 }
 
 function renderElegirPaciente() {
-  const q = $('#buscar-sesion').value.trim().toLowerCase();
+  const q = $('#buscar-sesion').value;
   const lista = pacientesActivos(estado.db)
-    .filter((p) => !q || p.nombre.toLowerCase().includes(q) || (p.documento ?? '').includes(q))
+    .filter((p) => coincideBusqueda(p, q))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
   $('#elegir-lista').innerHTML = lista.map((p) => `<li><button class="inicio-item" data-id="${esc(p.id)}">
       <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
@@ -171,4 +193,4 @@ function initInicio() {
 }
 
 if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', initInicio);
-if (typeof module !== 'undefined') module.exports = { saludo, pacientesActivos, sesionesDeLaSemana, citasDeHoy, motivosAtencion, pacientesConAtencion, sesionesRecientes };
+if (typeof module !== 'undefined') module.exports = { saludo, pacientesActivos, sesionesDeLaSemana, citasDeHoy, motivosAtencion, noRealizadaPendiente, coincideBusqueda, pacientesConAtencion, sesionesRecientes };

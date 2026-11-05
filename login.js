@@ -8,6 +8,8 @@ function mostrarPestana(nombre) {
   $('#tab-registro').setAttribute('aria-selected', String(registro));
   $('#tab-login').classList.toggle('active', !registro);
   $('#tab-registro').classList.toggle('active', registro);
+  $('#tab-login').tabIndex = registro ? -1 : 0;
+  $('#tab-registro').tabIndex = registro ? 0 : -1;
   $('#form-login').hidden = registro;
   $('#form-registro').hidden = !registro;
   document.title = registro ? 'Kinemo · Crear cuenta' : 'Kinemo · Iniciar sesión';
@@ -31,6 +33,14 @@ function init() {
 
   $('#tab-login').addEventListener('click', () => mostrarPestana('login'));
   $('#tab-registro').addEventListener('click', () => mostrarPestana('registro'));
+  // Flechas: cambian de pestaña, como en cualquier tablist.
+  $('.acceso-tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const destino = $('#tab-login').tabIndex === 0 ? 'registro' : 'login';
+    mostrarPestana(destino);
+    $(destino === 'registro' ? '#tab-registro' : '#tab-login').focus();
+  });
   document.querySelectorAll('[data-ir]').forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
     mostrarPestana(a.dataset.ir);

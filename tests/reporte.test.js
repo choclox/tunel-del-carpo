@@ -25,12 +25,12 @@ test('porcentaje de lo normal', () => {
 
 test('todo bien', () => {
   const l = lecturaPaciente(base(), HOY);
-  assert.deepStrictEqual(l.areas.map((a) => a.titulo), ['Movimiento', 'Dolor', 'Músculo', 'Constancia']);
+  assert.deepStrictEqual(l.areas.map((a) => a.titulo), ['Movimiento', 'Dolor', 'Tenar/extensores', 'Constancia']);
   assert.deepStrictEqual(estados(l), ['bien', 'bien', 'bien', 'bien']);
   assert.strictEqual(l.general, 'Va bien.');
   assert.strictEqual(area(l, 'movimiento').frase, 'Mueve la muñeca al 70 % de lo normal (+20 puntos desde la primera sesión).');
   assert.strictEqual(area(l, 'dolor').frase, 'Dolor 3/10 en la última sesión (al inicio: 7/10).');
-  assert.strictEqual(area(l, 'musculo').frase, 'Índice del nervio mediano: 124 % de la primera prueba.');
+  assert.strictEqual(area(l, 'musculo').frase, 'Razón tenar/extensores: 124 % de la primera prueba.');
   assert.ok(area(l, 'constancia').frase.startsWith('2 sesiones; la última hace 3 días. Próxima cita: '), area(l, 'constancia').frase);
 });
 
@@ -39,6 +39,7 @@ test('dolor en atención', () => {
   const l = lecturaPaciente(p, HOY);
   assert.strictEqual(area(l, 'dolor').estado, 'atencion');
   assert.strictEqual(l.general, 'Va avanzando; atención en dolor.');
+  assert.strictEqual(area(l, 'dolor').frase, 'Dolor 5/10 en la última sesión: entre 4 y 6 (al inicio: 7/10).');
 });
 
 test('movimiento que baja se revisa', () => {
@@ -46,6 +47,7 @@ test('movimiento que baja se revisa', () => {
   const l = lecturaPaciente(p, HOY);
   assert.strictEqual(area(l, 'movimiento').estado, 'revisar');
   assert.ok(l.general.startsWith('Revisar: movimiento'), l.general);
+  assert.ok(area(l, 'movimiento').frase.includes('bajó más de 8 % en '), area(l, 'movimiento').frase);
 });
 
 test('constancia', () => {
@@ -55,11 +57,22 @@ test('constancia', () => {
   assert.strictEqual(con('2026-10-24', '2026-10-25'), 'atencion'); // cita vencida
 });
 
+test('una sesión simulada no cambia la lectura ni se compara', () => {
+  const p = base();
+  const antes = lecturaPaciente(p, HOY);
+  const sim = ses('2026-10-26', 80, 0, { origen: 'simulador', emg: { prueba: prueba(900) } });
+  p.sesiones.push(sim);
+  const l = lecturaPaciente(p, HOY);
+  assert.deepStrictEqual(l.areas, antes.areas);
+  assert.strictEqual(l.simuladas, 1);
+  assert.deepStrictEqual(lecturaSesion(p, sim).chips.map((c) => c.texto), ['Simulada']);
+});
+
 test('sin sesiones', () => {
   const l = lecturaPaciente({ id: 'X', nombre: 'X', sesiones: [] }, HOY);
   assert.deepStrictEqual(estados(l), ['sin-datos', 'sin-datos', 'sin-datos', 'sin-datos']);
   assert.strictEqual(area(l, 'constancia').frase, 'Aún no hay sesiones.');
-  assert.strictEqual(l.general, 'Va bien.');
+  assert.strictEqual(l.general, 'Aún no hay datos para una lectura.');
 });
 
 test('datos mínimos (sesión importada)', () => {

@@ -36,6 +36,13 @@ test('resumenBloque', () => {
   assert.strictEqual(resumenBloque([400, 420, 200]).dudosa, true);
 });
 
+test('lineaBase ignora las sesiones simuladas', () => {
+  const sim = { fecha: '2026-09-01', origen: 'simulador', emg: { prueba: 'sim' } };
+  const real = { fecha: '2026-09-08', emg: { prueba: 'real' } };
+  assert.strictEqual(lineaBase([sim, real]), 'real');
+  assert.strictEqual(lineaBase([sim]), null);
+});
+
 test('lineaBase toma la sesión más antigua con prueba', () => {
   const a = prueba(1, 1, 1), b = prueba(2, 2, 2);
   const ses = [

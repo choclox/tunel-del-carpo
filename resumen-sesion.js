@@ -3,11 +3,12 @@
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsResumen = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, etapaPorNumero, etapaSugerida, lineaBase, medidasEmg }
+  ? { EJERCICIOS, etapaPorNumero, etapaSugerida, lineaBase, medidasEmg, esSimulada, sesionesClinicas }
   : { ...require('./data.js'), ...require('./rutinas.js'), ...require('./emg.js') });
 
 const TEXTO_PRIMERA_SESION = 'Primera sesión: será la referencia para comparar.';
 const TEXTO_SIN_COMPARABLES = 'Sin datos comparables con la sesión anterior.';
+const TEXTO_SIMULADA = 'Sesión simulada: no se compara ni cuenta en el seguimiento.';
 const fechaLarga = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 const conSigno = (n) => `${n >= 0 ? '+' : ''}${n}`;
 
@@ -17,11 +18,12 @@ function sumarDiasISO(iso, n) {
   return f.toISOString().slice(0, 10);
 }
 
-// Hasta 3 frases sencillas, la mejor primero: el ejercicio que más mejoró, el dolor antes → después
-// y el índice del nervio mediano; si sobra espacio, otros ejercicios.
+// Hasta 3 frases sencillas: primero lo que empeoró (lo peor antes) y luego lo que mejoró. Incluye el
+// ejercicio que más cambió, el dolor antes → después y la razón tenar/extensores; si sobra espacio, otros ejercicios.
 function comparacionConAnterior(p, s) {
-  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas } = depsResumen();
-  const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, esSimulada: simulada, sesionesClinicas: clinicas } = depsResumen();
+  if (simulada(s)) return [TEXTO_SIMULADA];
+  const ses = clinicas([...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha)));
   const prev = ses.filter((x) => x.fecha < s.fecha || (x.fecha === s.fecha && ses.indexOf(x) < ses.indexOf(s))).pop();
   if (!prev) return [TEXTO_PRIMERA_SESION];
 
@@ -42,12 +44,17 @@ function comparacionConAnterior(p, s) {
     const ahora = medidas(s.emg.prueba, b).indiceMediano;
     const antesIdx = medidas(pruebas[pruebas.length - 2].emg.prueba, b).indiceMediano;
     if (ahora != null && antesIdx != null) {
-      otras.push({ puntaje: (ahora - antesIdx) / 100, texto: `Índice del nervio mediano: ${Math.round(ahora)} % (${conSigno(Math.round(ahora - antesIdx))} puntos)` });
+      otras.push({ puntaje: (ahora - antesIdx) / 100, texto: `Razón tenar/extensores: ${Math.round(ahora)} % (${conSigno(Math.round(ahora - antesIdx))} puntos)` });
     }
   }
 
-  const elegidas = [...movimientos.slice(0, 1), ...otras].sort((x, y) => y.puntaje - x.puntaje);
-  for (const m of movimientos.slice(1)) if (elegidas.length < 3) elegidas.push(m);
+  const peor = movimientos[movimientos.length - 1];
+  const candidatas = [...movimientos.slice(0, 1), ...(movimientos.length > 1 && peor.puntaje < 0 ? [peor] : []), ...otras];
+  const elegidas = [
+    ...candidatas.filter((x) => x.puntaje < 0).sort((x, y) => x.puntaje - y.puntaje),
+    ...candidatas.filter((x) => x.puntaje >= 0).sort((x, y) => y.puntaje - x.puntaje),
+  ];
+  for (const m of movimientos) if (elegidas.length < 3 && !elegidas.includes(m)) elegidas.push(m);
   return elegidas.length ? elegidas.slice(0, 3).map((x) => x.texto) : [TEXTO_SIN_COMPARABLES];
 }
 
@@ -77,12 +84,14 @@ function abrirResumen(p, s) {
   resumenActual = { pacienteId: p.id, sesionId: s.id };
   const dlg = $('#dlg-resumen');
   dlg.dataset.destino = '';
-  pintarPasosSesion(dlg, 5, !s.emg?.prueba);
+  const simulada = esSimulada(s);
+  pintarPasosSesion(dlg, 5, !s.emg?.prueba, simulada);
+  $('#rs-hoja').hidden = simulada; // al paciente no se le entrega un dato inventado
   $('#rs-sub').textContent = `${p.nombre} · ${fmtFecha(s.fecha)}`;
   $('#rs-comparacion').innerHTML = comparacionConAnterior(p, s).map((t) => `<li>${esc(t)}</li>`).join('');
-  const avisos = calcularObservaciones(p, sesionesOrdenadas(p)).filter((o) => o.nivel === 'critical' || o.nivel === 'warning').slice(0, 3);
+  const avisos = (simulada ? [] : calcularObservaciones(p, sesionesOrdenadas(p))).filter((o) => o.nivel === 'critical' || o.nivel === 'warning').slice(0, 3);
   $('#rs-avisos-bloque').hidden = !avisos.length;
-  $('#rs-avisos').innerHTML = avisos.map((o) => `<li class="obs obs-${o.nivel}"><span class="obs-icon">!</span><span>${o.texto}</span></li>`).join('');
+  $('#rs-avisos').innerHTML = avisos.map((o) => `<li class="obs obs-${o.nivel}"><span class="obs-icon">!</span><span>${o.texto}${htmlSugerencia(o)}</span></li>`).join('');
   $('#rs-cita').textContent = p.proximaCita ? `Próxima cita: ${fmtFecha(p.proximaCita)}` : 'Sin próxima cita.';
   dlg.showModal();
 }
@@ -96,11 +105,11 @@ function imprimirHojaPaciente(p, s) {
       <div><h1>${esc(h.nombre)}</h1><p>Sesión del ${esc(h.fecha)}</p></div>
     </header>
     <section><h2>Hoy hizo</h2>
-      <table><tbody>${h.hizo.map((x) => `<tr><td>${esc(x.nombre)}</td><td>${x.reps ?? '—'} repeticiones</td></tr>`).join('')}</tbody></table>
+      <table><tbody>${h.hizo.map((x) => `<tr><td>${esc(x.nombre)}</td><td>${x.reps == null ? '—' : plural(x.reps, 'repetición', 'repeticiones')}</td></tr>`).join('')}</tbody></table>
     </section>
     <section><h2>Cómo va</h2><ul>${lista(h.comoVa)}</ul></section>
     <section><h2>Ejercicios para casa</h2>
-      <table><tbody>${h.ejercicios.map((x) => `<tr><td>${esc(x.nombre)}</td><td>${x.reps} repeticiones${x.sostenerS ? ` · sostener ${x.sostenerS} s` : ''}</td></tr>`).join('')}</tbody></table>
+      <table><tbody>${h.ejercicios.map((x) => `<tr><td>${esc(x.nombre)}</td><td>${plural(x.reps, 'repetición', 'repeticiones')}${x.sostenerS ? ` · sostener ${x.sostenerS} s` : ''}</td></tr>`).join('')}</tbody></table>
     </section>
     <section><h2>Cuidados</h2><ul>${lista(h.cuidados)}</ul></section>
     <section class="hoja-cita"><h2>Próxima cita</h2><p>${esc(h.proximaCita)}</p></section>
