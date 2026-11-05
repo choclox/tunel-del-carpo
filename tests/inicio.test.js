@@ -1,7 +1,7 @@
 // interfaz-medico/tests/inicio.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { saludo, pacientesActivos, sesionesDeLaSemana, citasDeHoy, motivosAtencion, pacientesConAtencion, sesionesRecientes } = require('../inicio.js');
+const { saludo, pacientesActivos, sesionesDeLaSemana, citasDeHoy, motivosAtencion, noRealizadaPendiente, coincideBusqueda, pacientesConAtencion, sesionesRecientes } = require('../inicio.js');
 
 const ses = (fecha, extra = {}) => ({ fecha, dolorEVA: 3, perdidaDatosPct: 0, ejercicios: [], ...extra });
 const pac = (id, extra = {}) => ({ id, nombre: id, sesiones: [], ...extra });
@@ -23,6 +23,28 @@ test('activos, semana y citas de hoy ignoran archivados', () => {
   assert.deepStrictEqual(pacientesActivos(db).map((p) => p.id), ['A', 'C']);
   assert.strictEqual(sesionesDeLaSemana(db, '2026-10-28'), 2); // miércoles: lunes 26 a miércoles 28
   assert.deepStrictEqual(citasDeHoy(db, '2026-10-28').map((p) => p.id), ['A']);
+});
+
+test('una sesión simulada no tapa los motivos de atención', () => {
+  const m = motivosAtencion(pac('A', { sesiones: [
+    ses('2026-10-20', { dolorEVA: 3 }), ses('2026-10-24', { dolorEVA: 6 }), ses('2026-10-25', { dolorEVA: 0, origen: 'simulador' }),
+  ] }), '2026-10-26');
+  assert.ok(textos(m).includes('warning:El dolor subió (3 → 6)'), textos(m).join(' | '));
+});
+
+test('sesión no realizada: pendiente hasta la siguiente sesión real', () => {
+  const n = { fecha: '2026-10-25', motivos: ['herida abierta'] };
+  const p = pac('A', { noRealizadas: [n], sesiones: [ses('2026-10-20')] });
+  assert.ok(textos(motivosAtencion(p, '2026-10-26')).some((t) => t.startsWith('critical:Sesión no realizada') && t.endsWith('herida abierta')));
+  assert.ok(textos(motivosAtencion(pac('B', { noRealizadas: [n] }), '2026-10-26')).some((t) => t.startsWith('critical:Sesión no realizada')));
+  assert.strictEqual(noRealizadaPendiente({ noRealizadas: [n] }, [ses('2026-10-26')]), null);
+});
+
+test('búsqueda sin acentos y documento sin puntos', () => {
+  const p = { id: 'P-002', nombre: 'María Fernanda Ríos', documento: '43.512.880' };
+  for (const q of ['maria', 'RÍOS', '43512880', '43.512', 'p-002', '']) assert.ok(coincideBusqueda(p, q), q);
+  assert.ok(!coincideBusqueda(p, 'pedro'));
+  assert.ok(!coincideBusqueda(p, '999'));
 });
 
 test('cita vencida solo si no hubo sesión desde la cita', () => {
@@ -53,9 +75,9 @@ test('movimiento, EMG y chequeo', () => {
     ses('2026-10-24', { ejercicios: ej(45), emg: { prueba: prueba(300) }, chequeo: { nivel: 'detener' } }),
   ] }), '2026-10-26');
   const t = textos(m);
-  assert.ok(t.includes('critical:El chequeo pidió no hacer la sesión'), t.join(' | '));
+  assert.ok(t.includes('critical:Se hizo la sesión aunque el chequeo recomendó no hacerla'), t.join(' | '));
   assert.ok(t.some((x) => x.startsWith('warning:Bajó el movimiento en')), t.join(' | '));
-  assert.ok(t.includes('warning:Bajó el índice del nervio mediano'), t.join(' | '));
+  assert.ok(t.includes('warning:Bajó la razón tenar/extensores'), t.join(' | '));
 });
 
 test('pacientesConAtencion ordena por gravedad y nombre; recientes por fecha', () => {

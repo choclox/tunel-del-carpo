@@ -46,6 +46,12 @@ let conectandoListos = 0;    // intentos de conexión lanzados desde "¿Listos?"
 let cierreFinPermitido = false; // #dlg-fin se cierra por Guardar, Descartar o Cerrar
 let navBloqueadaHasta = 0;   // evita que un doble clic salte dos pasos (o termine la rutina)
 const NAV_BLOQUEO_MS = 400;
+let faseCuenta = null;       // 'preparado' (espera a que el profesional arranque) | 'cuenta' | null
+let turnoCuenta = 0;         // invalida una cuenta regresiva cancelada
+let contadorPrevio = 0;      // última repetición con tono
+// Las pruebas de humo arrancan cada paso sin cuenta y aceleran la cuenta cuando la verifican.
+const sinCuenta = () => typeof window !== 'undefined' && window.RUTINA_SIN_CUENTA === true;
+const CUENTA_MS = (typeof window !== 'undefined' && window.CUENTA_RUTINA_MS) || 1000;
 
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 const textoReps = (p) => plural(p.reps, 'repetición', 'repeticiones') + (p.sostenerS ? ` · sostener ${p.sostenerS} s` : '');
@@ -60,10 +66,10 @@ function diasDesdeCirugia(p) {
   return Number.isFinite(d) ? d : null;
 }
 
-function textoSugerida(d) {
+function textoSugerida(d, fase) {
   if (d == null) return 'Sin fecha de cirugía válida: se sugiere la Fase 1.';
   if (d < 0) return 'La fecha de cirugía es futura: se sugiere la Fase 1.';
-  return `Sugerida por ${plural(d, 'día', 'días')} desde la cirugía.`;
+  return `Sugerida: Fase ${fase} (${plural(d, 'día', 'días')} desde la cirugía).`;
 }
 
 function renderTarjetaRutina() {
@@ -80,7 +86,7 @@ function renderTarjetaRutina() {
       aria-pressed="${x.numero === e.numero}">Fase ${x.numero}${x.numero === sugerida ? '<span class="rt-sug">Sugerida</span>' : ''}</button>`).join('');
   $('#rt-etapa-titulo').textContent = `${tituloEtapa(e)} · ${e.semanas}`;
   $('#rt-etapa-desc').textContent = e.descripcion;
-  $('#rt-etapa-sug').textContent = textoSugerida(diasDesdeCirugia(p));
+  $('#rt-etapa-sug').textContent = textoSugerida(diasDesdeCirugia(p), sugerida);
   $('#rt-pasos').innerHTML = e.pasos.map((x) => `
     <li><span class="rt-paso-nombre">${esc(x.nombre)}</span>
       <span class="rt-paso-meta"><span>${esc(textoReps(x))}</span>${x.medicion ? `<span class="rt-medido">Medido con ${x.medicion.fuente === 'emg' ? 'EMG' : 'el sensor de movimiento'}</span>` : ''}</span></li>`).join('');
@@ -99,6 +105,16 @@ function textoRegistro(r) {
   return 'Señal grabada';
 }
 
+function pintarModoRutina() {
+  if (!rt) return;
+  const grabando = modoRutina === 'grabacion';
+  $('#rt-modo').innerHTML = !grabando ? 'Revisión'
+    : faseCuenta ? 'Prepárese'
+    : !mv.paso ? 'Grabación en pausa'
+    : mv.conectado ? '<span class="live-dot"></span>Grabando'
+    : '<span class="dot critical"></span>Sin conexión: no se está grabando';
+}
+
 function mostrarPaso() {
   const paso = rt.actual();
   const grabando = modoRutina === 'grabacion';
@@ -108,19 +124,24 @@ function mostrarPaso() {
   const video = $('#rt-video');
   $('#rt-nombre').textContent = paso.nombre;
   $('#rt-paso').textContent = `Ejercicio ${rt.indice() + 1} de ${rt.total()} · Fase ${etapaRutina.numero}`;
-  $('#rt-modo').innerHTML = enVivo ? '<span class="live-dot"></span>Grabando' : grabando ? 'Grabación en pausa' : 'Revisión';
+  pintarModoRutina();
   $('#rt-reps').textContent = textoReps(paso);
   $('#rt-indicacion').textContent = paso.indicacion;
   $('#rt-cuidado').innerHTML = listaHTML([...paso.cuidado, ...etapaRutina.cuidado]);
   $('#rt-contador').hidden = !enVivo;
+  $('#rt-empezar-paso').hidden = faseCuenta !== 'preparado';
+  $('#rt-cuidados').open = !grabando;
   $('#rt-grabado').hidden = !previo;
   if (previo) $('#rt-grabado-txt').textContent = textoRegistro(previo);
   actualizarContador();
 
   $('#rt-falta').hidden = true;
   video.hidden = false;
+  video.setAttribute('aria-label', `Video del ejercicio: ${paso.nombre}`);
+  // Con movimiento reducido el video espera a que alguien pulse reproducir.
+  video.autoplay = !matchMedia('(prefers-reduced-motion: reduce)').matches;
   video.src = rutaVideo(paso.id);
-  video.play().catch(() => {});
+  if (video.autoplay) video.play().catch(() => {});
 
   const anterior = $('#rt-anterior');
   const siguiente = $('#rt-siguiente');
@@ -128,6 +149,7 @@ function mostrarPaso() {
   $('#rt-siguiente-txt').textContent = ultimoAlGrabar ? 'Terminar rutina' : 'Siguiente';
   anterior.disabled = !rt.hayAnterior();
   siguiente.disabled = !rt.haySiguiente() && !ultimoAlGrabar;
+  siguiente.classList.toggle('btn-primary', faseCuenta !== 'preparado');
   // Un botón deshabilitado pierde el foco y las flechas dejarían de funcionar:
   // pasar el foco al otro botón de navegación.
   if (document.activeElement === anterior && anterior.disabled) siguiente.focus();
@@ -141,10 +163,64 @@ function actualizarContador() {
   const modo = medicionEnCurso();
   el.classList.toggle('medido', modo === 'medido');
   el.classList.toggle('aviso', modo === 'sin-emg');
-  if (modo === 'medido') el.textContent = `Detectadas: ${repeticionesEnCurso() ?? '—'} / ${paso.reps}`;
+  const reps = repeticionesEnCurso();
+  el.classList.toggle('completo', modo === 'medido' && reps >= paso.reps);
+  if (modo === 'medido') {
+    if (reps > contadorPrevio) tono(reps === paso.reps ? 'objetivo' : 'repeticion');
+    contadorPrevio = reps ?? 0;
+    const texto = `${reps ?? '—'} / ${paso.reps}`;
+    if ($('#rt-contador b')?.textContent !== texto) el.innerHTML = `Detectadas: <b>${texto}</b>`;
+  }
   else if (modo === 'calibrando') el.textContent = 'Calibrando… mantenga la mano quieta en la posición del ejercicio.';
   else if (modo === 'sin-emg') el.textContent = TEXTO_PASO_SIN_EMG;
+  else if (!mv.conectado) el.textContent = 'Sin conexión: cuente las repeticiones y anótelas al final.';
   else el.textContent = 'Cuente las repeticiones; las anotará al final.';
+}
+
+// Cuenta regresiva: se graba solo al terminar, nunca durante la cuenta.
+async function correrCuenta(medir) {
+  const turno = ++turnoCuenta;
+  faseCuenta = 'cuenta';
+  mostrarPaso();
+  $('#rt-cuenta').hidden = false;
+  for (const n of ['3', '2', '1']) {
+    $('#rt-cuenta-num').textContent = n;
+    tono('cuenta');
+    await new Promise((r) => setTimeout(r, CUENTA_MS));
+    if (turno !== turnoCuenta) return;
+  }
+  $('#rt-cuenta').hidden = true;
+  faseCuenta = null;
+  contadorPrevio = 0;
+  tono('inicio');
+  medir();
+  mostrarPaso();
+  $('#rt-siguiente').focus();
+}
+
+function cancelarCuenta() {
+  turnoCuenta++;
+  faseCuenta = null;
+  $('#rt-cuenta').hidden = true;
+  if (mv.paso?.enEspera) mv.paso = null; // aún no se grabó nada: no hay registro que cerrar
+}
+
+function comenzarPaso() {
+  if (faseCuenta !== 'preparado') return;
+  faseCuenta = null;
+  iniciarPasoRutina(rt.actual(), correrCuenta);
+  mostrarPaso();
+}
+
+// Espacio: arranca el ejercicio o pasa al siguiente, sin buscar el botón.
+function accionPrincipal() {
+  if (faseCuenta === 'preparado') comenzarPaso();
+  else if (faseCuenta !== 'cuenta') $('#rt-siguiente').click();
+}
+
+function pintarSonido() {
+  const activo = sonidoActivo();
+  $('#rt-sonido').innerHTML = `<svg class="ic" aria-hidden="true"><use href="#i-${activo ? 'sonido' : 'silencio'}"/></svg>${activo ? 'Sonido' : 'Silencio'}`;
 }
 
 function abrirDlgRutina(modo) {
@@ -157,7 +233,9 @@ function abrirDlgRutina(modo) {
   mostrarPaso();
   clearInterval(timerContador);
   if (modo === 'grabacion') timerContador = setInterval(actualizarContador, 250);
+  pintarSonido();
   $('#dlg-rutina').showModal();
+  if (modo === 'grabacion') $(faseCuenta === 'preparado' ? '#rt-empezar-paso' : '#rt-siguiente').focus();
 }
 
 function abrirRevision() {
@@ -171,12 +249,14 @@ function empezarGrabacion() {
 // Al grabar, un paso sin registro empieza a grabarse solo; uno ya grabado espera a "Volver a grabar".
 function iniciarPasoSiFalta() {
   const paso = rt.actual();
-  if (!registroDePaso(paso)) iniciarPasoRutina(paso);
+  if (registroDePaso(paso)) return;
+  if (sinCuenta()) iniciarPasoRutina(paso);
+  else faseCuenta = 'preparado';
 }
 
 function volverAGrabar() {
   if (modoRutina !== 'grabacion' || !rt || mv.paso) return;
-  iniciarPasoRutina(rt.actual());
+  iniciarPasoRutina(rt.actual(), sinCuenta() ? undefined : correrCuenta);
   mostrarPaso();
   $('#rt-siguiente').focus(); // el botón se oculta: el foco pasa a la navegación
 }
@@ -191,10 +271,12 @@ function irAPaso(direccion) {
   if (!rt || navBloqueada()) return;
   if (direccion > 0 ? !rt.haySiguiente() : !rt.hayAnterior()) return;
   navBloqueadaHasta = performance.now() + NAV_BLOQUEO_MS;
+  cancelarCuenta();
   if (modoRutina === 'grabacion') finalizarPasoRutina(); // sin paso en curso no hace nada
   if (direccion > 0) rt.siguiente(); else rt.anterior();
   if (modoRutina === 'grabacion') iniciarPasoSiFalta();
   mostrarPaso();
+  if (faseCuenta === 'preparado') $('#rt-empezar-paso').focus();
 }
 
 function cerrarDlgRutina() {
@@ -216,29 +298,35 @@ async function abrirListos() {
   $('#ls-etapa').textContent = tituloEtapa(e);
   $('#ls-resumen').textContent = `${plural(e.pasos.length, 'ejercicio', 'ejercicios')} · Paciente: ${p.nombre}`;
   $('#ls-empezar').disabled = true;
+  // El simulador se elige en cada sesión: nunca se hereda de la anterior.
+  if (estadoDispositivo().origen === 'simulador' && !sesionTieneDatos()) await desconectar();
   actualizarListos();
   pintarPasosSesion($('#dlg-listos'), 1);
   $('#dlg-listos').showModal();
   clearInterval(timerListos);
   timerListos = setInterval(actualizarListos, 200);
 
-  await conectarYCalibrarListos(turno);
+  calibrarListos();
 }
 
-// Conecta (simulador si no hay dispositivo) y calibra; un fallo deja "Sin conexión" con "Reintentar".
-async function conectarYCalibrarListos(turno) {
-  if (!estadoDispositivo().conectado) {
-    conectandoListos++;
-    actualizarListos();
-    try {
-      await asegurarConexion();
-    } catch (err) {
-      console.warn('No se pudo conectar:', err);
-    } finally {
-      conectandoListos--;
-    }
+// Solo el profesional elige la fuente: un clic abre el selector de puerto o conecta el simulador.
+async function conectarListos(origen) {
+  const turno = turnoListos;
+  conectandoListos++;
+  actualizarListos();
+  try {
+    await conectarCon(origen === 'usb' ? new TransporteSerial() : new TransporteSimulado(), origen);
+  } catch (err) {
+    console.warn('No se pudo conectar:', err);
+  } finally {
+    conectandoListos--;
   }
   if (turno !== turnoListos || !$('#dlg-listos').open) return;
+  pintarPasosSesion($('#dlg-listos'), 1);
+  calibrarListos();
+}
+
+function calibrarListos() {
   const d = estadoDispositivo();
   if (d.conectado && !d.calOk && !d.calibrando) calibrar();
   actualizarListos();
@@ -247,14 +335,19 @@ async function conectarYCalibrarListos(turno) {
 function actualizarListos() {
   const d = estadoDispositivo();
   const usb = d.conectado && d.origen === 'usb';
-  $('#ls-disp-dot').className = 'dot ' + (usb ? 'good' : 'warning');
-  $('#ls-disp').textContent = usb
-    ? 'Dispositivo conectado'
-    : 'Sin dispositivo: se usará el simulador y la sesión quedará marcada como simulada.';
+  const conectando = mv.conectando || conectandoListos > 0;
+  const usbDisponible = TransporteSerial.disponible();
+  $('#ls-disp-dot').className = 'dot ' + (usb ? 'good' : d.conectado ? 'warning' : 'critical');
+  $('#ls-disp').textContent = usb ? 'Dispositivo conectado'
+    : d.conectado ? 'Simulador: la sesión quedará marcada como simulada y no contará en el seguimiento.'
+    : usbDisponible ? 'Sin conexión. Conecte el dispositivo para grabar mediciones reales.'
+    : 'Este navegador no puede conectar el dispositivo: use Chrome o Edge.';
+  $('#ls-opciones').hidden = d.conectado || conectando;
+  $('#ls-conectar').disabled = !usbDisponible;
 
   let cal = 'Conectando…', dot = 'warning', fallo = false;
-  if (!d.conectado && !mv.conectando && !conectandoListos) {
-    cal = 'Sin conexión con el dispositivo.'; dot = 'critical'; fallo = true;
+  if (!d.conectado && !conectando) {
+    cal = 'Elija cómo medir para calibrar.'; dot = '';
   } else if (d.conectado) {
     if (d.calibrando) cal = 'Calibrando… mantenga la mano quieta en posición neutra';
     else if (d.calOk) { cal = `Calibrado en ${fmt(d.calTiempoS, 1)} s`; dot = 'good'; }
@@ -281,6 +374,7 @@ function empezarDesdeListos() {
 /* ---------- #dlg-fin: Rutina terminada ---------- */
 
 function terminarRutina() {
+  cancelarCuenta();
   clearInterval(timerContador);
   timerContador = null;
   finalizarPasoRutina();
@@ -305,6 +399,9 @@ function abrirFin() {
   $('#fin-descartar').hidden = !hay;
   $('#fin-guardar').hidden = !hay;
   $('#fin-cerrar').hidden = hay;
+  const faltantes = e.pasos.filter((x) => !pasos.some((r) => r.id === x.id)).map((x) => x.nombre);
+  $('#fin-faltantes').hidden = !hay || !faltantes.length;
+  $('#fin-faltantes').textContent = `Sin registro: ${faltantes.join(', ')}.`;
   $('#fin-tabla').innerHTML = pasos.map((r) => `
     <tr>
       <td>${esc(r.nombre)}</td>
@@ -313,9 +410,12 @@ function abrirFin() {
       <td class="num"><input type="number" class="input-manual" min="0" step="1" data-id="${esc(r.id)}" aria-label="Conteo manual de ${esc(r.nombre)}"></td>
     </tr>`).join('');
   $('#fin-dolor').value = '';
+  $('#fin-error').textContent = '';
   $('#fin-notas').value = '';
   if (!hay && mv.sesion) descartarSesion(false); // nada que guardar
-  $('#fin-cita').value = sumarDiasISO(hoyISO(), 7);
+  // Una cita futura ya acordada se conserva; solo se propone otra si no la hay.
+  const cita = estado.db.pacientes.find((x) => x.id === estado.pacienteId)?.proximaCita;
+  $('#fin-cita').value = cita > hoyISO() ? cita : sumarDiasISO(hoyISO(), 7);
   $('#fin-sin-cita').checked = false;
   $('#fin-cita').disabled = false;
   pintarPasosSesion($('#dlg-fin'), 4);
@@ -334,10 +434,17 @@ function cerrarFin() {
 }
 
 function guardarDesdeFin() {
+  const dolor = $('#fin-dolor').value.trim();
+  if (dolor !== '' && !(Number.isInteger(Number(dolor)) && Number(dolor) >= 0 && Number(dolor) <= 10)) {
+    $('#fin-error').textContent = 'Indique el dolor con un número entero de 0 a 10, o deje el campo vacío.';
+    $('#fin-dolor').focus();
+    return;
+  }
+  $('#fin-error').textContent = '';
   const manuales = {};
   document.querySelectorAll('#fin-tabla input[data-id]').forEach((i) => { manuales[i.dataset.id] = i.value; });
   const proximaCita = $('#fin-sin-cita').checked ? null : ($('#fin-cita').value || null);
-  const s = guardarSesionRutina({ dolor: $('#fin-dolor').value, notas: $('#fin-notas').value, manuales, proximaCita });
+  const s = guardarSesionRutina({ dolor, notas: $('#fin-notas').value, manuales, proximaCita });
   if (!s) return;
   cerrarFin();
   const p = estado.db.pacientes.find((x) => x.sesiones.includes(s));
@@ -363,6 +470,8 @@ function initRutina() {
     if (modoRutina === 'grabacion') pedirTerminar(); else cerrarDlgRutina();
   });
   $('#rt-regrabar').addEventListener('click', volverAGrabar);
+  $('#rt-empezar-paso').addEventListener('click', comenzarPaso);
+  $('#rt-sonido').addEventListener('click', () => { cambiarSonido(!sonidoActivo()); pintarSonido(); });
   $('#rt-anterior').addEventListener('click', () => irAPaso(-1));
   $('#rt-siguiente').addEventListener('click', () => {
     if (navBloqueada()) return;
@@ -372,6 +481,11 @@ function initRutina() {
   dlg.addEventListener('keydown', (ev) => {
     if (ev.key === 'ArrowLeft') { ev.preventDefault(); irAPaso(-1); }
     else if (ev.key === 'ArrowRight') { ev.preventDefault(); irAPaso(1); }
+    // Espacio sobre otro control (Sonido, Cuidado…) conserva su efecto normal.
+    else if (ev.key === ' ' && modoRutina === 'grabacion' && !ev.repeat && (ev.target.closest('#rt-empezar-paso, #rt-siguiente') || !ev.target.closest('button, summary'))) {
+      ev.preventDefault();
+      accionPrincipal();
+    }
     // Chrome deja de permitir cancelar el evento 'cancel' si se pulsa Esc dos veces seguidas;
     // anular la tecla evita la petición de cierre y siempre se pregunta.
     else if (ev.key === 'Escape' && modoRutina === 'grabacion') { ev.preventDefault(); pedirTerminar(); }
@@ -394,6 +508,7 @@ function initRutina() {
   // 'close' llega en una tarea aparte: si la ventana ya se volvió a abrir, no hay nada que limpiar.
   dlg.addEventListener('close', () => {
     if (dlg.open) return;
+    cancelarCuenta();
     video.pause();
     video.removeAttribute('src');
     video.load();
@@ -416,10 +531,9 @@ function initRutina() {
 
   const listos = $('#dlg-listos');
   $('#ls-cancelar').addEventListener('click', () => listos.close());
-  $('#ls-reintentar').addEventListener('click', () => {
-    if (estadoDispositivo().conectado) { calibrar(); actualizarListos(); }
-    else conectarYCalibrarListos(turnoListos);
-  });
+  $('#ls-reintentar').addEventListener('click', () => { calibrar(); actualizarListos(); });
+  $('#ls-conectar').addEventListener('click', () => conectarListos('usb'));
+  $('#ls-simulador').addEventListener('click', () => conectarListos('simulador'));
   $('#ls-empezar').addEventListener('click', empezarDesdeListos);
   listos.addEventListener('close', () => {
     if (listos.open) return;

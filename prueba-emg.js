@@ -37,6 +37,7 @@ function textoResultado(musculo, media) {
   const p = estado.db.pacientes.find((x) => x.id === mv.sesion?.pacienteId);
   const base = lineaBase(p?.sesiones ?? [])?.[musculo]?.media;
   const cambio = base ? Math.round((media / base - 1) * 100) : null;
+  if (mv.sesion?.origen === 'simulador') return `${NOMBRES_MUSCULO[musculo]}: ${media} unidades (simulado: no se compara)`;
   const detalle = cambio == null ? 'primera prueba: será la referencia' : `${cambio >= 0 ? '+' : ''}${cambio} % desde la primera prueba`;
   return `${NOMBRES_MUSCULO[musculo]}: ${media} unidades (${detalle})`;
 }
@@ -59,9 +60,11 @@ async function correrBloque() {
     $('#pr-contador').textContent = `Contracción ${i + 1} de ${CONTRACCIONES_PRUEBA}`;
     for (const n of ['3', '2', '1']) {
       $('#pr-cuenta').textContent = n;
+      tono('cuenta');
       if (!(await esperarPrueba(TIEMPOS_PRUEBA_EMG.prepara / 3, turno))) return;
     }
     $('#pr-cuenta').textContent = '¡Fuerza!';
+    tono('inicio');
     enviarPrueba(`PR,${musculo}`);
     pr.recoger = [];
     const barra = setInterval(() => {
@@ -145,7 +148,10 @@ function initPrueba() {
   const dlg = $('#dlg-prueba');
   $('#pr-siguiente').addEventListener('click', siguienteMusculo);
   $('#pr-repetir').addEventListener('click', () => { if (pr) correrBloque(); });
-  $('#pr-omitir').addEventListener('click', () => terminarPrueba(false));
+  $('#pr-omitir').addEventListener('click', () => {
+    if (Object.keys(pr?.resultados ?? {}).length && !confirm('¿Omitir la prueba? Se perderán los músculos ya medidos.')) return;
+    terminarPrueba(false);
+  });
   // Esc o cualquier cierre que no sea de la prueba cuenta como "Omitir prueba": la rutina no se pierde.
   dlg.addEventListener('cancel', (ev) => { ev.preventDefault(); terminarPrueba(false); });
   dlg.addEventListener('close', () => { if (pr) terminarPrueba(false); });

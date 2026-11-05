@@ -235,14 +235,14 @@ function procesarLinea(linea) {
       if (emg) {
         mv.conEmg = true;
         if (mv.sesion) mv.sesion.conEmg = true;
-        if (mv.paso && mv.sesion) acumularSenalEmg(mv.sesion, emg);
+        if (mv.paso && !mv.paso.enEspera && mv.sesion) acumularSenalEmg(mv.sesion, emg);
         if (typeof pruebaRecibirMuestra === 'function') pruebaRecibirMuestra(emg);
       }
       const ult = mv.buffer[mv.buffer.length - 1];
       if (ult && m.t < ult.t) mv.buffer = []; // el dispositivo se reinició
       mv.buffer.push(m);
       while (mv.buffer.length && mv.buffer[0].t < m.t - VENTANA_S) mv.buffer.shift();
-      if (mv.paso) mv.paso.muestras.push(m);
+      if (mv.paso && !mv.paso.enEspera) mv.paso.muestras.push(m);
       if (mv.ej) procesarMuestraEjercicio(m);
       break;
     }
@@ -267,7 +267,7 @@ function procesarLinea(linea) {
           pedirCalibracion(false); // terminó la del paso anterior, en su postura: falta la neutra
         } else {
           mv.paso.esperandoCal = false;
-          iniciarEjercicio(mv.paso.medicion.tipo, mv.paso.paso.reps);
+          medirPaso();
         }
       }
       renderMonitorControles();
@@ -428,7 +428,8 @@ const TEXTO_PASO_SIN_EMG = 'Este ejercicio se mide con EMG: conecte los electrod
 
 // medicion: cómo se cuenta el paso hoy (rutinas.js), o null si se cuenta a mano. Los pasos IMU con
 // `recalibrar` piden CAL en la postura del paso y empiezan a contar cuando el dispositivo responde.
-function iniciarPasoRutina(paso) {
+// antesDeMedir(medir): la rutina hace ahí la cuenta regresiva; hasta que llame a medir() no se graba nada.
+function iniciarPasoRutina(paso, antesDeMedir = (medir) => medir()) {
   if (mv.paso) finalizarPasoRutina();
   const chequeo = typeof chequeoPendiente !== 'undefined' ? chequeoPendiente : null;
   let medicion = mv.conectado ? medicionDelPaso(paso, chequeo) : null;
@@ -436,7 +437,7 @@ function iniciarPasoRutina(paso) {
   if (medicion?.fuente === 'emg' && !mv.conEmg) { medicion = null; sinEmg = true; }
   // Sin calibración válida (y sin una en curso) no se puede medir el ángulo: conteo manual.
   if (medicion?.fuente === 'imu' && !paso.recalibrar && mv.calInicio == null && !mv.cal?.ok) medicion = null;
-  mv.paso = { paso, muestras: [], medicion, sinEmg, esperandoCal: false };
+  mv.paso = { paso, muestras: [], medicion, sinEmg, esperandoCal: false, enEspera: false, antesDeMedir };
   const calDeOtraPostura = !paso.recalibrar && !!mv.cal?.postura;
   if (medicion?.fuente === 'imu' && (paso.recalibrar || mv.calInicio != null || calDeOtraPostura)) {
     // Espera la calibración: la que pide este paso (en su postura, o neutra si la vigente es de
@@ -444,10 +445,22 @@ function iniciarPasoRutina(paso) {
     mv.paso.esperandoCal = true;
     mv.transporte.enviar('EJ,-').catch(() => {});
     if (mv.calInicio == null) pedirCalibracion(!!paso.recalibrar);
-  } else if (medicion?.fuente === 'imu') iniciarEjercicio(medicion.tipo, paso.reps);
-  else if (medicion?.fuente === 'emg') iniciarEjercicioEmg(medicion.musculo, paso.reps);
-  else mv.transporte?.enviar('EJ,-').catch(() => {});
+  } else medirPaso();
   renderMonitorControles();
+}
+
+function medirPaso() {
+  const actual = mv.paso;
+  actual.enEspera = true;
+  actual.antesDeMedir(() => {
+    if (mv.paso !== actual) return; // se canceló durante la cuenta
+    actual.enEspera = false;
+    const { paso, medicion } = actual;
+    if (medicion?.fuente === 'imu') iniciarEjercicio(medicion.tipo, paso.reps);
+    else if (medicion?.fuente === 'emg') iniciarEjercicioEmg(medicion.musculo, paso.reps);
+    else mv.transporte?.enviar('EJ,-').catch(() => {});
+    renderMonitorControles();
+  });
 }
 
 // Para el contador de la rutina: 'calibrando' | 'medido' | 'sin-emg' | 'manual' (null sin paso).
@@ -589,14 +602,6 @@ async function alternarConexion() {
   await conectarCon(origen === 'usb' ? new TransporteSerial() : new TransporteSimulado(), origen);
 }
 
-/* Si no hay dispositivo conectado, conecta el simulador (la sesión queda marcada como simulada). */
-async function asegurarConexion() {
-  while (mv.conectando) await new Promise((r) => setTimeout(r, 100));
-  if (mv.conectado) return;
-  $('#mv-origen').value = 'simulador';
-  await conectarCon(new TransporteSimulado(), 'simulador');
-}
-
 async function conectarCon(t, origen) {
   t.onLinea = procesarLinea;
   t.onCierre = (motivo) => alPerderConexion(motivo);
@@ -634,7 +639,7 @@ function alPerderConexion(motivo) {
     if (mv.paso) mv.paso.registro = registro;
   }
   if (typeof pruebaPerdioConexion === 'function') pruebaPerdioConexion();
-  if (mv.paso) toast('Se perdió la conexión: los ejercicios siguientes quedarán sin datos.');
+  if (mv.paso) { toast('Se perdió la conexión: los ejercicios siguientes quedarán sin datos.'); tono('alerta'); }
   else if (motivo) toast(motivo);
   mv.conectado = false;
   mv.transporte = null;
@@ -642,6 +647,7 @@ function alPerderConexion(motivo) {
   if (mv.paso?.esperandoCal) { mv.paso.esperandoCal = false; mv.paso.medicion = null; }
   clearInterval(mv.timer);
   renderMonitor();
+  if (typeof pintarModoRutina === 'function') pintarModoRutina();
 }
 
 async function desconectar() {
@@ -689,8 +695,8 @@ function renderMonitorControles() {
   optUsb.disabled = sinSerial;
   if (sinSerial && $('#mv-origen').value === 'usb') $('#mv-origen').value = 'simulador';
   $('#mv-ayuda-conexion').textContent = sinSerial
-    ? 'Este navegador no puede conectar el dispositivo: se usará el simulador.'
-    : 'Si no hay dispositivo, la rutina usa el simulador.';
+    ? 'Este navegador no puede conectar el dispositivo (use Chrome o Edge). Solo está disponible el simulador.'
+    : 'Al empezar la rutina podrá conectar el dispositivo o elegir el simulador.';
   $('#mv-baud-wrap').hidden = $('#mv-origen').value !== 'usb';
   $('#mv-origen').disabled = $('#mv-baud').disabled = mv.conectado || mv.conectando;
 
@@ -770,7 +776,7 @@ function refrescar() {
       <div class="readout"><div class="readout-label">Máxima</div><div class="readout-value">${fmt(max, 0)}</div></div>
       ${reps}${tiempo}` : `
       <div class="readout"><div class="readout-label">${EJERCICIOS[e.tipo].corto} — ángulo actual</div><div class="readout-value">${fmt(actual, 0)}°</div></div>
-      <div class="readout"><div class="readout-label">Máximo alcanzado</div><div class="readout-value">${fmt(max, 0)}° <small>${fmt((max / EJERCICIOS[e.tipo].ref) * 100)} % ref.</small></div></div>
+      <div class="readout"><div class="readout-label">Máximo alcanzado</div><div class="readout-value">${fmt(max, 0)}° <small>${fmt((max / EJERCICIOS[e.tipo].ref) * 100)} % de lo normal</small></div></div>
       ${reps}${tiempo}`;
   } else {
     $('#mv-lecturas').innerHTML = Object.entries(CANALES).map(([k, c]) =>
@@ -782,6 +788,7 @@ function refrescar() {
 
 function crearChartVivo() {
   const base = { borderWidth: 2, pointRadius: 0, tension: 0, data: [] };
+  if (typeof Chart === 'undefined') return;
   mv.chart = nuevoChart('chart-vivo', {
     type: 'line',
     data: {
@@ -810,6 +817,7 @@ function crearChartVivo() {
 function actualizarChartVivo() {
   if (!$('#det-tecnicos').open) return; // plegado: se dibuja al abrir
   if (!mv.chart) crearChartVivo();
+  if (!mv.chart) return;
   const ds = mv.chart.data.datasets;
   const b = mv.buffer;
   const tUlt = b.length ? b[b.length - 1].t : 0;

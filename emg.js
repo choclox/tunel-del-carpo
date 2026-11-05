@@ -31,9 +31,9 @@ function resumenBloque(picos) {
   return { picos, media, dudosa: picos.some((x) => x < 0.7 * media) };
 }
 
-// Prueba de la sesión más antigua (por fecha) que la tenga: es la referencia (100 %).
+// Prueba de la sesión real más antigua (por fecha) que la tenga: es la referencia (100 %).
 function lineaBase(sesiones) {
-  const con = sesiones.filter((s) => s.emg?.prueba).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const con = sesiones.filter((s) => s.emg?.prueba && s.origen !== 'simulador').sort((a, b) => a.fecha.localeCompare(b.fecha));
   return con.length ? con[0].emg.prueba : null;
 }
 

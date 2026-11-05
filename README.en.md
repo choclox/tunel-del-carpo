@@ -18,7 +18,7 @@ Full documentation in Spanish: [README.md](README.md).
 ## Signal processing
 
 - **Repetition counting:** hysteresis thresholds relative to the rest position, on a 5-sample moving average (~100 ms). Thresholds adapt to the amplitude of previous repetitions (IMU: rise = max(8°, 50% of typical amplitude), fall = max(3°, 25%); EMG: rise = max(60, 50% of median peak), fall = max(25, 25%)).
-- **EMG strength test:** per-muscle strength relative to the patient's first test, a **median-nerve index** (thenar ÷ extensors, normalized) and a **co-contraction** ratio (extensor activity during flexor contraction).
+- **EMG activation test:** per-muscle activation relative to the patient's first test, a **thenar/extensor ratio** (thenar ÷ extensors, normalized; not a nerve conduction test) and a **co-contraction** ratio (extensor activity during flexor contraction).
 - **Data quality:** sample-rate monitoring, packet-loss detection from sequence numbers (target < 1%) and calibration-time checks.
 
 ## Testing

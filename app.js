@@ -27,10 +27,16 @@ function cargarDB() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const db = JSON.parse(raw);
-      if (db && Array.isArray(db.pacientes)) return db;
+      if (db && Array.isArray(db.pacientes)) return marcarEjemplos(db);
     }
   } catch (e) { /* almacenamiento no disponible: se usa la demo en memoria */ }
   return generarDemo();
+}
+// Los pacientes de demostración guardados antes de existir la marca también se muestran como ejemplo.
+function marcarEjemplos(db) {
+  const demo = new Map(generarDemo().pacientes.map((p) => [p.id, p.nombre]));
+  db.pacientes.forEach((p) => { if (demo.get(p.id) === p.nombre) p.ejemplo = true; });
+  return db;
 }
 function guardarDB() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(estado.db)); return true; }
@@ -58,9 +64,12 @@ function dias(desdeISO, hastaISO) {
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg;
+  // Como popover vuelve a la capa superior: se ve encima de una ventana modal abierta.
+  if (t.matches(':popover-open')) t.hidePopover();
+  t.showPopover();
   t.classList.add('show');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+  toast._t = setTimeout(() => { t.classList.remove('show'); t.hidePopover(); }, 2600);
 }
 
 const ic = (nombre, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${nombre}"/></svg>`;
@@ -68,6 +77,8 @@ const iniciales = (nombre) => nombre.split(/\s+/).filter(Boolean).slice(0, 2).ma
 
 const paciente = () => estado.db.pacientes.find((p) => p.id === estado.pacienteId);
 const sesionesOrdenadas = (p) => [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
+// Las que cuentan en resúmenes, gráficas y avisos (las simuladas siguen visibles en Una sesión y Reporte).
+const sesionesSeguimiento = (p) => sesionesClinicas(sesionesOrdenadas(p));
 const ejercicioDe = (s, tipo) => s.ejercicios.find((e) => e.tipo === tipo);
 
 /* Promedio del % del valor de referencia alcanzado en una sesión (tope 100 % por ejercicio). */
@@ -88,6 +99,7 @@ function metricas(s) {
     velocidad: prom(ej.map((e) => e.velocidadMedia)),
     variabilidad: prom(ej.map((e) => e.variabilidadPct)),
     duracion: s.duracionMin,
+    hormigueo: { no: 0, leve: 1, fuerte: 2 }[s.chequeo?.hormigueo] ?? null,
   };
 }
 
@@ -96,13 +108,15 @@ const INDICADORES = {
   dolor:        { titulo: 'Dolor reportado (EVA)', unidad: '', desc: 'Escala visual análoga 0–10 reportada por el paciente al final de la sesión.', mejorSube: false, min: 0, max: 10, d: 0 },
   velocidad:    { titulo: 'Velocidad angular media', unidad: '°/s', desc: 'Promedio de la velocidad angular media de los ejercicios.', mejorSube: true, min: 0, d: 1 },
   variabilidad: { titulo: 'Variabilidad entre repeticiones', unidad: '%', desc: 'Coeficiente de variación de la amplitud entre repeticiones (menor = más consistente).', mejorSube: false, min: 0, d: 1 },
+  hormigueo:    { titulo: 'Hormigueo o adormecimiento', unidad: '', desc: 'Reportado en el chequeo de cada sesión: 0 no, 1 leve, 2 fuerte.', mejorSube: false, min: 0, max: 2, d: 0 },
   duracion:     { titulo: 'Duración de la sesión', unidad: 'min', desc: 'Tiempo total de la sesión registrada por el dispositivo.', mejorSube: null, min: 0, d: 0 },
 };
 
 /* ======================= Tema de las gráficas ======================= */
 function aplicarTemaCharts() {
+  if (typeof Chart === 'undefined') return;
   Chart.defaults.font.family = css('--font') || 'system-ui, sans-serif';
-  Chart.defaults.font.size = 12;
+  Chart.defaults.font.size = 13;
   Chart.defaults.color = css('--ink-2');
   Chart.defaults.borderColor = css('--grid');
   Chart.defaults.animation = false;
@@ -132,29 +146,44 @@ function ejeY(titulo, extra = {}) {
 function ejeX(extra = {}) {
   return { grid: { display: false }, border: { color: css('--axis') }, ticks: { color: css('--muted') }, ...extra };
 }
+// Lo que dice cada gráfica para lectores de pantalla; las cifras están en las tablas y tarjetas vecinas.
+const DESCRIPCION_GRAFICAS = {
+  'chart-rom': 'Ángulo máximo de cada ejercicio por sesión. Las cifras de cada sesión están en Una sesión.',
+  'chart-ind': 'Evolución del indicador elegido por sesión.',
+  'chart-emg': 'Activación de cada músculo por sesión, en porcentaje de la primera prueba.',
+  'chart-emg-senal': 'Señal EMG de los tres músculos durante la rutina.',
+  'chart-senal': 'Señal del sensor durante el ejercicio elegido.',
+  'chart-cmp': 'Comparación del ángulo máximo entre las dos sesiones. Las cifras están en la tabla de abajo.',
+  'chart-vivo': 'Señal en tiempo real del dispositivo.',
+};
+
 function nuevoChart(id, config) {
+  if (typeof Chart === 'undefined') return null; // sin CDN: el panel sigue funcionando sin gráficas
+  const lienzo = document.getElementById(id);
+  lienzo.setAttribute('role', 'img');
+  lienzo.setAttribute('aria-label', DESCRIPCION_GRAFICAS[id] ?? 'Gráfica');
   if (charts[id]) charts[id].destroy();
-  charts[id] = new Chart(document.getElementById(id), config);
+  charts[id] = new Chart(lienzo, config);
   return charts[id];
 }
 
 /* ======================= Lista de pacientes ======================= */
 function renderLista() {
-  const q = estado.busqueda.toLowerCase();
   const lista = estado.db.pacientes
     .filter((p) => estado.verArchivados || !p.archivado)
-    .filter((p) => !q || p.nombre.toLowerCase().includes(q) || (p.documento ?? '').includes(q) || p.id.toLowerCase().includes(q))
+    .filter((p) => coincideBusqueda(p, estado.busqueda))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
   $('#lista-pacientes').innerHTML = lista.map((p) => {
-    const ses = sesionesOrdenadas(p);
+    const ses = sesionesSeguimiento(p);
     const ult = ses[ses.length - 1];
     const prog = progresoGlobal(ult);
-    return `<li class="patient-item ${p.id === estado.pacienteId && estado.pantalla === 'paciente' ? 'active' : ''}" data-id="${esc(p.id)}" tabindex="0">
+    const actual = p.id === estado.pacienteId && estado.pantalla === 'paciente';
+    return `<li class="patient-item ${actual ? 'active' : ''}" data-id="${esc(p.id)}" role="button" tabindex="0"${actual ? ' aria-current="true"' : ''}>
       <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
       <span class="pi-name">${esc(p.nombre)}</span>
-      <span class="pi-meta"><span>${esc(p.id)} · Mano ${esc(p.mano.toLowerCase())}${p.archivado ? ' · <b>Dado de alta</b>' : ''}</span><span>${dias(p.fechaCirugia, hoyISO())} d post-op</span></span>
+      <span class="pi-meta"><span>${esc(p.id)} · Mano ${esc(p.mano.toLowerCase())}${p.ejemplo ? ' · Ejemplo' : ''}${p.archivado ? ' · <b>Dado de alta</b>' : ''}</span><span>${dias(p.fechaCirugia, hoyISO())} d post-op</span></span>
       <span class="pi-meta"><span>${ult ? 'Última: ' + fmtFecha(ult.fecha, true) : 'Sin sesiones'} · ${ses.length} ses.</span><span>${prog == null ? '' : fmt(prog) + ' %'}</span></span>
-      ${prog == null ? '' : `<span></span><span class="pi-bar" title="Progreso global: ${fmt(prog)} % del valor de referencia"><span style="width:${prog}%"></span></span>`}
+      ${prog == null ? '' : `<span></span><span class="pi-bar" title="Movimiento: ${fmt(prog)} % de lo normal"><span style="width:${prog}%"></span></span>`}
     </li>`;
   }).join('') || '<li class="muted" style="padding:12px">Sin resultados</li>';
 }
@@ -174,6 +203,10 @@ function seleccionarPaciente(id) {
   estado.cmpB = ses.length ? ses[ses.length - 1].id : null;
   renderLista();
   renderPaciente();
+  // En móvil la lista va plegada: al elegir se cierra y se ve el paciente desde arriba.
+  $('.sidebar').classList.remove('abierta');
+  $('#nav-pacientes').setAttribute('aria-expanded', 'false');
+  if (matchMedia('(max-width: 760px)').matches) scrollTo(0, 0);
 }
 
 /* ======================= Vista del paciente ======================= */
@@ -195,7 +228,7 @@ function renderEncabezado(p) {
       <span class="avatar" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
       <div>
         <h1 class="enc-nombre">${esc(p.nombre)}</h1>
-        <p class="enc-sub">Mano ${esc(p.mano.toLowerCase())} · ${dpo} días desde la cirugía · Fase ${etapaSugerida(p.fechaCirugia, hoyISO())} sugerida</p>
+        <p class="enc-sub">${p.ejemplo ? 'Paciente de ejemplo · ' : ''}Mano ${esc(p.mano.toLowerCase())} · ${dpo} días desde la cirugía · Fase ${etapaSugerida(p.fechaCirugia, hoyISO())} sugerida</p>
       </div>
     </div>
     <details class="enc-ficha">
@@ -221,8 +254,9 @@ function deltaHTML(valor, mejorSube, unidad, d = 0, ref = 'vs. sesión anterior'
 }
 
 function renderResumen(p) {
-  const ses = sesionesOrdenadas(p);
+  const ses = sesionesSeguimiento(p);
   const ult = ses[ses.length - 1], prev = ses[ses.length - 2], primera = ses[0];
+  if (!ult) { $('#resumen-tarjetas').innerHTML = '<p class="muted">Solo hay sesiones simuladas: no cuentan en el seguimiento.</p>'; return; }
   const prog = progresoGlobal(ult), prog0 = progresoGlobal(primera);
   const tarjeta = (icono, titulo, valor, pie) => `<div class="kpi">
       <span class="icon-bubble">${ic(icono)}</span>
@@ -231,9 +265,9 @@ function renderResumen(p) {
       <div class="kpi-delta">${pie}</div>
     </div>`;
   $('#resumen-tarjetas').innerHTML =
-    tarjeta('trend', 'Avance', prog == null ? '—' : `${fmt(prog)} %`,
+    tarjeta('trend', `Movimiento${botonTermino('movimiento')}`, prog == null ? '—' : `${fmt(prog)} % <small>de lo normal</small>`,
       deltaHTML(ses.length > 1 && prog != null && prog0 != null ? prog - prog0 : null, true, ' puntos', 0, 'desde la primera sesión')) +
-    tarjeta('heart', 'Dolor', `${ult.dolorEVA ?? '—'} <small>/ 10</small>`,
+    tarjeta('heart', `Dolor${botonTermino('dolor')}`, `${ult.dolorEVA ?? '—'} <small>/ 10</small>`,
       deltaHTML(prev && ult.dolorEVA != null && prev.dolorEVA != null ? ult.dolorEVA - prev.dolorEVA : null, false, '', 0, 'vs. sesión anterior')) +
     tarjeta('calendar', 'Última sesión', fmtFecha(ult.fecha, true),
       `<span class="muted">hace ${plural(dias(ult.fecha, hoyISO()), 'día', 'días')}</span>`) +
@@ -244,18 +278,22 @@ function renderResumen(p) {
 const COLOR_MUSCULO = { tenar: '--s2', flexores: '--s3', extensores: '--s7' };
 const conPruebaEmg = (ses) => ses.filter((s) => s.emg?.prueba);
 
-// Índice del nervio mediano de la última sesión con prueba EMG.
+// Razón tenar/extensores de la última sesión con prueba EMG.
 function tarjetaMusculo(ses, tarjeta) {
   const pruebas = conPruebaEmg(ses);
-  if (!pruebas.length) return tarjeta('activity', 'Músculo', '—', '<span class="muted">Sin prueba EMG (empieza en la Fase 2)</span>');
-  const m = medidasEmg(pruebas[pruebas.length - 1].emg.prueba, lineaBase(ses));
-  return tarjeta('activity', 'Músculo', m.indiceMediano == null ? '—' : `${fmt(m.indiceMediano)} %`,
-    deltaHTML(m.indiceMediano == null ? null : m.indiceMediano - 100, true, ' puntos', 0, 'índice del nervio mediano · desde la primera prueba'));
+  const titulo = `Tenar/extensores${botonTermino('razon')}`;
+  if (!pruebas.length) return tarjeta('activity', titulo, '—', '<span class="muted">Sin prueba EMG (empieza en la Fase 2)</span>');
+  const base = lineaBase(ses);
+  const m = medidasEmg(pruebas[pruebas.length - 1].emg.prueba, base);
+  const previo = pruebas.length > 1 ? medidasEmg(pruebas[pruebas.length - 2].emg.prueba, base).indiceMediano : null;
+  // Frente a la prueba anterior, como el estado de Reporte.
+  return tarjeta('activity', titulo, m.indiceMediano == null ? '—' : `${fmt(m.indiceMediano)} %`,
+    deltaHTML(m.indiceMediano == null ? null : previo != null ? m.indiceMediano - previo : m.indiceMediano - 100, true, ' puntos', 0, previo != null ? 'vs. prueba anterior' : 'desde la primera prueba'));
 }
 
 // Gráfica plegada de Resumen: % de la primera prueba por músculo y sesión (huecos sin prueba).
 function renderEmg(p) {
-  const ses = sesionesOrdenadas(p);
+  const ses = sesionesSeguimiento(p);
   const base = lineaBase(ses);
   const clave = { tenar: 'tenarPct', flexores: 'flexoresPct', extensores: 'extensoresPct' };
   nuevoChart('chart-emg', {
@@ -280,7 +318,7 @@ function renderEmg(p) {
   });
 }
 
-// Tarjeta "Prueba de fuerza muscular" y señal EMG de la sesión elegida.
+// Tarjeta "Prueba de activación muscular" y señal EMG de la sesión elegida.
 function renderEmgSesion(s, p) {
   const prueba = s.emg?.prueba;
   $('#sesion-emg').hidden = !prueba;
@@ -293,8 +331,8 @@ function renderEmgSesion(s, p) {
         <td class="num">${prueba[k].picos.map((x) => `<span class="emg-pico">${fmt(x)}</span>`).join(' · ')}</td>
         <td class="num">${fmt(prueba[k].media)} <span class="muted">(${pctDe[k] == null ? '—' : fmt(pctDe[k]) + ' %'})</span></td>
       </tr>`).join('')}</tbody>`;
-    $('#sesion-emg-cocontraccion').innerHTML = `<b>Co-contracción:</b> ${m.cocontraccion == null ? '—' : fmt(m.cocontraccion) + ' %'}
-      <span class="muted">· índice del nervio mediano: ${m.indiceMediano == null ? '—' : fmt(m.indiceMediano) + ' %'}</span>`;
+    $('#sesion-emg-cocontraccion').innerHTML = `<b>Co-contracción:</b> ${m.cocontraccion == null ? '—' : fmt(m.cocontraccion) + ' %'}${botonTermino('cocontraccion')}
+      <span class="muted">· razón tenar/extensores: ${m.indiceMediano == null ? '—' : fmt(m.indiceMediano) + ' %'}</span>${botonTermino('razon')}`;
   }
   const senal = s.emg?.senal;
   const haySenal = !!senal && MUSCULOS.some((k) => senal[k]?.length);
@@ -332,7 +370,10 @@ function renderSeccion() {
     else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('section.seccion').forEach((s) => (s.hidden = s.dataset.seccion !== estado.seccion));
-  document.querySelectorAll('#seg-vistas .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.vista === estado.vista));
+  document.querySelectorAll('#seg-vistas .seg-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.vista === estado.vista);
+    b.setAttribute('aria-pressed', String(b.dataset.vista === estado.vista));
+  });
   document.querySelectorAll('.vista').forEach((v) => (v.hidden = v.dataset.vista !== estado.vista));
   const p = paciente();
   if (!p) return;
@@ -353,7 +394,7 @@ function renderSeccion() {
 /* ---------- Evolución ---------- */
 function renderEvolucion(p) {
   renderResumen(p);
-  const ses = sesionesOrdenadas(p);
+  const ses = sesionesSeguimiento(p);
   const labels = ses.map((s) => fmtFecha(s.fecha, true));
   const pct = estado.romModo === 'pct';
 
@@ -400,7 +441,7 @@ function renderEvolucion(p) {
       },
       scales: {
         x: ejeX(),
-        y: ejeY(pct ? '% del valor de referencia' : 'Ángulo máximo (°)', { beginAtZero: true, suggestedMax: pct ? 100 : undefined }),
+        y: ejeY(pct ? '% de lo normal' : 'Ángulo máximo (°)', { beginAtZero: true, suggestedMax: pct ? 100 : undefined }),
       },
     },
   });
@@ -412,7 +453,7 @@ function renderEvolucion(p) {
 
 /* Gráfica del indicador elegido; vive en un <details> y se dibuja solo cuando está abierto. */
 function renderIndicador(p) {
-  const ses = sesionesOrdenadas(p);
+  const ses = sesionesSeguimiento(p);
   const labels = ses.map((s) => fmtFecha(s.fecha, true));
   const ind = INDICADORES[estado.indicador];
   $('#ind-titulo').textContent = ind.titulo;
@@ -458,15 +499,19 @@ function renderIndicador(p) {
 }
 
 /* Avisos automáticos de un paciente (sin DOM): los usan Seguimiento › Resumen y el Resumen de la sesión. */
-function calcularObservaciones(p, ses) {
-  const obs = []; // {nivel: critical|warning|good|info, texto}
+function calcularObservaciones(p, sesiones) {
+  const ses = sesionesClinicas(sesiones); // una sesión simulada no tapa un problema ni crea uno
+  const obs = []; // {nivel: critical|warning|good|info, texto, accion?}
   const n = ses.length;
   if (!n) return [];
   const ult = ses[n - 1], prev = ses[n - 2], primera = ses[0];
 
+  const noHecha = noRealizadaPendiente(p, ses);
+  if (noHecha) obs.push({ nivel: 'critical', texto: `<b>Sesión no realizada (${fmtFecha(noHecha.fecha, true)}):</b> ${esc(noHecha.motivos.join('; '))}.`, accion: 'Confirme con el médico tratante antes de la próxima sesión.' });
+
   // Calidad de datos de la última sesión (criterios de éxito del brief)
-  if (ult.perdidaDatosPct >= 1) obs.push({ nivel: 'critical', texto: `<b>Calidad de datos:</b> la última sesión registró ${fmt(ult.perdidaDatosPct, 1)} % de pérdida de datos (criterio &lt; 1 %). Interpretar con precaución.` });
-  if (ult.calibracion && (!ult.calibracion.ok || ult.calibracion.tiempoS > 30)) obs.push({ nivel: 'warning', texto: `<b>Calibración:</b> la última calibración ${ult.calibracion.ok ? `tardó ${fmt(ult.calibracion.tiempoS, 1)} s (criterio ≤ 30 s)` : 'reportó errores'}.` });
+  if (ult.perdidaDatosPct >= 1) obs.push({ nivel: 'critical', texto: `<b>Calidad de datos:</b> la última sesión registró ${fmt(ult.perdidaDatosPct, 1)} % de pérdida de datos (criterio &lt; 1 %). Interpretar con precaución.`, accion: 'Revise la conexión del dispositivo y repita la medición antes de comparar.' });
+  if (ult.calibracion && (!ult.calibracion.ok || ult.calibracion.tiempoS > 30)) obs.push({ nivel: 'warning', texto: `<b>Calibración:</b> la última calibración ${ult.calibracion.ok ? `tardó ${fmt(ult.calibracion.tiempoS, 1)} s (criterio ≤ 30 s)` : 'reportó errores'}.`, accion: 'Repita la calibración antes de la próxima medición.' });
 
   ORDEN_EJERCICIOS.forEach((tipo) => {
     const e = EJERCICIOS[tipo];
@@ -474,20 +519,24 @@ function calcularObservaciones(p, ses) {
     if (v == null) return;
     if (prev) {
       const vp = ejercicioDe(prev, tipo)?.anguloMax;
-      if (vp && (vp - v) / vp > 0.08) obs.push({ nivel: 'warning', texto: `<b>${e.nombre}:</b> disminuyó ${fmt(((vp - v) / vp) * 100)} % respecto a la sesión anterior (${fmt(vp)}° → ${fmt(v)}°).` });
+      if (vp && (vp - v) / vp > 0.08) obs.push({ nivel: 'warning', texto: `<b>${e.nombre}:</b> disminuyó ${fmt(((vp - v) / vp) * 100)} % respecto a la sesión anterior (${fmt(vp)}° → ${fmt(v)}°).`, accion: 'Confirme la medición y pregunte si hubo dolor o rigidez.' });
     }
     if (n >= 4) {
       // Solo sesiones con el ejercicio medido; hacen falta al menos 2 valores reales.
       const ult3 = ses.slice(-3).map((s) => ejercicioDe(s, tipo)?.anguloMax).filter((x) => x != null);
       const rango = Math.max(...ult3) - Math.min(...ult3);
-      if (ult3.length >= 2 && rango < 3 && v / e.ref < 0.85) obs.push({ nivel: 'info', texto: `<b>${e.nombre}:</b> sin cambios mayores a 3° en las últimas 3 sesiones (${fmt(v)}°, ${fmt((v / e.ref) * 100)} % de referencia).` });
+      if (ult3.length >= 2 && rango < 3 && v / e.ref < 0.85) obs.push({ nivel: 'info', texto: `<b>${e.nombre}:</b> sin cambios mayores a 3° en las últimas 3 sesiones (${fmt(v)}°, ${fmt((v / e.ref) * 100)} % de lo normal).`, accion: 'Valore si conviene ajustar la rutina.' });
     }
   });
 
   if (!ult.ejercicios.length) obs.push({ nivel: 'info', texto: '<b>Última sesión:</b> no tiene ejercicios medidos por el dispositivo, así que no hay datos de movimiento para comparar.' });
 
   if (prev && ult.dolorEVA != null && prev.dolorEVA != null && ult.dolorEVA - prev.dolorEVA >= 2) {
-    obs.push({ nivel: 'warning', texto: `<b>Dolor reportado:</b> aumentó de ${prev.dolorEVA} a ${ult.dolorEVA} (EVA) respecto a la sesión anterior.` });
+    obs.push({ nivel: 'warning', texto: `<b>Dolor reportado:</b> aumentó de ${prev.dolorEVA} a ${ult.dolorEVA} (EVA) respecto a la sesión anterior.`, accion: 'Pregunte qué cambió y valore bajar de fase.' });
+  }
+  const dolorAntes = ult.chequeo?.dolorAntes;
+  if (dolorAntes != null && ult.dolorEVA != null && ult.dolorEVA - dolorAntes >= 2) {
+    obs.push({ nivel: 'warning', texto: `<b>Dolor durante la sesión:</b> subió de ${dolorAntes} a ${ult.dolorEVA}.`, accion: 'Revise qué ejercicio lo aumentó antes de repetir la rutina.' });
   }
 
   if (n >= 2) {
@@ -501,24 +550,26 @@ function calcularObservaciones(p, ses) {
     if (c0 != null && c1 != null && c1 < c0 - 1) obs.push({ nivel: 'good', texto: `<b>Consistencia:</b> la variabilidad entre repeticiones bajó de ${fmt(c0, 1)} % a ${fmt(c1, 1)} %.` });
   }
 
-  // EMG: índice del nervio mediano frente a la prueba anterior y co-contracción de la última prueba.
+  // EMG: razón tenar/extensores frente a la prueba anterior y co-contracción de la última prueba.
   const pruebas = conPruebaEmg(ses);
   if (pruebas.length) {
     const base = lineaBase(ses);
     const mUlt = medidasEmg(pruebas[pruebas.length - 1].emg.prueba, base);
     const mPrev = pruebas.length > 1 ? medidasEmg(pruebas[pruebas.length - 2].emg.prueba, base) : null;
     if (mPrev?.indiceMediano && mUlt.indiceMediano != null && (mPrev.indiceMediano - mUlt.indiceMediano) / mPrev.indiceMediano > 0.15) {
-      obs.push({ nivel: 'warning', texto: `<b>Índice del nervio mediano:</b> bajó ${fmt(((mPrev.indiceMediano - mUlt.indiceMediano) / mPrev.indiceMediano) * 100)} % respecto a la prueba anterior (${fmt(mPrev.indiceMediano)} % → ${fmt(mUlt.indiceMediano)} %).` });
+      obs.push({ nivel: 'warning', texto: `<b>Razón tenar/extensores:</b> bajó ${fmt(((mPrev.indiceMediano - mUlt.indiceMediano) / mPrev.indiceMediano) * 100)} % respecto a la prueba anterior (${fmt(mPrev.indiceMediano)} % → ${fmt(mUlt.indiceMediano)} %).`, accion: 'Repita la prueba y revise los electrodos antes de sacar conclusiones.' });
     }
     if (mUlt.cocontraccion != null && mUlt.cocontraccion > 30) {
-      obs.push({ nivel: 'info', texto: `<b>Co-contracción:</b> al apretar, los extensores se activaron al ${fmt(mUlt.cocontraccion)} % de los flexores (más de 30 %).` });
+      obs.push({ nivel: 'info', texto: `<b>Co-contracción:</b> al apretar, los extensores se activaron al ${fmt(mUlt.cocontraccion)} % de los flexores (más de 30 %).`, accion: 'Observe si el paciente logra relajar los extensores al apretar.' });
     }
   }
 
   const sinSesion = dias(ult.fecha, hoyISO());
-  if (sinSesion > 10) obs.push({ nivel: 'info', texto: `<b>Seguimiento:</b> han pasado ${sinSesion} días desde la última sesión registrada.` });
+  if (sinSesion > 10) obs.push({ nivel: 'info', texto: `<b>Seguimiento:</b> han pasado ${sinSesion} días desde la última sesión registrada.`, accion: 'Contacte al paciente para programar la próxima sesión.' });
   return obs;
 }
+
+const htmlSugerencia = (o) => (o.accion ? `<small class="obs-accion">Sugerencia: ${o.accion}</small>` : '');
 
 function renderObservaciones(p, ses) {
   if (!ses.length) { $('#observaciones').innerHTML = '<li class="muted">Sin sesiones registradas.</li>'; return; }
@@ -528,7 +579,7 @@ function renderObservaciones(p, ses) {
   const icono = { critical: '!', warning: '!', info: 'i', good: '✓' };
   const etiqueta = { critical: 'Crítico', warning: 'Atención', info: 'Información', good: 'Favorable' };
   const { visibles, ocultas } = recortarObservaciones(obs, 3);
-  const item = (o) => `<li class="obs obs-${o.nivel}"><span class="obs-icon" role="img" aria-label="${etiqueta[o.nivel]}" title="${etiqueta[o.nivel]}">${icono[o.nivel]}</span><span>${o.texto}</span></li>`;
+  const item = (o) => `<li class="obs obs-${o.nivel}"><span class="obs-icon" role="img" aria-label="${etiqueta[o.nivel]}" title="${etiqueta[o.nivel]}">${icono[o.nivel]}</span><span>${o.texto}${htmlSugerencia(o)}</span></li>`;
   $('#observaciones').innerHTML = visibles.map(item).join('') +
     ocultas.map((o) => item(o).replace('<li class="obs', '<li hidden class="obs obs-extra')).join('');
   const mas = $('#obs-mas');
@@ -538,7 +589,20 @@ function renderObservaciones(p, ses) {
 
 /* ---------- Detalle de sesión ---------- */
 function opcionesSesiones(ses, seleccion) {
-  return ses.map((s, i) => `<option value="${esc(s.id)}" ${s.id === seleccion ? 'selected' : ''}>Sesión ${i + 1} — ${fmtFecha(s.fecha)}</option>`).reverse().join('');
+  return ses.map((s, i) => `<option value="${esc(s.id)}" ${s.id === seleccion ? 'selected' : ''}>Sesión ${i + 1} — ${fmtFecha(s.fecha)}${esSimulada(s) ? ' (simulada)' : ''}</option>`).reverse().join('');
+}
+
+function renderChequeoSesion(s) {
+  const c = s.chequeo;
+  $('#sesion-chequeo').hidden = !c;
+  if (!c) return;
+  const herida = { bien: 'Bien', enrojecida: 'Enrojecida o con secreción', abierta: 'Abierta' }[c.herida] ?? c.herida;
+  const decision = c.continuoBajoCriterio ? 'Continuó bajo criterio del profesional' : 'Continuó';
+  const fase = c.faseAdelantada ? `Fase ${c.faseAdelantada.elegida} elegida; sugerida: Fase ${c.faseAdelantada.sugerida}` : null;
+  const fila = (k, v) => `<dt>${k}</dt><dd>${esc(v)}</dd>`;
+  $('#sesion-chequeo-datos').innerHTML = fila('Dolor antes', `${c.dolorAntes}/10`) + fila('Dolor después', s.dolorEVA == null ? '—' : `${s.dolorEVA}/10`) +
+    fila('Hormigueo', c.hormigueo === 'no' ? 'No' : c.hormigueo === 'leve' ? 'Leve' : 'Fuerte') + fila('Herida', herida) +
+    fila('Recomendación', RECOMENDACION[c.nivel] ?? '—') + fila('Decisión', decision) + (fase ? fila('Fase', fase) : '');
 }
 
 function renderSesion(p) {
@@ -546,7 +610,8 @@ function renderSesion(p) {
   if (!ses.length) return;
   if (!ses.some((s) => s.id === estado.sesionId)) estado.sesionId = ses[ses.length - 1].id;
   const idx = ses.findIndex((s) => s.id === estado.sesionId);
-  const s = ses[idx], prev = ses[idx - 1];
+  const s = ses[idx];
+  const prev = esSimulada(s) ? undefined : sesionesClinicas(ses.slice(0, idx)).pop();
 
   $('#sesion-select').innerHTML = opcionesSesiones(ses, s.id);
   $('#sesion-meta').textContent = `Sesión ${idx + 1} de ${ses.length} · ${fmtFecha(s.fecha)} · ${dias(p.fechaCirugia, s.fecha)} días post-operatorio · ${s.duracionMin} min`;
@@ -557,10 +622,12 @@ function renderSesion(p) {
   const avisos = [];
   if (!calOk) avisos.push(['warning', s.calibracion?.ok ? `Calibración lenta (${fmt(s.calibracion.tiempoS, 1)} s)` : 'Calibración con errores']);
   if (!perdidaOk) avisos.push(['critical', `Se perdieron datos (${fmt(s.perdidaDatosPct, 2)} %)`]);
-  if (s.origen === 'simulador') avisos.push(['warning', 'Datos del simulador']);
+  if (esSimulada(s)) avisos.push(['warning', 'Sesión simulada: no cuenta en el seguimiento']);
+  else if (p.ejemplo) avisos.push(['warning', 'Datos de ejemplo']);
   $('#sesion-calidad').innerHTML = avisos.length
     ? avisos.map(([dot, txt]) => `<span class="badge"><span class="dot ${dot}"></span>${txt}</span>`).join('')
     : '<span class="badge"><span class="dot good"></span>✓ Datos confiables</span>';
+  renderChequeoSesion(s);
 
   const filas = ORDEN_EJERCICIOS.map((tipo) => {
     const e = ejercicioDe(s, tipo);
@@ -678,7 +745,7 @@ function renderComparar(p) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { position: 'top', align: 'end' },
-        tooltip: { filter: (it) => it.parsed.y != null, callbacks: { label: (c) => ` ${c.dataset.label.split(' (')[0]}: ${fmt(c.parsed.y, 1)}° (${fmt((c.parsed.y / EJERCICIOS[tipos[c.dataIndex]].ref) * 100)}% ref.)` } },
+        tooltip: { filter: (it) => it.parsed.y != null, callbacks: { label: (c) => ` ${c.dataset.label.split(' (')[0]}: ${fmt(c.parsed.y, 1)}° (${fmt((c.parsed.y / EJERCICIOS[tipos[c.dataIndex]].ref) * 100)} % de lo normal)` } },
       },
       scales: { x: ejeX(), y: ejeY('Ángulo máximo (°)', { beginAtZero: true }) },
     },
@@ -796,7 +863,7 @@ function importarJSON(texto) {
 function exportarCSV(p) {
   const enc = ['paciente_id', 'sesion_id', 'fecha', 'dias_postop', 'duracion_min', 'dolor_eva', 'perdida_datos_pct', 'calibracion_s',
     'ejercicio', 'repeticiones', 'repeticiones_objetivo', 'angulo_max', 'angulo_min', 'velocidad_media', 'variabilidad_pct', 'duracion_s',
-    'emg_tenar', 'emg_flexores', 'emg_extensores', 'emg_tenar_pct', 'emg_flexores_pct', 'emg_extensores_pct', 'indice_mediano_pct', 'cocontraccion_pct'];
+    'emg_tenar', 'emg_flexores', 'emg_extensores', 'emg_tenar_pct', 'emg_flexores_pct', 'emg_extensores_pct', 'indice_mediano_pct', 'cocontraccion_pct', 'origen'];
   const filas = [enc.join(';')];
   const base = lineaBase(p.sesiones);
   // Columnas EMG por sesión (vacías si la sesión no tiene prueba de fuerza).
@@ -809,7 +876,7 @@ function exportarCSV(p) {
   // Una sesión sin ejercicios medidos sale en una fila con las columnas del ejercicio vacías.
   sesionesOrdenadas(p).forEach((s) => (s.ejercicios.length ? s.ejercicios : [{}]).forEach((e) => {
     filas.push([p.id, s.id, s.fecha, dias(p.fechaCirugia, s.fecha), s.duracionMin, s.dolorEVA ?? '', s.perdidaDatosPct, s.calibracion?.tiempoS ?? '',
-      e.tipo, e.repeticiones, e.repeticionesObjetivo, e.anguloMax, e.anguloMin, e.velocidadMedia, e.variabilidadPct, e.duracionS, ...columnasEmg(s)]
+      e.tipo, e.repeticiones, e.repeticionesObjetivo, e.anguloMax, e.anguloMin, e.velocidadMedia, e.variabilidadPct, e.duracionS, ...columnasEmg(s), s.origen]
       .map((v) => String(v ?? '').replace('.', ',')).join(';'));
   }));
   descargar(`${p.id}_sesiones.csv`, '﻿' + filas.join('\r\n'), 'text/csv;charset=utf-8');
@@ -873,7 +940,10 @@ function init() {
   document.querySelectorAll('#seg-vistas .seg-btn').forEach((b) => b.addEventListener('click', () => irA('seguimiento', b.dataset.vista)));
   document.querySelectorAll('#rom-modo .seg-btn').forEach((b) => b.addEventListener('click', () => {
     estado.romModo = b.dataset.modo;
-    document.querySelectorAll('#rom-modo .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    document.querySelectorAll('#rom-modo .seg-btn').forEach((x) => {
+      x.classList.toggle('active', x === b);
+      x.setAttribute('aria-pressed', String(x === b));
+    });
     renderEvolucion(paciente());
   }));
   $('#ind-select').addEventListener('change', (e) => { estado.indicador = e.target.value; renderIndicador(paciente()); });
@@ -967,12 +1037,32 @@ function init() {
     if (e.target.closest('#btn-editar-ficha')) abrirFormPaciente(paciente());
     if (e.target.closest('#btn-archivar')) archivarPaciente(estado.pacienteId, !paciente()?.archivado);
   });
+  $('#nav-pacientes').addEventListener('click', (e) => {
+    e.currentTarget.setAttribute('aria-expanded', String($('.sidebar').classList.toggle('abierta')));
+  });
   $('#ver-archivados').addEventListener('change', (e) => { estado.verArchivados = e.target.checked; renderLista(); });
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { aplicarTemaCharts(); renderSeccion(); });
   // Redibuja las gráficas cuando termine de cargar la tipografía web
   document.fonts?.ready.then(() => { aplicarTemaCharts(); renderSeccion(); });
-  window.addEventListener('beforeunload', guardarDB);
+  // Con el panel en varias pestañas, la que quedó atrás adopta lo guardado por otra en vez de pisarlo.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY || !e.newValue) return;
+    try {
+      const db = JSON.parse(e.newValue);
+      if (!Array.isArray(db?.pacientes)) return;
+      estado.db = marcarEjemplos(db);
+      renderLista();
+      if (!document.querySelector('dialog[open]')) renderPaciente();
+    } catch (err) { /* contenido ilegible: se conserva lo que hay en memoria */ }
+  });
+  $('#aviso-graficas').hidden = typeof Chart !== 'undefined';
+  // Las tablas anchas se desplazan con el teclado.
+  document.querySelectorAll('.table-wrap').forEach((w) => {
+    w.tabIndex = 0;
+    w.setAttribute('role', 'region');
+    w.setAttribute('aria-label', 'Tabla con desplazamiento');
+  });
 
   renderLista();
   // Tras el login se empieza en el Inicio del profesional.

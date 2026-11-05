@@ -15,12 +15,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
+  <a class="salto" href="#main">Saltar al contenido</a>
   <!-- Iconos de línea (se usan con <svg><use href="#i-..."/></svg>) -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
       <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
       <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5"/></symbol>
+      <symbol id="i-ayuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 1 1 3.9 2.3c-.9.5-1.4 1.1-1.4 2.1M12 17h.01"/></symbol>
+      <symbol id="i-sonido" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
+      <symbol id="i-silencio" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
       <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
       <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
@@ -72,6 +76,8 @@
     <aside class="sidebar">
       <div class="sidebar-head">
         <button class="nav-inicio" id="nav-inicio"><svg class="ic"><use href="#i-trend"/></svg>Inicio</button>
+        <button class="nav-inicio" id="nav-glosario"><svg class="ic"><use href="#i-ayuda"/></svg>Glosario</button>
+        <button class="nav-inicio" id="nav-pacientes" aria-expanded="false" aria-controls="lista-pacientes"><svg class="ic"><use href="#i-users"/></svg>Pacientes</button>
         <div class="eyebrow">Mis pacientes</div>
         <div class="search">
           <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
@@ -83,7 +89,8 @@
       <ul class="patient-list" id="lista-pacientes"></ul>
     </aside>
 
-    <main class="main" id="main">
+    <main class="main" id="main" tabindex="-1">
+      <p class="banda-simulada" id="aviso-graficas" hidden>No se pudieron cargar las gráficas. Revise la conexión a internet y recargue la página.</p>
       <!-- ===== INICIO DEL PROFESIONAL ===== -->
       <section id="inicio" class="inicio" hidden>
         <div class="inicio-cabecera">
@@ -103,6 +110,7 @@
           <div class="inicio-grid">
             <div class="card">
               <h2>Requieren atención</h2>
+              <p class="muted">Avisos automáticos y orientativos. No son un diagnóstico.</p>
               <ul class="inicio-lista" id="inicio-atencion"></ul>
             </div>
             <div class="inicio-col">
@@ -165,8 +173,8 @@
                 <p class="muted">Ángulo máximo de cada ejercicio en cada sesión.</p>
               </div>
               <div class="seg" id="rom-modo" role="group" aria-label="Unidad">
-                <button class="seg-btn active" data-modo="grados">Grados</button>
-                <button class="seg-btn" data-modo="pct">% de lo normal</button>
+                <button class="seg-btn active" data-modo="grados" aria-pressed="true">Grados</button>
+                <button class="seg-btn" data-modo="pct" aria-pressed="false">% de lo normal</button>
               </div>
             </div>
             <div class="chart-box tall"><canvas id="chart-rom"></canvas></div>
@@ -193,6 +201,7 @@
                 <option value="dolor">Dolor reportado (EVA 0–10)</option>
                 <option value="velocidad">Velocidad angular media (°/s)</option>
                 <option value="variabilidad">Variabilidad entre repeticiones (%)</option>
+                <option value="hormigueo">Hormigueo o adormecimiento (0–2)</option>
                 <option value="duracion">Duración de la sesión (min)</option>
               </select>
             </div>
@@ -200,8 +209,8 @@
           </details>
 
           <details class="card plegable" id="mas-emg">
-            <summary>Fuerza muscular (EMG)</summary>
-            <p class="muted">Promedio de la prueba de fuerza de cada músculo, en % de la primera prueba (100 %). Empieza en la Fase 2.</p>
+            <summary>Activación muscular (EMG)</summary>
+            <p class="muted">Promedio de la prueba de activación de cada músculo, en % de la primera prueba (100 %). Empieza en la Fase 2.</p>
             <div class="chart-box"><canvas id="chart-emg"></canvas></div>
           </details>
         </div>
@@ -226,6 +235,11 @@
             <button class="btn btn-ghost btn-columnas" id="btn-columnas">Mostrar todas las columnas</button>
           </div>
 
+          <div class="card" id="sesion-chequeo" hidden>
+            <h2>Chequeo de seguridad</h2>
+            <dl class="chequeo-datos" id="sesion-chequeo-datos"></dl>
+          </div>
+
           <div class="card" id="sesion-rutina" hidden>
             <div class="card-head">
               <div>
@@ -239,7 +253,7 @@
 
           <div class="card" id="sesion-emg" hidden>
             <div>
-              <h2>Prueba de fuerza muscular</h2>
+              <h2>Prueba de activación muscular</h2>
               <p class="muted">Pico de cada contracción y promedio, en unidades EMG; entre paréntesis, % de la primera prueba.</p>
             </div>
             <div class="table-wrap"><table class="table" id="tabla-emg"></table></div>
@@ -285,11 +299,11 @@
         <section class="seccion tab-panel" data-seccion="reporte" hidden>
           <div class="card lectura">
             <div>
-              <h2>Lectura rápida</h2>
+              <h2>Lectura rápida <button type="button" class="termino" data-termino="estados" aria-label="Qué significan Bien, Atención y Revisar" title="Qué significa"><svg class="ic" aria-hidden="true"><use href="#i-ayuda"/></svg></button></h2>
               <p class="lectura-general" id="lectura-general"></p>
             </div>
             <ul class="lectura-areas" id="lectura-areas"></ul>
-            <p class="muted">Lectura orientativa calculada con los datos registrados. No es un diagnóstico.</p>
+            <p class="muted" id="lectura-nota"></p>
           </div>
           <div class="card">
             <div>
@@ -300,7 +314,7 @@
           </div>
           <div class="card">
             <h2>Notas de la sesión <span id="nota-sesion-label" class="muted"></span></h2>
-            <textarea id="nota" rows="5" placeholder="Observaciones del profesional para esta sesión…"></textarea>
+            <textarea id="nota" rows="5" aria-label="Notas de la sesión" placeholder="Observaciones del profesional para esta sesión…"></textarea>
             <div class="note-foot muted" id="nota-estado"></div>
           </div>
           <div class="card">
@@ -346,7 +360,7 @@
                     <span class="badge" id="mv-estado"><span class="dot"></span>Desconectado</span>
                     <button class="btn" id="mv-conectar">Conectar</button>
                   </div>
-                  <p class="muted" id="mv-ayuda-conexion">Si no hay dispositivo, la rutina usa el simulador.</p>
+                  <p class="muted" id="mv-ayuda-conexion">Al empezar la rutina podrá conectar el dispositivo o elegir el simulador.</p>
                 </div>
               </li>
               <li class="paso-guia" data-paso="2">
@@ -413,25 +427,38 @@
   </div>
 
   <!-- Modal nuevo paciente -->
-  <dialog id="dlg-paciente">
+  <dialog id="dlg-paciente" aria-labelledby="dlg-paciente-titulo">
     <form method="dialog" id="form-paciente">
       <div class="eyebrow">Registro</div>
       <h2 id="dlg-paciente-titulo">Nuevo paciente</h2>
-      <div class="form-grid">
-        <label>Nombre completo<input name="nombre" required></label>
-        <label>Documento<input name="documento" required></label>
-        <label>Edad<input name="edad" type="number" min="1" max="120" required></label>
-        <label>Sexo
-          <select name="sexo"><option>F</option><option>M</option><option>Otro</option></select>
-        </label>
-        <label>Mano intervenida
-          <select name="mano"><option>Derecha</option><option>Izquierda</option></select>
-        </label>
-        <label>Fecha de cirugía<input name="fechaCirugia" type="date" required></label>
-        <label>Ocupación<input name="ocupacion"></label>
-        <label>Profesional responsable<input name="profesional"></label>
-        <label>Próxima cita<input name="proximaCita" type="date"></label>
-      </div>
+      <fieldset class="form-grupo">
+        <legend>Datos personales</legend>
+        <div class="form-grid">
+          <label>Nombre completo<input name="nombre" required></label>
+          <label>Documento<input name="documento" required></label>
+          <label>Edad<input name="edad" type="number" min="1" max="120" required></label>
+          <label>Sexo
+            <select name="sexo"><option>F</option><option>M</option><option>Otro</option></select>
+          </label>
+          <label>Ocupación<input name="ocupacion"></label>
+        </div>
+      </fieldset>
+      <fieldset class="form-grupo">
+        <legend>Cirugía</legend>
+        <div class="form-grid">
+          <label>Mano intervenida
+            <select name="mano"><option>Derecha</option><option>Izquierda</option></select>
+          </label>
+          <label>Fecha de cirugía<input name="fechaCirugia" type="date" required></label>
+        </div>
+      </fieldset>
+      <fieldset class="form-grupo">
+        <legend>Seguimiento</legend>
+        <div class="form-grid">
+          <label>Profesional responsable<input name="profesional"></label>
+          <label>Próxima cita<input name="proximaCita" type="date"></label>
+        </div>
+      </fieldset>
       <div class="dlg-actions">
         <button class="btn btn-ghost" value="cancel" formnovalidate>Cancelar</button>
         <button class="btn btn-primary" value="ok">Guardar</button>
@@ -459,32 +486,40 @@
           <div class="eyebrow" id="rt-paso">Ejercicio 1 de 5</div>
           <h2 id="rt-nombre"></h2>
         </div>
-        <button class="btn btn-ghost rt-cerrar" id="rt-cerrar" aria-label="Cerrar rutina"><svg class="ic"><use href="#i-x"/></svg></button>
+        <div class="rt-acciones">
+          <button type="button" class="btn btn-ghost" id="rt-sonido" title="Tonos de la cuenta y de las repeticiones"></button>
+          <button class="btn btn-ghost rt-cerrar" id="rt-cerrar" aria-label="Cerrar rutina"><svg class="ic"><use href="#i-x"/></svg></button>
+        </div>
       </div>
       <div class="rt-main">
         <div class="rt-media">
-          <video id="rt-video" autoplay muted loop playsinline></video>
+          <video id="rt-video" autoplay muted loop playsinline controls controlslist="nodownload nofullscreen noremoteplayback" disablepictureinpicture></video>
           <p class="rt-falta muted" id="rt-falta" hidden></p>
         </div>
         <div class="rt-info">
           <span class="badge" id="rt-modo"></span>
           <p class="rt-reps" id="rt-reps"></p>
           <p class="rt-indicacion" id="rt-indicacion"></p>
+          <button type="button" class="btn btn-primary rt-empezar-paso" id="rt-empezar-paso" hidden><svg class="ic"><use href="#i-play"/></svg>Empezar ejercicio<kbd>Espacio</kbd></button>
           <p class="rt-contador" id="rt-contador" aria-live="polite" hidden></p>
           <div class="rt-grabado" id="rt-grabado" hidden>
             <span class="rt-grabado-badge"><svg class="ic"><use href="#i-check"/></svg>Ya grabado</span>
             <p class="rt-grabado-txt" id="rt-grabado-txt"></p>
             <button type="button" class="btn" id="rt-regrabar"><svg class="ic"><use href="#i-refresh"/></svg>Volver a grabar</button>
           </div>
-          <div>
-            <div class="eyebrow">Cuidado</div>
+          <details class="rt-cuidados" id="rt-cuidados">
+            <summary>Cuidados</summary>
             <ul class="rt-lista" id="rt-cuidado"></ul>
-          </div>
+          </details>
         </div>
       </div>
       <div class="rt-nav">
         <button class="btn" id="rt-anterior"><svg class="ic"><use href="#i-chevron-left"/></svg>Anterior</button>
         <button class="btn btn-primary" id="rt-siguiente"><span id="rt-siguiente-txt">Siguiente</span><svg class="ic"><use href="#i-chevron-right"/></svg></button>
+      </div>
+      <div class="rt-cuenta" id="rt-cuenta" aria-live="assertive" hidden>
+        <p class="rt-cuenta-prep">Prepárese</p>
+        <p class="rt-cuenta-num" id="rt-cuenta-num"></p>
       </div>
     </div>
   </dialog>
@@ -507,6 +542,7 @@
     <p class="campo-error" id="ch-error" aria-live="polite"></p>
     <div class="ch-resultado" id="ch-resultado" aria-live="polite" hidden>
       <p class="ch-mensaje" id="ch-mensaje"></p>
+      <p id="ch-motivo" hidden></p>
       <p class="muted">Recomendación orientativa: decide el profesional.</p>
       <button class="btn" id="ch-bajar" hidden></button>
       <label class="ch-criterio" id="ch-criterio-fila" hidden><input type="checkbox" id="ch-criterio"> Revisé al paciente y decido continuar</label>
@@ -527,6 +563,10 @@
     <p class="muted" id="ls-resumen"></p>
     <div class="ls-estado">
       <div class="ls-fila"><span class="dot" id="ls-disp-dot"></span><span id="ls-disp"></span></div>
+      <div class="ls-opciones" id="ls-opciones" hidden>
+        <button class="btn btn-primary" id="ls-conectar">Conectar dispositivo</button>
+        <button class="btn btn-ghost" id="ls-simulador">Usar simulador (solo demostración)</button>
+      </div>
       <div class="ls-fila"><span class="dot" id="ls-cal-dot"></span><span id="ls-cal"></span>
         <button class="btn btn-ghost ls-reintentar" id="ls-reintentar" hidden><svg class="ic"><use href="#i-refresh"/></svg>Reintentar</button>
       </div>
@@ -542,17 +582,17 @@
     </div>
   </dialog>
 
-  <!-- Prueba de fuerza muscular (EMG) -->
+  <!-- Prueba de activación muscular (EMG) -->
   <dialog id="dlg-prueba" class="dlg-prueba" aria-labelledby="pr-titulo">
     <div class="pasos-sesion"></div>
     <div class="eyebrow" id="pr-paso"></div>
-    <h2 id="pr-titulo">Prueba de fuerza muscular</h2>
+    <h2 id="pr-titulo">Prueba de activación muscular</h2>
     <div class="pr-bloque">
       <p class="pr-musculo" id="pr-musculo"></p>
       <p class="pr-indicacion" id="pr-indicacion"></p>
       <p class="pr-cuenta" id="pr-cuenta" aria-live="assertive"></p>
       <p class="muted" id="pr-contador"></p>
-      <div class="pr-barra-pista" role="img" aria-label="Activación del músculo"><div class="pr-barra" id="pr-barra"></div></div>
+      <div class="pr-barra-pista" aria-hidden="true"><div class="pr-barra" id="pr-barra"></div></div>
       <p class="pr-resultado" id="pr-resultado" aria-live="polite"></p>
       <p class="pr-dudosa" id="pr-dudosa" hidden>Una contracción salió más débil que las otras.</p>
     </div>
@@ -575,6 +615,7 @@
           <tbody id="fin-tabla"></tbody>
         </table>
       </div>
+      <p class="muted" id="fin-faltantes" hidden></p>
       <div class="fin-campos">
         <label>Dolor después (0–10)<input type="number" id="fin-dolor" min="0" max="10" step="1" placeholder="0–10"></label>
         <div class="fin-cita">
@@ -583,6 +624,7 @@
         </div>
         <label class="grow">Notas<textarea id="fin-notas" rows="3" placeholder="Observaciones de la sesión…"></textarea></label>
       </div>
+      <p class="campo-error" id="fin-error" aria-live="polite"></p>
     </div>
     <p class="muted" id="fin-vacio" hidden>No se grabó ningún ejercicio.</p>
     <div class="dlg-actions">
@@ -604,6 +646,7 @@
     <div id="rs-avisos-bloque">
       <div class="eyebrow">Avisos</div>
       <ul class="obs-list" id="rs-avisos"></ul>
+      <p class="muted">Avisos automáticos y orientativos. No son un diagnóstico.</p>
     </div>
     <p id="rs-cita"></p>
     <div class="dlg-actions">
@@ -613,12 +656,21 @@
     </div>
   </dialog>
 
+  <dialog id="dlg-glosario" class="dlg-glosario" aria-labelledby="glo-titulo">
+    <h2 id="glo-titulo">Qué significa cada indicador</h2>
+    <p class="muted">Definiciones y umbrales del prototipo, orientativos y pendientes de revisión clínica.</p>
+    <div class="glo-lista" id="glo-lista"></div>
+    <div class="dlg-actions"><button class="btn btn-primary" id="glo-cerrar">Cerrar</button></div>
+  </dialog>
+
   <!-- Hoja imprimible para el paciente (solo se ve al imprimir) -->
   <section class="hoja-paciente" id="hoja-paciente" aria-hidden="true"></section>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" popover="manual"></div>
 
   <script src="data.js"></script>
+  <script src="glosario.js"></script>
+  <script src="sonido.js"></script>
   <script src="rutinas.js"></script>
   <script src="navegacion.js"></script>
   <script src="app.js"></script>

@@ -12,6 +12,16 @@ const s2 = {
 };
 const pac = { id: 'P-1', nombre: 'Ana Pérez', fechaCirugia: '2026-09-20', sesiones: [s2, s1] };
 
+test('lo que empeoró va primero y las simuladas no se comparan', () => {
+  const a = { fecha: '2026-10-01', ejercicios: [{ tipo: 'flexion', anguloMax: 50 }, { tipo: 'extension', anguloMax: 50 }] };
+  const b = { fecha: '2026-10-08', chequeo: { dolorAntes: 2 }, dolorEVA: 9, ejercicios: [{ tipo: 'flexion', anguloMax: 60 }, { tipo: 'extension', anguloMax: 49 }] };
+  const sim = { fecha: '2026-10-05', origen: 'simulador', ejercicios: [{ tipo: 'flexion', anguloMax: 80 }] };
+  const c = comparacionConAnterior({ sesiones: [a, sim, b] }, b);
+  assert.strictEqual(c[0], 'Dolor: 2 → 9 durante la sesión');
+  assert.ok(c.some((x) => x.startsWith('Flexión de muñeca: 60° (+10° que')), c.join(' | '));
+  assert.deepStrictEqual(comparacionConAnterior({ sesiones: [a, sim, b] }, sim), ['Sesión simulada: no se compara ni cuenta en el seguimiento.']);
+});
+
 test('sumarDiasISO', () => {
   assert.strictEqual(sumarDiasISO('2026-10-30', 7), '2026-11-06');
   assert.strictEqual(sumarDiasISO('2026-12-28', 7), '2027-01-04');
@@ -21,7 +31,7 @@ test('comparación con la sesión anterior', () => {
   const c = comparacionConAnterior(pac, s2);
   assert.ok(c.includes('Flexión de muñeca: 52° (+6° que la sesión anterior)'), c.join(' | '));
   assert.ok(c.includes('Dolor: 5 → 3 durante la sesión'), c.join(' | '));
-  assert.ok(c.some((x) => x.startsWith('Índice del nervio mediano')), c.join(' | '));
+  assert.ok(c.some((x) => x.startsWith('Razón tenar/extensores')), c.join(' | '));
   assert.ok(c.length <= 3);
 });
 
