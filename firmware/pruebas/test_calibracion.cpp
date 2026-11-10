@@ -285,6 +285,17 @@ PRUEBA(sesgo_confiable_tras_quietud_desde_el_ancla) {
   for (uint32_t t = 0; t <= 60000; t += 10) e.agregar({0, 0, 0.02f}, G, t);
   CERCA(e.sesgo().z, 0.02f, 1e-3f);   // sin ancla no hay límite
 }
+PRUEBA(sesgo_desconfiar_permite_recalibrar) {   // un CAL rechazado no debe bloquear los siguientes
+  EstimadorSesgo e; e.fijar({0, 0, 0}, true);
+  for (uint32_t t = 0; t <= 3000; t += 10) e.agregar({0.01f, 0, 0}, G, t);
+  VERIFICAR(e.confiable());
+  VERIFICAR(!sesgoCalCoherente({0.09f, 0, 0}, e.sesgo(), e.confiable()));
+  const Vec3 antes = e.sesgo();
+  e.desconfiar();
+  VERIFICAR(!e.confiable());
+  VERIFICAR(sesgoCalCoherente({0.09f, 0, 0}, e.sesgo(), e.confiable()));
+  CERCA(e.sesgo().x, antes.x, 1e-9f); CERCA(e.sesgo().y, antes.y, 1e-9f); CERCA(e.sesgo().z, antes.z, 1e-9f);
+}
 PRUEBA(cal_sesgo_coherente_con_el_estimador) {
   const Vec3 est{0.02f, -0.01f, 0.03f};
   VERIFICAR(sesgoCalCoherente({0.03f, -0.02f, 0.06f}, est, true));

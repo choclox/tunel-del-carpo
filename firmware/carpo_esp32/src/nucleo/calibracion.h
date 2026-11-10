@@ -122,6 +122,9 @@ class EstimadorSesgo {
   bool quieto() const { return quieto_; }
   // true si hay ancla y desde que se fijó el estimador estuvo quieto al menos una vez.
   bool confiable() const { return confiable_; }
+  // Quita la confianza sin tocar sesgo, ancla ni ventana: tras rechazar un CAL por sesgo
+  // incoherente, el siguiente CAL se acepta y reancla (si no, la deriva térmica lo bloquearía).
+  void desconfiar();
 
  private:
   void limitarAlAncla();

@@ -299,6 +299,10 @@ void EstimadorSesgo::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
   limitarAlAncla();
 }
 
+void EstimadorSesgo::desconfiar() {
+  confiable_ = false;
+}
+
 void EstimadorSesgo::reiniciar() {
   hayAncla_ = false;
   confiable_ = false;

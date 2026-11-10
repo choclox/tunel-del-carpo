@@ -316,6 +316,9 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
       if (!sesgoCalCoherente(calibrador.sesgoGiro(), estimadorSesgo.sesgo(),
                              estimadorSesgo.confiable())) {
         terminarCalConError("movimiento");
+        // El cero real pudo derivar más allá del límite del ancla: sin esto todo CAL posterior
+        // se rechazaría hasta reiniciar. El próximo CAL (mano quieta) se acepta y reancla.
+        estimadorSesgo.desconfiar();
         return;
       }
       sesgoGiro = calibrador.sesgoGiro();
