@@ -39,6 +39,7 @@ const mv = {
   conectado: false,
   conectando: false,
   cal: null,             // { tiempoS, ok, motivo }
+  avisos: {},            // última vez que se mostró cada aviso del firmware (clave -> ms)
   calInicio: null,       // performance.now() al pedir la calibración
   bateria: null,
   stats: null,
@@ -277,7 +278,21 @@ function procesarLinea(linea) {
       mv.bateria = Number(partes[1]);
       break;
     default:
-      if (!linea.startsWith('#')) st.malformadas++;
+      if (!linea.startsWith('#')) { st.malformadas++; break; }
+      mostrarAvisoDispositivo(linea);
+  }
+}
+
+// Avisos '#...' del firmware: se muestran (sin repetir cada 10 s) y, si piden recalibrar,
+// invalidan la calibración vigente. Un ejercicio en curso no se interrumpe.
+function mostrarAvisoDispositivo(linea) {
+  const a = avisoDispositivo(linea);
+  if (!a) return;
+  if (debeMostrar(a.clave, performance.now(), mv.avisos)) toast(a.texto);
+  if (a.recalibrar && mv.cal?.ok) {
+    mv.cal = { ...mv.cal, ok: false, motivo: 'el dispositivo pidió recalibrar' };
+    if (mv.sesion) mv.sesion.calibracion = mv.cal;
+    renderMonitorControles();
   }
 }
 
@@ -623,6 +638,7 @@ async function conectarCon(t, origen) {
   mv.stats = statsVacias();
   mv.buffer = [];
   mv.cal = null;
+  mv.avisos = {};
   mv.bateria = null;
   mv.conEmg = false;
   await t.enviar('START');
