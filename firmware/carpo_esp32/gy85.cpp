@@ -8,6 +8,8 @@ constexpr uint8_t DIR_QMC = 0x0D;
 // Cada cuántas lecturas (100 Hz -> ~1 s) se relee la configuración: un corte breve de VCC
 // devuelve los chips a sus valores por defecto sin que falle el I2C.
 constexpr uint8_t LECTURAS_POR_VERIFICACION = 100;
+// Lecturas en cero del ADXL345 que se toleran tras configurarlo (aún no tiene una conversión).
+constexpr uint8_t GRACIA_ADXL = 5;
 }  // namespace
 
 bool Gy85::escribir(uint8_t dir, uint8_t reg, uint8_t valor) {
@@ -39,15 +41,27 @@ bool Gy85::iniciar(TwoWire& wire) {
   if (!escribir(DIR_ADXL, 0x31, 0x0B)) return false;   // resolución completa, ±16 g
   if (!escribir(DIR_ADXL, 0x2D, 0x08)) return false;   // medición
 
-  // ITG3205: 0x68 o 0x69 (se omite con USAR_GIROSCOPIO = false)
+  // ITG3205: 0x68 o 0x69 (se omite con USAR_GIROSCOPIO = false). Un módulo con el chip dañado
+  // puede responder al I2C y aun así no funcionar: se comprueba que conserve la configuración
+  // y que dé una temperatura distinta de cero. Si no pasa, se sigue sin giroscopio.
+  tieneGiro_ = false;
+  gracia_ = GRACIA_ADXL;
   if (USAR_GIROSCOPIO) {
     uint8_t quien = 0;
+    bool responde = true;
     if (leerBytes(0x68, 0x00, &quien, 1)) dirGiro_ = 0x68;
     else if (leerBytes(0x69, 0x00, &quien, 1)) dirGiro_ = 0x69;
-    else return false;
-    if (!escribir(dirGiro_, 0x3E, 0x01)) return false;   // PLL con giro X
-    if (!escribir(dirGiro_, 0x15, 0x09)) return false;   // 100 Hz
-    if (!escribir(dirGiro_, 0x16, 0x1B)) return false;   // ±2000 °/s, DLPF 42 Hz
+    else responde = false;
+    if (responde && escribir(dirGiro_, 0x3E, 0x01) &&   // PLL con giro X
+        escribir(dirGiro_, 0x15, 0x09) &&               // 100 Hz
+        escribir(dirGiro_, 0x16, 0x1B)) {               // ±2000 °/s, DLPF 42 Hz
+      delay(10);   // primera conversión antes de leer la temperatura
+      uint8_t dlpf = 0, temp[2] = {0, 0};
+      if (leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B &&
+          leerBytes(dirGiro_, 0x1B, temp, 2) && (temp[0] != 0 || temp[1] != 0)) {
+        tieneGiro_ = true;
+      }
+    }
   }
 
   // Magnetómetro: primero HMC5883L, luego QMC5883L
@@ -73,7 +87,7 @@ bool Gy85::iniciar(TwoWire& wire) {
 bool Gy85::configuracionIntacta() {
   uint8_t potencia = 0, dlpf = 0;
   if (!leerBytes(DIR_ADXL, 0x2D, &potencia, 1) || potencia != 0x08) return false;
-  return !USAR_GIROSCOPIO || (leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B);
+  return !tieneGiro_ || (leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B);
 }
 
 bool Gy85::leer(Vec3& acel, Vec3& giro, Vec3& mag) {
@@ -85,10 +99,16 @@ bool Gy85::leer(Vec3& acel, Vec3& giro, Vec3& mag) {
   uint8_t r[7];
   if (!leerBytes(DIR_ADXL, 0x32, r, 6)) { iniciado_ = false; return false; }
   Vec3 a = decodificarAdxl345(r);
-  if (esCero(a)) { iniciado_ = false; return false; }   // ADXL345 en reposo tras un corte
-  acel = corregirAcel(aplicarMontaje(a, MONTAJE_ACEL), DESFASE_ACEL, ESCALA_ACEL);
+  if (esCero(a)) {
+    // Las primeras lecturas tras configurar pueden ser cero: no cuentan como sensor perdido.
+    if (gracia_ > 0) { gracia_--; return false; }
+    iniciado_ = false;   // ADXL345 en reposo tras un corte
+    return false;
+  }
+  gracia_ = 0;
+  acel = corregirAcel(aplicarMontaje(a, MONTAJE_ACEL), desfase_, escala_);
   giro = Vec3{0, 0, 0};
-  if (USAR_GIROSCOPIO) {
+  if (tieneGiro_) {
     if (!leerBytes(dirGiro_, 0x1D, r, 6)) { iniciado_ = false; return false; }
     giro = aplicarMontaje(decodificarItg3205(r), MONTAJE_GIRO);
   }
