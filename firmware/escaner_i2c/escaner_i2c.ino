@@ -1,4 +1,4 @@
-// Diagnóstico: escanea el bus I2C (SDA=GPIO21, SCL=GPIO22) y revisa el ITG3205.
+// Diagnóstico: escanea el bus I2C (SDA=GPIO22, SCL=GPIO21) y revisa el ITG3205.
 // Sin '#' a propósito: es solo para el monitor serie, no para la interfaz.
 #include <Wire.h>
 #include <esp_log.h>
@@ -40,7 +40,7 @@ static void revisarGiro(uint8_t dir) {
 void setup() {
   Serial.begin(115200);
   esp_log_level_set("*", ESP_LOG_NONE);
-  Wire.begin(21, 22, 100000);
+  Wire.begin(22, 21, 100000);
 }
 
 void loop() {

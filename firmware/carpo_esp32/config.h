@@ -4,8 +4,9 @@
 #include "src/nucleo/gy85_datos.h"
 
 // Pines (ESP32-C6: el ADC solo existe en GPIO0–GPIO6; GPIO4, 5, 8, 9 y 15 son de arranque)
-constexpr int PIN_SDA = 21;
-constexpr int PIN_SCL = 22;
+// Cableado del GY-85 actual: SDA en GPIO22 y SCL en GPIO21 (verificado con el escáner I2C).
+constexpr int PIN_SDA = 22;
+constexpr int PIN_SCL = 21;
 constexpr uint32_t I2C_HZ = 400000;
 // Alimentación por el USB del PC, sin batería: no se envía BAT. Poner en true solo si se
 // conecta una LiPo 1S a PIN_BATERIA con el divisor 100 k / 100 k.
