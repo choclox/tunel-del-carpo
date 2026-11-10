@@ -6,9 +6,11 @@
 
 class Gy85 {
  public:
-  // true si responden el acelerómetro y el giroscopio. Puede llamarse de nuevo para recuperar.
+  // true si responden el acelerómetro y el giroscopio (este solo con USAR_GIROSCOPIO).
+  // Puede llamarse de nuevo para recuperar.
   bool iniciar(TwoWire& wire);
   // Lectura montada (g, rad/s, µT). false si falla el acelerómetro o el giroscopio.
+  // Con USAR_GIROSCOPIO = false, giro = {0,0,0}.
   // Si el magnetómetro falla o satura, mag = {0,0,0}.
   bool leer(Vec3& acel, Vec3& giro, Vec3& mag);
   bool tieneMagnetometro() const { return tipoMag_ != TipoMag::Ninguno; }

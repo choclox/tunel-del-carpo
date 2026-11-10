@@ -58,6 +58,31 @@ float anguloEntreGrados(const Vec3& a, const Vec3& b) {
   return acosf(c) * (180.0f / 3.14159265f);
 }
 
+static void pasoBajo(Vec3& x, const Vec3& nuevo, float alfa) {
+  x.x += alfa * (nuevo.x - x.x);
+  x.y += alfa * (nuevo.y - x.y);
+  x.z += alfa * (nuevo.z - x.z);
+}
+
+FiltroSinGiro::FiltroSinGiro(float alfa) : alfa_(alfa) {}
+
+void FiltroSinGiro::reiniciar() { vacio_ = true; }
+
+void FiltroSinGiro::actualizar(const Vec3& acel, const Vec3& mag) {
+  if (vacio_) {
+    acel_ = acel;
+    mag_ = mag;
+    vacio_ = false;
+    return;
+  }
+  pasoBajo(acel_, acel, alfa_);
+  if (esCero(mag)) mag_ = Vec3{0, 0, 0};   // sin magnetómetro en esta muestra: solo inclinación
+  else if (esCero(mag_)) mag_ = mag;
+  else pasoBajo(mag_, mag, alfa_);
+}
+
+Cuaternion FiltroSinGiro::orientacion() const { return orientacionDesdeAcelMag(acel_, mag_); }
+
 FiltroMadgwick::FiltroMadgwick(float beta) : beta_(beta) {}
 void FiltroMadgwick::fijarBeta(float b) { beta_ = b; }
 void FiltroMadgwick::reiniciar(const Cuaternion& q) { q_ = q; }
