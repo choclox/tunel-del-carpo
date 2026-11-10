@@ -109,4 +109,35 @@ PRUEBA(acel_nombres_y_vencimiento) {
   CalibradorAcel c; c.iniciar(1000);
   VERIFICAR(!c.vencido(180999)); VERIFICAR(c.vencido(181000));
 }
+PRUEBA(cal_acel_que_cambia_no_es_quietud) {   // giro constante, acel deriva 0,1 g
+  Calibrador c; c.iniciar(0);
+  for (uint32_t t = 0; t <= 2600; t += 10) c.agregar({0.01f, 0, 0}, {0, 0.1f * t / 2600, 1}, t);
+  VERIFICAR(c.estado() != EstadoCal::Listo);
+}
+PRUEBA(sesgo_converge_en_reposo) {
+  EstimadorSesgo e; e.fijar({0, 0, 0});
+  for (uint32_t t = 0; t <= 30000; t += 10) e.agregar({0.02f, -0.01f, 0.015f}, {0, 0, 1}, t);
+  VERIFICAR(e.quieto());
+  CERCA(e.sesgo().x, 0.02f, 5e-4f); CERCA(e.sesgo().y, -0.01f, 5e-4f); CERCA(e.sesgo().z, 0.015f, 5e-4f);
+}
+PRUEBA(sesgo_no_cambia_en_los_primeros_2_s) {
+  EstimadorSesgo e; e.fijar({0, 0, 0});
+  for (uint32_t t = 0; t < 1990; t += 10) e.agregar({0.02f, 0, 0}, {0, 0, 1}, t);
+  VERIFICAR(!e.quieto()); CERCA(e.sesgo().x, 0, 1e-6f);
+}
+PRUEBA(sesgo_giro_lento_no_se_aprende) {   // 0,04 rad/s en Z durante 20 s: el acel (gravedad en el marco del sensor) cambia
+  EstimadorSesgo e; e.fijar({0, 0, 0});
+  for (uint32_t t = 0; t <= 20000; t += 10) {
+    float ang = 0.04f * t / 1000;   // gira sobre Y para que cambie la gravedad
+    e.agregar({0, 0.04f, 0}, {sinf(ang), 0, cosf(ang)}, t);
+  }
+  CERCA(e.sesgo().y, 0, 1e-3f);
+}
+PRUEBA(sesgo_movimiento_reinicia_la_ventana) {
+  EstimadorSesgo e; e.fijar({0, 0, 0});
+  for (uint32_t t = 0; t <= 3000; t += 10) e.agregar({0.02f, 0, 0}, {0, 0, 1}, t);
+  e.agregar({0.5f, 0, 0}, {0, 0, 1}, 3010);
+  VERIFICAR(!e.quieto());
+}
+
 int main() { return correrPruebas(); }

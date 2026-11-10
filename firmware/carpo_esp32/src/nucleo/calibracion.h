@@ -22,7 +22,7 @@ class Calibrador {
   EstadoCal estado_ = EstadoCal::Inactivo;
   uint32_t inicio_ = 0, inicioVentana_ = 0, duracion_ = 0;
   bool hayReferencia_ = false;
-  Vec3 referencia_{0, 0, 0}, suma_{0, 0, 0}, sesgo_{0, 0, 0};
+  Vec3 acelRef_{0, 0, 0}, referencia_{0, 0, 0}, suma_{0, 0, 0}, sesgo_{0, 0, 0};
   uint32_t n_ = 0;
   const char* motivo_ = "";
 };
@@ -74,4 +74,22 @@ class CalibradorAcel {
   bool hayVentana_ = false;
   float suma_[3] = {0, 0, 0}, min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};
   float valor_[6] = {0, 0, 0, 0, 0, 0};   // promedio del eje dominante por cara
+};
+
+// Sesgo del giroscopio en reposo: se aprende solo con la mano quieta (giroscopio y
+// acelerómetro estables) durante al menos 2 s.
+class EstimadorSesgo {
+ public:
+  explicit EstimadorSesgo(float alfa = 0.002f) : alfa_(alfa) {}
+  void fijar(const Vec3& sesgo);
+  void agregar(const Vec3& giroCrudo, const Vec3& acel, uint32_t tMs);
+  Vec3 sesgo() const { return sesgo_; }
+  bool quieto() const { return quieto_; }
+
+ private:
+  float alfa_;
+  Vec3 sesgo_{0, 0, 0};
+  bool hayVentana_ = false, quieto_ = false;
+  uint32_t inicioVentana_ = 0;
+  float min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};
 };

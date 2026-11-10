@@ -6,6 +6,7 @@ const float ACEL_MIN = 0.90f, ACEL_MAX = 1.10f, GIRO_TOL = 0.10f;
 const uint32_t MIDIENDO_MS = 1000, CONVERGIENDO_MS = 1500, LIMITE_MS = 10000;
 const uint32_t ASENTAMIENTO_MS = 500;   // parte final de CONVERGIENDO_MS a beta normal
 const float RANGO_MAG_MIN = 30.0f;
+const float ACEL_TOL_CAL = 0.05f;   // g respecto a la primera muestra de la ventana
 const uint8_t FALLAS_PERDIDO = 5;
 const uint32_t REINTENTO_MS = 1000;
 }
@@ -35,6 +36,7 @@ EstadoCal Calibrador::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
   }
   if (!hayReferencia_) {                      // primera muestra de la ventana: referencia
     referencia_ = g;
+    acelRef_ = a;
     inicioVentana_ = tMs;
     hayReferencia_ = true;
   }
@@ -42,7 +44,10 @@ EstadoCal Calibrador::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
   bool quieta = m >= ACEL_MIN && m <= ACEL_MAX &&
                 fabsf(g.x - referencia_.x) < GIRO_TOL &&
                 fabsf(g.y - referencia_.y) < GIRO_TOL &&
-                fabsf(g.z - referencia_.z) < GIRO_TOL;
+                fabsf(g.z - referencia_.z) < GIRO_TOL &&
+                fabsf(a.x - acelRef_.x) < ACEL_TOL_CAL &&
+                fabsf(a.y - acelRef_.y) < ACEL_TOL_CAL &&
+                fabsf(a.z - acelRef_.z) < ACEL_TOL_CAL;
   if (!quieta) {
     nuevaVentana();                           // la muestra no inicia la ventana nueva
     return estado_;
@@ -180,4 +185,41 @@ Vec3 CalibradorAcel::escala() const {
 const char* CalibradorAcel::nombreCara(uint8_t i) {
   static const char* const N[6] = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
   return i < 6 ? N[i] : "?";
+}
+
+namespace {
+const float SESGO_GIRO_TOL = 0.05f, SESGO_ACEL_RANGO = 0.03f;
+const uint32_t SESGO_VENTANA_MS = 2000;
+}
+
+void EstimadorSesgo::fijar(const Vec3& sesgo) {
+  sesgo_ = sesgo;
+  hayVentana_ = false;
+  quieto_ = false;
+}
+
+void EstimadorSesgo::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
+  const float v[3] = {a.x, a.y, a.z};
+  bool quieta = fabsf(g.x - sesgo_.x) < SESGO_GIRO_TOL &&
+                fabsf(g.y - sesgo_.y) < SESGO_GIRO_TOL &&
+                fabsf(g.z - sesgo_.z) < SESGO_GIRO_TOL;
+  if (quieta && hayVentana_) {
+    for (int e = 0; e < 3; e++) {
+      if (v[e] < min_[e]) min_[e] = v[e];
+      if (v[e] > max_[e]) max_[e] = v[e];
+      if (max_[e] - min_[e] >= SESGO_ACEL_RANGO) quieta = false;
+    }
+  }
+  if (!quieta || !hayVentana_) {   // la ventana empieza en esta muestra
+    for (int e = 0; e < 3; e++) min_[e] = max_[e] = v[e];
+    inicioVentana_ = tMs;
+    hayVentana_ = true;
+    quieto_ = false;
+    if (!quieta) return;
+  }
+  if (tMs - inicioVentana_ < SESGO_VENTANA_MS) return;
+  quieto_ = true;
+  sesgo_.x += alfa_ * (g.x - sesgo_.x);
+  sesgo_.y += alfa_ * (g.y - sesgo_.y);
+  sesgo_.z += alfa_ * (g.z - sesgo_.z);
 }
