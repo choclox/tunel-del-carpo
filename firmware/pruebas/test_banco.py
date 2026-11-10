@@ -44,6 +44,15 @@ class TestBanco(unittest.TestCase):
         self.assertEqual(r["n"], 1)
         self.assertEqual(r["invalidas"], 0)
 
+    def test_malformadas(self):
+        # Como la interfaz: cuenta lo que no es D, CAL, BAT ni empieza con '#' (sin las vacías).
+        lineas = ["D,1,20,0,0,0", "CAL,OK,2500", "BAT,87", "#Recalibre",
+                  "ets Jul 29 2019", "rst:0x1", "DATOS,1", "  ", "D,2,40,1,2"]
+        r = banco.analizar_muestras(lineas, 1.0)
+        self.assertEqual(r["malformadas"], 3)
+        self.assertEqual(r["invalidas"], 1)
+        self.assertEqual(banco.contar_malformadas(["D,1,20,0,0,0", "#x"]), 0)
+
     def test_parsear_estado(self):
         e = banco.parsear_estado("#ESTADO,giro=1,mag=QMC5883L,magcal=0,acelcal=1,mano=D")
         self.assertEqual(e, {"giro": 1, "mag": "QMC5883L", "magcal": 0,

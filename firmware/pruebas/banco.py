@@ -53,6 +53,20 @@ def _parsear_d(linea):
     return valores[0], valores[1], valores[2], valores[3], valores[4]
 
 
+def contar_malformadas(lineas):
+    """Líneas que la interfaz cuenta como no válidas: el primer campo no es D, CAL ni BAT y
+    no empiezan con '#'. Las vacías se descartan, como en la interfaz. Las D mal formadas
+    se cuentan aparte (invalidas)."""
+    n = 0
+    for linea in lineas:
+        linea = linea.strip()
+        if not linea or linea.startswith("#"):
+            continue
+        if linea.split(",")[0] not in ("D", "CAL", "BAT"):
+            n += 1
+    return n
+
+
 def _media(xs):
     return sum(xs) / len(xs)
 
@@ -82,6 +96,7 @@ def analizar_muestras(lineas, duracion_s):
         "hz": n / duracion_s if duracion_s > 0 else 0.0,
         "perdida_pct": 100.0 * huecos / total if total else 0.0,
         "invalidas": invalidas,
+        "malformadas": contar_malformadas(lineas),
         "errores_sensor": errores_sensor,
         "media": None,
         "deriva": None,
@@ -245,6 +260,7 @@ def ejecutar(puerto_nombre, segundos, sin_giro):
     filas.append(("frecuencia", f"{r['hz']:.1f} Hz", "48..52 Hz", _estado(48 <= r["hz"] <= 52)))
     filas.append(("pérdida", f"{r['perdida_pct']:.2f} %", "< 1 %", _estado(r["perdida_pct"] < 1)))
     filas.append(("líneas inválidas", r["invalidas"], "= 0", _estado(r["invalidas"] == 0)))
+    filas.append(("líneas malformadas", r["malformadas"], "= 0", _estado(r["malformadas"] == 0)))
     filas.append(("errores de sensor", r["errores_sensor"], "= 0",
                   _estado(r["errores_sensor"] == 0)))
     for eje in EJES:
