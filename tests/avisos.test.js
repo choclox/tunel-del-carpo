@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { avisoDispositivo, debeMostrar } = require('../avisos.js');
+const { avisoDispositivo, debeMostrar, debeAnularMedicion } = require('../avisos.js');
 
 const casos = [
   ['#Recalibre', 'recalibre', true],
@@ -35,4 +35,10 @@ test('debeMostrar limita por clave', () => {
   assert.strictEqual(debeMostrar('a', 6000, u), false);
   assert.strictEqual(debeMostrar('a', 11000, u), true);
   assert.strictEqual(debeMostrar('b', 11000, u), true);
+});
+
+test('debeAnularMedicion solo en la cuenta regresiva sin ejercicio', () => {
+  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: false }), true);
+  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: true }), false);
+  assert.strictEqual(debeAnularMedicion({ enEspera: false, hayEjercicio: false }), false);
 });

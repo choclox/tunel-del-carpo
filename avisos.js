@@ -46,4 +46,10 @@ function debeMostrar(clave, ahoraMs, ultimos, intervaloMs = 10000) {
   return true;
 }
 
-if (typeof module !== 'undefined') module.exports = { avisoDispositivo, debeMostrar };
+// En la cuenta regresiva de un paso (enEspera, sin ejercicio en marcha) una calibración invalidada
+// deja el paso en conteo manual; un ejercicio ya en marcha no se toca.
+function debeAnularMedicion({ enEspera, hayEjercicio }) {
+  return !!enEspera && !hayEjercicio;
+}
+
+if (typeof module !== 'undefined') module.exports = { avisoDispositivo, debeMostrar, debeAnularMedicion };
