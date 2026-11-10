@@ -5,6 +5,15 @@
 
 const float GRAD = 3.14159265f / 180;
 
+// Ruido uniforme determinista (LCG) en [-amp, amp): ±0,026 g ≈ σ 0,015 g; ±0,012 rad/s ≈ σ 0,007 rad/s.
+static uint32_t semilla = 12345;
+static float ruido(float amp) {
+  semilla = semilla * 1664525u + 1013904223u;
+  return amp * (2.0f * (float)(semilla >> 8) / 16777216.0f - 1.0f);
+}
+static Vec3 conRuido(Vec3 v, float amp) { return {v.x + ruido(amp), v.y + ruido(amp), v.z + ruido(amp)}; }
+const float RUIDO_ACEL = 0.026f, RUIDO_GIRO = 0.012f;
+
 // Llama a agregar cada 10 ms desde 'desde' hasta 'hasta' (ambos incluidos) y devuelve el último estado.
 EstadoCal alimentar(Calibrador& c, uint32_t desde, uint32_t hasta, Vec3 giro, Vec3 acel) {
   EstadoCal e = c.estado();
@@ -89,14 +98,26 @@ PRUEBA(acel_seis_caras_recupera_desfase_y_escala) {
   CERCA(c.desfase().x, 0.07f, 1e-3f); CERCA(c.desfase().y, -0.02f, 1e-3f); CERCA(c.desfase().z, 0.05f, 1e-3f);
   CERCA(c.escala().x, 0.98f, 1e-3f); CERCA(c.escala().y, 1.03f, 1e-3f); CERCA(c.escala().z, 1.01f, 1e-3f);
 }
+static void quietaConRuido(CalibradorAcel& c, uint32_t& t, Vec3 a, uint32_t ms) {
+  uint32_t ini = t;
+  while (t - ini < ms) { c.agregar(conRuido(a, RUIDO_ACEL), t); t += 10; }
+}
+PRUEBA(acel_seis_caras_con_ruido) {
+  CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
+  const Vec3 caras[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+  for (auto& g : caras) { quietaConRuido(c, t, medida(g), 1500); quietaConRuido(c, t, medida({0.5f,0.5f,0.5f}), 300); }
+  VERIFICAR(c.completo());
+  CERCA(c.desfase().x, 0.07f, 3e-3f); CERCA(c.desfase().y, -0.02f, 3e-3f); CERCA(c.desfase().z, 0.05f, 3e-3f);
+  CERCA(c.escala().x, 0.98f, 3e-3f); CERCA(c.escala().y, 1.03f, 3e-3f); CERCA(c.escala().z, 1.01f, 3e-3f);
+}
 PRUEBA(acel_falta_una_cara) {
   CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
   quieta(c, t, {0,0,1}, 1500); quieta(c, t, {0,0,-1}, 1500);
   VERIFICAR(!c.completo()); VERIFICAR(c.caras() == 0x30);
 }
-PRUEBA(acel_movimiento_no_captura) {   // sostenida en la mano: ±0,04 g alternando
+PRUEBA(acel_movimiento_lento_no_captura) {   // sostenida en la mano: ±0,06 g a 2 Hz
   CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
-  for (int i = 0; i < 300; i++, t += 10) c.agregar({0, 0, i % 2 ? 1.04f : 0.96f}, t);
+  for (int i = 0; i < 300; i++, t += 10) c.agregar({0, 0, 1 + 0.06f * sinf(2 * 3.14159265f * 2 * t / 1000.0f)}, t);
   VERIFICAR(c.caras() == 0);
 }
 PRUEBA(acel_inclinada_no_captura) {
@@ -113,6 +134,21 @@ PRUEBA(cal_acel_que_cambia_no_es_quietud) {   // giro constante, acel deriva 0,1
   Calibrador c; c.iniciar(0);
   for (uint32_t t = 0; t <= 2600; t += 10) c.agregar({0.01f, 0, 0}, {0, 0.1f * t / 2600, 1}, t);
   VERIFICAR(c.estado() != EstadoCal::Listo);
+}
+PRUEBA(cal_quieto_con_ruido) {
+  Calibrador c; c.iniciar(0);
+  bool listo = false;
+  for (uint32_t t = 0; t <= 3000 && !listo; t += 10)
+    listo = c.agregar(conRuido(SESGO, RUIDO_GIRO), conRuido(G, RUIDO_ACEL), t) == EstadoCal::Listo;
+  VERIFICAR(listo);
+  CERCA(c.sesgoGiro().x, SESGO.x, 2e-3f); CERCA(c.sesgoGiro().y, SESGO.y, 2e-3f); CERCA(c.sesgoGiro().z, SESGO.z, 2e-3f);
+}
+PRUEBA(sesgo_converge_con_ruido) {
+  EstimadorSesgo e; e.fijar({0, 0, 0});
+  const Vec3 B{0.02f, -0.01f, 0.015f};
+  for (uint32_t t = 0; t <= 30000; t += 10) e.agregar(conRuido(B, RUIDO_GIRO), conRuido(G, RUIDO_ACEL), t);
+  VERIFICAR(e.quieto());
+  CERCA(e.sesgo().x, B.x, 1e-3f); CERCA(e.sesgo().y, B.y, 1e-3f); CERCA(e.sesgo().z, B.z, 1e-3f);
 }
 PRUEBA(sesgo_converge_en_reposo) {
   EstimadorSesgo e; e.fijar({0, 0, 0});

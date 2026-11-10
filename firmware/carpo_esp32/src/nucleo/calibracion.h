@@ -4,7 +4,23 @@
 
 enum class EstadoCal { Inactivo, Midiendo, Convergiendo, Listo, Error };
 
-// Calibración del cero del giroscopio: exige quietud sostenida.
+// La quietud se juzga con promedios de bloques de MUESTRAS_BLOQUE muestras consecutivas
+// (100 ms a 100 Hz), no con muestras sueltas: el ruido real del GY-85 (σ ≈ 0,015 g y
+// ≈ 0,007 rad/s) vence umbrales por muestra. Los tiempos se siguen midiendo por muestra.
+const uint8_t MUESTRAS_BLOQUE = 10;
+
+// Acumula muestras de a una y entrega el promedio cuando el bloque se completa.
+struct Bloque {
+  Vec3 suma{0, 0, 0};
+  uint8_t n = 0;
+  void vaciar() { suma = {0, 0, 0}; n = 0; }
+  // true si esta muestra completó el bloque; deja el promedio en 'media' y vacía.
+  bool agregar(const Vec3& v, Vec3& media);
+};
+
+// Calibración del cero del giroscopio: exige quietud sostenida. Por muestra: módulo del
+// acelerómetro razonable y giroscopio cerca de la primera muestra (descarta golpes al
+// instante). Por bloque: promedios de acel y giro cerca del primer bloque de la ventana.
 class Calibrador {
  public:
   void iniciar(uint32_t tMs);
@@ -21,8 +37,10 @@ class Calibrador {
   void nuevaVentana();
   EstadoCal estado_ = EstadoCal::Inactivo;
   uint32_t inicio_ = 0, inicioVentana_ = 0, duracion_ = 0;
-  bool hayReferencia_ = false;
-  Vec3 acelRef_{0, 0, 0}, referencia_{0, 0, 0}, suma_{0, 0, 0}, sesgo_{0, 0, 0};
+  bool hayReferencia_ = false, hayBloqueRef_ = false;
+  Vec3 referencia_{0, 0, 0}, suma_{0, 0, 0}, sesgo_{0, 0, 0};
+  Vec3 acelRef_{0, 0, 0}, giroRef_{0, 0, 0};   // promedios del primer bloque de la ventana
+  Bloque bloqueAcel_, bloqueGiro_;
   uint32_t n_ = 0;
   const char* motivo_ = "";
 };
@@ -54,6 +72,8 @@ class VigilanteSensor {
 };
 
 // Calibración del acelerómetro en 6 posiciones quietas: desfase y escala por eje.
+// Quieta = rango por eje de los promedios de bloque de la ventana < 0,05 g; la cara se
+// captura al completar un bloque con la ventana de al menos 1 s (promedio de todas sus muestras).
 // Caras como bits: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z.
 class CalibradorAcel {
  public:
@@ -72,12 +92,15 @@ class CalibradorAcel {
   uint8_t caras_ = 0;
   uint32_t inicio_ = 0, inicioVentana_ = 0, n_ = 0;
   bool hayVentana_ = false;
-  float suma_[3] = {0, 0, 0}, min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};
+  float suma_[3] = {0, 0, 0}, min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};   // min/max de bloques
+  Bloque bloque_;
   float valor_[6] = {0, 0, 0, 0, 0, 0};   // promedio del eje dominante por cara
 };
 
 // Sesgo del giroscopio en reposo: se aprende solo con la mano quieta (giroscopio y
-// acelerómetro estables) durante al menos 2 s.
+// acelerómetro estables) durante al menos 2 s. La quietud se juzga por bloque (rango de
+// promedios de acel < 0,03 g y promedio de giro a < 0,025 rad/s del sesgo); un golpe grande
+// de giroscopio corta la ventana al instante. El sesgo se actualiza muestra a muestra.
 class EstimadorSesgo {
  public:
   explicit EstimadorSesgo(float alfa = 0.002f) : alfa_(alfa) {}
@@ -91,5 +114,7 @@ class EstimadorSesgo {
   Vec3 sesgo_{0, 0, 0};
   bool hayVentana_ = false, quieto_ = false;
   uint32_t inicioVentana_ = 0;
-  float min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};
+  float min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};   // min/max de promedios de bloque
+  Bloque bloqueAcel_, bloqueGiro_;
+  bool hayBloque_ = false;
 };
