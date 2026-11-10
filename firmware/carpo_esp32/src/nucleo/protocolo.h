@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum class TipoComando { Start, Stop, Cal, Ej, Mag, Raw, Mano, Prueba, Desconocido };
+enum class TipoComando { Start, Stop, Cal, Ej, Mag, Raw, Mano, Prueba, Acel, Estado, Desconocido };
+// "ACEL" (calibracion del acelerometro en 6 caras) y "ESTADO" son solo para la preparacion.
 
 // Comparacion exacta y sensible a mayusculas. "EJ,", "MANO," y "PR," se reconocen por prefijo.
 // "PR,<musculo>" / "PR,-" marca la prueba de fuerza EMG: es informativo (no hace nada).

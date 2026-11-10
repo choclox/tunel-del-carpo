@@ -15,6 +15,8 @@ TipoComando parsearComando(const char* linea) {
   if (strcmp(linea, "CAL") == 0) return TipoComando::Cal;
   if (strcmp(linea, "MAG") == 0) return TipoComando::Mag;
   if (strcmp(linea, "RAW") == 0) return TipoComando::Raw;
+  if (strcmp(linea, "ACEL") == 0) return TipoComando::Acel;
+  if (strcmp(linea, "ESTADO") == 0) return TipoComando::Estado;
   if (empiezaCon(linea, "EJ,")) return TipoComando::Ej;
   if (empiezaCon(linea, "MANO,")) return TipoComando::Mano;
   if (empiezaCon(linea, "PR,")) return TipoComando::Prueba;
