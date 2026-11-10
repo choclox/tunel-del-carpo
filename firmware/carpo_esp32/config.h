@@ -20,11 +20,13 @@ constexpr uint32_t PERIODO_BAT_MS = 10000;
 constexpr uint32_t PERIODO_RAW_MS = 200;
 constexpr uint32_t DURACION_MAG_MS = 20000;
 
-// Giroscopio: el ITG3205 del módulo actual no mide (no guarda la configuración y da ceros).
-// Con false no se usa: la orientación sale solo de acel y mag (FiltroSinGiro). Volver a true
-// con un GY-85 cuyo giroscopio funcione.
-constexpr bool USAR_GIROSCOPIO = false;
+// Giroscopio: true permite usarlo si el driver lo detecta. Si el ITG3205 no responde o no
+// funciona (no guarda la configuración, temperatura en cero), el firmware avisa y sigue sin
+// él: la orientación sale solo de acel y mag (FiltroSinGiro). Con false no se usa nunca.
+constexpr bool USAR_GIROSCOPIO = true;  // permite usarlo si el driver lo detecta
 constexpr float ALFA_SIN_GIRO = 0.2f;   // paso bajo de acel/mag a 100 Hz (~50 ms)
+// Estimador del sesgo del giroscopio con la mano quieta (corrige la deriva entre CAL).
+constexpr float ALFA_SESGO = 0.002f;
 
 // Filtro
 constexpr float BETA_NORMAL = 0.1f;
@@ -51,10 +53,5 @@ constexpr size_t EMG_VENTANA_RMS = 50;   // muestras de 1 ms
 constexpr Montaje MONTAJE_ACEL = MONTAJE_IDENTIDAD;
 constexpr Montaje MONTAJE_GIRO = MONTAJE_IDENTIDAD;
 constexpr Montaje MONTAJE_MAG = MONTAJE_IDENTIDAD;  // al cambiarlo hay que repetir MAG
-
-// Corrección del acelerómetro, en el marco ya montado: a = (a_montado - DESFASE_ACEL) * ESCALA_ACEL.
-// Medir con RAW cada eje hacia arriba y hacia abajo: desfase = (max + min) / 2, escala = 2 / (max - min).
-// Medido el 2026-10-26 con el GY-85 actual (6 posiciones, RAW): X +1,069/−0,920 g,
-// Y +0,987/−0,959 g, Z +0,909/−1,049 g. Repetir la medición si se cambia el módulo.
-constexpr Vec3 DESFASE_ACEL{0.0745f, 0.0140f, -0.0700f};   // g
-constexpr Vec3 ESCALA_ACEL{1.0055f, 1.0277f, 1.0215f};
+// La corrección del acelerómetro (desfase y escala) se mide en la placa con el comando ACEL y
+// queda guardada en NVS; hay que repetirla al cambiar de módulo.

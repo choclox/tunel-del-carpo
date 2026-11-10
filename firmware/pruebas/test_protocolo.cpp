@@ -60,3 +60,8 @@ PRUEBA(comando_prueba_emg) {
 }
 
 int main() { return correrPruebas(); }
+PRUEBA(comandos_acel_y_estado) {
+  VERIFICAR(parsearComando("ACEL") == TipoComando::Acel);
+  VERIFICAR(parsearComando("ESTADO") == TipoComando::Estado);
+  VERIFICAR(parsearComando("acel") == TipoComando::Desconocido);
+}

@@ -9,7 +9,10 @@ constexpr uint8_t DIR_QMC = 0x0D;
 // devuelve los chips a sus valores por defecto sin que falle el I2C.
 constexpr uint8_t LECTURAS_POR_VERIFICACION = 100;
 // Lecturas en cero del ADXL345 que se toleran tras configurarlo (aún no tiene una conversión).
-constexpr uint8_t GRACIA_ADXL = 5;
+// Debe quedar por debajo de las 5 fallas seguidas con que VigilanteSensor da el sensor por perdido.
+constexpr uint8_t GRACIA_ADXL = 3;
+// Intentos de la comprobación del ITG3205 (configuración y temperatura), 10 ms entre ellos.
+constexpr uint8_t INTENTOS_GIRO = 5;
 }  // namespace
 
 bool Gy85::escribir(uint8_t dir, uint8_t reg, uint8_t valor) {
@@ -31,6 +34,7 @@ bool Gy85::leerBytes(uint8_t dir, uint8_t reg, uint8_t* dest, uint8_t n) {
 bool Gy85::iniciar(TwoWire& wire) {
   wire_ = &wire;
   iniciado_ = false;
+  tieneGiro_ = false;   // un inicio fallido no deja un giroscopio de antes
   lecturas_ = 0;
   tipoMag_ = TipoMag::Ninguno;
 
@@ -44,7 +48,6 @@ bool Gy85::iniciar(TwoWire& wire) {
   // ITG3205: 0x68 o 0x69 (se omite con USAR_GIROSCOPIO = false). Un módulo con el chip dañado
   // puede responder al I2C y aun así no funcionar: se comprueba que conserve la configuración
   // y que dé una temperatura distinta de cero. Si no pasa, se sigue sin giroscopio.
-  tieneGiro_ = false;
   gracia_ = GRACIA_ADXL;
   if (USAR_GIROSCOPIO) {
     uint8_t quien = 0;
@@ -55,11 +58,14 @@ bool Gy85::iniciar(TwoWire& wire) {
     if (responde && escribir(dirGiro_, 0x3E, 0x01) &&   // PLL con giro X
         escribir(dirGiro_, 0x15, 0x09) &&               // 100 Hz
         escribir(dirGiro_, 0x16, 0x1B)) {               // ±2000 °/s, DLPF 42 Hz
-      delay(10);   // primera conversión antes de leer la temperatura
-      uint8_t dlpf = 0, temp[2] = {0, 0};
-      if (leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B &&
-          leerBytes(dirGiro_, 0x1B, temp, 2) && (temp[0] != 0 || temp[1] != 0)) {
-        tieneGiro_ = true;
+      // Hasta INTENTOS_GIRO comprobaciones (≤ ~50 ms): la primera conversión puede tardar.
+      for (uint8_t i = 0; i < INTENTOS_GIRO && !tieneGiro_; i++) {
+        delay(10);
+        uint8_t dlpf = 0, temp[2] = {0, 0};
+        if (leerBytes(dirGiro_, 0x16, &dlpf, 1) && dlpf == 0x1B &&
+            leerBytes(dirGiro_, 0x1B, temp, 2) && (temp[0] != 0 || temp[1] != 0)) {
+          tieneGiro_ = true;
+        }
       }
     }
   }

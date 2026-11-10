@@ -17,9 +17,11 @@
 
 static Gy85 gy85;
 static FiltroMadgwick filtro(BETA_NORMAL);
-static FiltroSinGiro filtroSinGiro(ALFA_SIN_GIRO);  // con USAR_GIROSCOPIO = false
+static FiltroSinGiro filtroSinGiro(ALFA_SIN_GIRO);  // sin giroscopio (no detectado o desactivado)
 static Calibrador calibrador;
 static CalibradorMag calibradorMag;
+static CalibradorAcel calibradorAcel;
+static EstimadorSesgo estimadorSesgo(ALFA_SESGO);
 static VigilanteSensor vigilante;
 static LectorLineas lector;
 static RmsVentana rmsEmg[3] = {RmsVentana(EMG_VENTANA_RMS), RmsVentana(EMG_VENTANA_RMS),
@@ -34,11 +36,17 @@ static bool enviandoRaw = false;
 static bool manoIzquierda = false;
 static bool calibrando = false;
 static bool midiendoMag = false;
+static bool calibrandoAcel = false;
 static bool magCalibrado = false;     // hay un MAG guardado para este chip y este MONTAJE_MAG
+static bool acelCalibrado = false;    // hay un ACEL guardado (acelok en NVS)
+static bool avisoSinGiro = false;     // el aviso de giroscopio ausente ya se imprimió en este arranque
 static bool sembrarPendiente = true;  // sembrar el filtro con la próxima lectura válida
 
-static Vec3 sesgoGiro{0, 0, 0};
+static Vec3 sesgoGiro{0, 0, 0};       // sesgo medido por el último CAL
 static Vec3 desfaseMag{0, 0, 0};
+// Corrección del acelerómetro guardada; sin acelok es neutra, nunca la de otro módulo.
+static Vec3 desfaseAcel{0, 0, 0};
+static Vec3 escalaAcel{1, 1, 1};
 static Cuaternion qCal;
 
 // Calibración del magnetómetro guardada en NVS (indicador, chip y huella del montaje).
@@ -62,8 +70,11 @@ static bool sensorDisponible() { return detectado && !vigilante.perdido(); }
 // Fusión de 9 ejes solo con un magnetómetro presente y calibrado (MAG) para este montaje.
 static bool usarMag() { return USAR_MAGNETOMETRO && gy85.tieneMagnetometro() && magCalibrado; }
 
+// Fusión con giroscopio solo si está permitido y el driver lo detectó en el último inicio.
+static bool usaGiro() { return USAR_GIROSCOPIO && gy85.tieneGiroscopio(); }
+
 static Cuaternion orientacionActual() {
-  return USAR_GIROSCOPIO ? filtro.orientacion() : filtroSinGiro.orientacion();
+  return usaGiro() ? filtro.orientacion() : filtroSinGiro.orientacion();
 }
 
 static Vec3 restarDesfaseMag(const Vec3& mag) {
@@ -110,6 +121,40 @@ static void cargarPreferencias() {
   pref.end();
 }
 
+// Corrección del acelerómetro desde NVS; sin acelok, desfase {0,0,0} y escala {1,1,1}.
+static void cargarCorreccionAcel() {
+  Preferences pref;
+  pref.begin("carpo", true);
+  acelCalibrado = pref.getBool("acelok", false);
+  if (acelCalibrado) {
+    desfaseAcel = Vec3{pref.getFloat("adx", 0.0f), pref.getFloat("ady", 0.0f),
+                       pref.getFloat("adz", 0.0f)};
+    escalaAcel = Vec3{pref.getFloat("asx", 1.0f), pref.getFloat("asy", 1.0f),
+                      pref.getFloat("asz", 1.0f)};
+  } else {
+    desfaseAcel = Vec3{0, 0, 0};
+    escalaAcel = Vec3{1, 1, 1};
+  }
+  pref.end();
+}
+
+static void guardarCorreccionAcel() {
+  Preferences pref;
+  pref.begin("carpo", false);
+  pref.putFloat("adx", desfaseAcel.x);
+  pref.putFloat("ady", desfaseAcel.y);
+  pref.putFloat("adz", desfaseAcel.z);
+  pref.putFloat("asx", escalaAcel.x);
+  pref.putFloat("asy", escalaAcel.y);
+  pref.putFloat("asz", escalaAcel.z);
+  pref.putBool("acelok", true);
+  pref.end();
+}
+
+// El driver conserva la corrección entre llamadas a iniciar(): basta con fijarla al arrancar
+// y cada vez que ACEL la cambia.
+static void aplicarCorreccionAcel() { gy85.fijarCorreccionAcel(desfaseAcel, escalaAcel); }
+
 // Tras detectar o recuperar el GY-85: el MAG guardado vale solo para el mismo chip y montaje.
 static void evaluarMag() {
   magCalibrado = magOkGuardado && strcmp(chipGuardado, gy85.codigoMagnetometro()) == 0 &&
@@ -117,6 +162,16 @@ static void evaluarMag() {
   if (USAR_MAGNETOMETRO && gy85.tieneMagnetometro() && !magCalibrado) {
     Serial.println("#Magnetometro sin calibrar: envie MAG");
   }
+}
+
+// Avisos tras detectar o recuperar el GY-85: giroscopio ausente (una vez por arranque) y
+// acelerómetro sin ACEL guardado.
+static void avisarSensor() {
+  if (USAR_GIROSCOPIO && !gy85.tieneGiroscopio() && !avisoSinGiro) {
+    Serial.println("#Giroscopio no responde: modo sin giroscopio");
+    avisoSinGiro = true;
+  }
+  if (!acelCalibrado) Serial.println("#Acelerometro sin calibrar: envie ACEL");
 }
 
 static void enviarBateria() {
@@ -155,6 +210,27 @@ static void iniciarMag(uint32_t ahora) {
   Serial.println("#MAG: gire la mano en todas las direcciones durante 20 s");
 }
 
+// ACEL: con la corrección neutra, gy85.leer() entrega el acelerómetro sin corregir. Un ACEL en
+// curso se reinicia; la corrección guardada se conserva hasta completar las 6 caras.
+static void iniciarAcel(uint32_t ahora) {
+  if (!sensorDisponible()) {
+    Serial.println("#ACEL,ERR,sensor");
+    return;
+  }
+  Serial.println("#ACEL: ponga la placa quieta con cada cara hacia arriba y hacia abajo (6 posiciones)");
+  gy85.fijarCorreccionAcel(Vec3{0, 0, 0}, Vec3{1, 1, 1});
+  calibradorAcel.iniciar(ahora);
+  calibrandoAcel = true;
+}
+
+static void enviarEstado() {
+  char buf[96];
+  snprintf(buf, sizeof(buf), "#ESTADO,giro=%d,mag=%s,magcal=%d,acelcal=%d,mano=%c",
+           usaGiro() ? 1 : 0, gy85.nombreMagnetometro(), magCalibrado ? 1 : 0,
+           acelCalibrado ? 1 : 0, manoIzquierda ? 'I' : 'D');
+  Serial.println(buf);
+}
+
 static void procesarComando(const char* linea, uint32_t ahora) {
   switch (parsearComando(linea)) {
     case TipoComando::Start:
@@ -168,6 +244,8 @@ static void procesarComando(const char* linea, uint32_t ahora) {
     case TipoComando::Prueba: break;  // informativo: la prueba EMG la guía la interfaz
     case TipoComando::Mag: iniciarMag(ahora); break;
     case TipoComando::Raw: enviandoRaw = !enviandoRaw; break;
+    case TipoComando::Acel: iniciarAcel(ahora); break;
+    case TipoComando::Estado: enviarEstado(); break;
     case TipoComando::Mano: {
       bool izq = false;
       if (parsearMano(linea, izq)) {
@@ -222,6 +300,7 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
     qCal = orientacionActual();
     filtro.fijarBeta(BETA_NORMAL);
     calibrando = false;
+    estimadorSesgo.fijar(sesgoGiro);  // el estimador sigue la deriva desde el sesgo medido
     if (USAR_EMG) reposoEmg.terminar();
     formatearCalOk(buf, sizeof(buf), calibrador.duracionMs());
     Serial.println(buf);
@@ -250,6 +329,48 @@ static void gestionarMag(const Vec3& mag, bool ok, uint32_t ahora) {
     Serial.println("#Recalibre");
   } else {
     Serial.println("#MAG,ERR,giro insuficiente");
+  }
+}
+
+// Calibración del acelerómetro: captura cada cara quieta; al completar las 6 guarda y aplica la
+// corrección, y si vence restaura la anterior. CAL y MAG siguen funcionando mientras tanto.
+static void gestionarAcel(const Vec3& acel, bool ok, uint32_t ahora) {
+  if (!calibrandoAcel) return;
+  char buf[96];
+  uint8_t antes = calibradorAcel.caras();
+  if (ok && calibradorAcel.agregar(acel, ahora)) {
+    uint8_t nuevas = calibradorAcel.caras() & ~antes;
+    for (uint8_t i = 0; i < 6; i++) {
+      if (nuevas & (1u << i)) {
+        snprintf(buf, sizeof(buf), "#ACEL,%s", CalibradorAcel::nombreCara(i));
+        Serial.println(buf);
+      }
+    }
+  }
+  if (calibradorAcel.completo()) {
+    calibrandoAcel = false;
+    desfaseAcel = calibradorAcel.desfase();
+    escalaAcel = calibradorAcel.escala();
+    acelCalibrado = true;
+    guardarCorreccionAcel();
+    aplicarCorreccionAcel();
+    sembrarPendiente = true;  // la gravedad corregida cambia la inclinación: el cero anterior ya no vale
+    snprintf(buf, sizeof(buf), "#ACEL,OK,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f", desfaseAcel.x,
+             desfaseAcel.y, desfaseAcel.z, escalaAcel.x, escalaAcel.y, escalaAcel.z);
+    Serial.println(buf);
+    Serial.println("#Recalibre");
+  } else if (calibradorAcel.vencido(ahora)) {
+    calibrandoAcel = false;
+    aplicarCorreccionAcel();  // vuelve la corrección anterior (o la neutra)
+    int n = snprintf(buf, sizeof(buf), "#ACEL,ERR,faltan,");
+    bool primera = true;
+    for (uint8_t i = 0; i < 6; i++) {
+      if (calibradorAcel.caras() & (1u << i)) continue;
+      n += snprintf(buf + n, sizeof(buf) - n, "%s%s", primera ? "" : " ",
+                    CalibradorAcel::nombreCara(i));
+      primera = false;
+    }
+    Serial.println(buf);
   }
 }
 
@@ -286,7 +407,7 @@ static void enviarMuestra(uint32_t ahora) {
   Serial.println(buf);
 }
 
-// #RAW: acel (g), giro (rad/s), mag montado (µT) y el ángulo acel-mag (grados) con el desfase
+// #RAW: acel corregido (g; sin corregir mientras corre ACEL), giro crudo (rad/s), mag montado (µT) y el ángulo acel-mag (grados) con el desfase
 // de MAG restado. Tras MAG ese ángulo debe mantenerse constante al girar la mano.
 static void enviarRaw() {
   if (!sensorDisponible()) {  // no repetir la última lectura como si fuera nueva
@@ -301,7 +422,8 @@ static void enviarRaw() {
   Serial.println(buf);
 }
 
-// Vigila las lecturas y reintenta el driver; al recuperarlo se vuelve a sembrar el filtro.
+// Vigila las lecturas y reintenta el driver; al recuperarlo se vuelve a sembrar el filtro
+// (el de usaGiro(), que pudo cambiar si el giroscopio dejó o volvió a responder).
 static void vigilarSensor(bool ok, uint32_t ahora) {
   vigilante.registrar(ok, ahora);
   if (!vigilante.debeReintentar(ahora)) return;
@@ -309,6 +431,8 @@ static void vigilarSensor(bool ok, uint32_t ahora) {
   if (!gy85.iniciar(Wire)) return;
   detectado = true;
   Serial.println("#GY-85 recuperado");
+  if (!calibrandoAcel) aplicarCorreccionAcel();  // durante ACEL sigue la neutra
+  avisarSensor();
   evaluarMag();
   sembrarPendiente = true;
   if (!usarMag()) Serial.println("#Recalibre");  // en 6 ejes el rumbo sembrado es arbitrario
@@ -318,7 +442,7 @@ static void vigilarSensor(bool ok, uint32_t ahora) {
 // En 9 ejes la siembra espera a una lectura con magnetómetro para fijar el rumbo.
 static void actualizarFiltro(const Vec3& giro, const Vec3& acel, const Vec3& mag, float dt) {
   Vec3 magC = magParaFiltro(mag);
-  if (!USAR_GIROSCOPIO) {  // sin giroscopio: orientación directa desde acel/mag suavizados
+  if (!usaGiro()) {  // sin giroscopio: orientación directa desde acel/mag suavizados
     if (sembrarPendiente) {
       filtroSinGiro.reiniciar();
       sembrarPendiente = false;
@@ -331,7 +455,11 @@ static void actualizarFiltro(const Vec3& giro, const Vec3& acel, const Vec3& mag
     sembrarPendiente = false;
     return;
   }
-  Vec3 giroC{giro.x - sesgoGiro.x, giro.y - sesgoGiro.y, giro.z - sesgoGiro.z};
+  // En la convergencia de CAL se usa el sesgo recién medido; fuera de ella, el del estimador
+  // (sembrado con ese mismo sesgo al terminar CAL y corregido luego con la mano quieta).
+  bool convergiendo = calibrando && calibrador.estado() == EstadoCal::Convergiendo;
+  Vec3 sesgo = convergiendo ? sesgoGiro : estimadorSesgo.sesgo();
+  Vec3 giroC{giro.x - sesgo.x, giro.y - sesgo.y, giro.z - sesgo.z};
   filtro.actualizar(giroC, acel, magC, dt);  // con magC = {0,0,0} usa 6 ejes
 }
 
@@ -347,6 +475,7 @@ static void cicloFusion(uint32_t ahora) {
 
   if (ok) {
     ultAcel = acel; ultGiro = giro; ultMag = mag;
+    if (usaGiro() && !calibrando) estimadorSesgo.agregar(giro, acel, ahora);
     actualizarFiltro(giro, acel, mag, dt);
   }
 
@@ -357,6 +486,7 @@ static void cicloFusion(uint32_t ahora) {
   }
   gestionarCalibracion(giro, acel, ok, ahora);
   gestionarMag(mag, ok, ahora);
+  gestionarAcel(acel, ok, ahora);
 
   if (++ciclo >= CICLOS_POR_ENVIO) {
     ciclo = 0;
@@ -374,6 +504,8 @@ void setup() {
   esp_log_level_set("i2c.master", ESP_LOG_NONE);
   Wire.begin(PIN_SDA, PIN_SCL, I2C_HZ);
   cargarPreferencias();
+  cargarCorreccionAcel();
+  aplicarCorreccionAcel();  // antes de la primera lectura
 
   detectado = gy85.iniciar(Wire);
   if (detectado) {
@@ -381,6 +513,7 @@ void setup() {
     Serial.println(gy85.nombreMagnetometro());
     if (!gy85.tieneMagnetometro()) Serial.println("#Sin magnetometro: rc puede derivar");
     if (!USAR_GIROSCOPIO) Serial.println("#Modo sin giroscopio: angulos solo desde acelerometro y magnetometro");
+    avisarSensor();
     evaluarMag();
   } else {
     Serial.println("#GY-85 no detectado");
