@@ -50,5 +50,25 @@ class TestBanco(unittest.TestCase):
                              "acelcal": 1, "mano": "D"})
 
 
+class TestRobustez(unittest.TestCase):
+    def test_hay_raw(self):
+        self.assertTrue(banco.hay_raw(["ok", "#RAW,1,2,3,4,5,6,7,8,9,10"]))
+        self.assertFalse(banco.hay_raw(["#ESTADO,giro=1", "D,1,20,0,0,0"]))
+        self.assertFalse(banco.hay_raw([]))
+
+    def test_deriva_valida(self):
+        self.assertFalse(banco.deriva_valida(5))
+        self.assertFalse(banco.deriva_valida(9.9))
+        self.assertTrue(banco.deriva_valida(10))
+        self.assertTrue(banco.deriva_valida(60))
+
+    def test_estado_malformado(self):
+        e = banco.parsear_estado("#ESTADO,giro=x,mag=QMC5883L,magcal=0,acelcal=,mano=D")
+        self.assertIsNone(e["giro"])
+        self.assertIsNone(e["acelcal"])
+        self.assertEqual(e["magcal"], 0)
+        self.assertEqual(e["mano"], "D")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -19,8 +19,24 @@ def parsear_estado(linea):
         if "=" not in campo:
             continue
         clave, valor = campo.split("=", 1)
-        estado[clave] = int(valor) if clave in ("giro", "magcal", "acelcal") else valor
+        if clave in ("giro", "magcal", "acelcal"):
+            try:
+                estado[clave] = int(valor)
+            except ValueError:
+                estado[clave] = None
+        else:
+            estado[clave] = valor
     return estado
+
+
+def hay_raw(lineas):
+    """True si entre las líneas hay alguna '#RAW,' (el modo RAW está activo)."""
+    return any(l.startswith("#RAW,") for l in lineas)
+
+
+def deriva_valida(duracion_s):
+    """La deriva compara dos ventanas de 5 s; necesita al menos 10 s sin solaparlas."""
+    return duracion_s >= 2 * VENTANA_MS / 1000.0
 
 
 def _parsear_d(linea):
@@ -129,7 +145,10 @@ def _fase_raw(puerto):
     _enviar(puerto, "RAW")
     lineas = _leer_lineas(puerto, 3.0)
     _enviar(puerto, "RAW")
-    _leer_lineas(puerto, 0.5)
+    if hay_raw(_leer_lineas(puerto, 0.5)):
+        # el cierre se perdió: un segundo toggle apaga RAW
+        _enviar(puerto, "RAW")
+        _leer_lineas(puerto, 0.5)
     acel, giro = [], [[], [], []]
     for linea in lineas:
         if not linea.startswith("#RAW,"):
@@ -166,9 +185,15 @@ def ejecutar(puerto_nombre, segundos, sin_giro):
         # 1. ESTADO
         _enviar(puerto, "ESTADO")
         estado = {}
-        for linea in _leer_lineas(puerto, 2.0, ("#ESTADO",)):
+        lineas_estado = _leer_lineas(puerto, 2.0, ("#ESTADO",))
+        for linea in lineas_estado:
             if linea.startswith("#ESTADO"):
                 estado = parsear_estado(linea)
+        lineas_estado += _leer_lineas(puerto, 0.5)  # detectar RAW ya activo
+        if hay_raw(lineas_estado):
+            # RAW ya estaba activo: un toggle lo apaga antes de la fase RAW
+            _enviar(puerto, "RAW")
+            _leer_lineas(puerto, 0.5)
         if sin_giro:
             filas.append(("giro", estado.get("giro", "?"), "omitido (--sin-giro)", "INFO"))
         else:
@@ -228,7 +253,10 @@ def ejecutar(puerto_nombre, segundos, sin_giro):
             filas.append((f"media {eje} tras CAL", "sin datos", "|m| < 1.0°", "FALLA"))
         else:
             d, m = r["deriva"][eje], r["media"][eje]
-            filas.append((f"deriva {eje}", f"{d:+.2f}°", "|d| < 1.0°", _estado(abs(d) < 1.0)))
+            if deriva_valida(segundos):
+                filas.append((f"deriva {eje}", f"{d:+.2f}°", "|d| < 1.0°", _estado(abs(d) < 1.0)))
+            else:
+                filas.append((f"deriva {eje}", "duración < 10 s", "|d| < 1.0°", "FALLA"))
             filas.append((f"media {eje} tras CAL", f"{m:+.2f}°", "|m| < 1.0°",
                           _estado(abs(m) < 1.0)))
 
