@@ -157,6 +157,27 @@ PRUEBA(cal_temblor_de_mano) {   // temblor fisiológico 8-12 Hz de ±0,1 rad/s: 
   VERIFICAR(listo);
   CERCA(c.sesgoGiro().x, SESGO.x, 5e-3f); CERCA(c.sesgoGiro().y, SESGO.y, 5e-3f); CERCA(c.sesgoGiro().z, SESGO.z, 5e-3f);
 }
+// 8 Hz no se anula en un bloque de 100 ms: el peor caso para el bloque. La fase del temblor
+// respecto al inicio de CAL es arbitraria en la mano real, así que se barre (fase 0 = caso base).
+PRUEBA(cal_temblor_8hz) {
+  const float PI2 = 2 * 3.14159265f;
+  uint32_t peor = 0;
+  for (int k = 0; k < 16; k++) {
+    float f = PI2 * k / 16;
+    Calibrador c; c.iniciar(0);
+    bool listo = false;
+    for (uint32_t t = 0; t <= 3000 && !listo; t += 10) {
+      float s = t / 1000.0f;
+      Vec3 g{SESGO.x + 0.14f * sinf(PI2 * 8 * s + f), SESGO.y + 0.08f * sinf(PI2 * 12 * s + 0.5f + f),
+             SESGO.z + 0.03f * sinf(PI2 * 7 * s + f)};
+      listo = c.agregar(g, conRuido(G, RUIDO_ACEL), t) == EstadoCal::Listo;
+    }
+    VERIFICAR(listo);
+    if (c.duracionMs() > peor) peor = c.duracionMs();
+    CERCA(c.sesgoGiro().x, SESGO.x, 8e-3f); CERCA(c.sesgoGiro().y, SESGO.y, 8e-3f); CERCA(c.sesgoGiro().z, SESGO.z, 8e-3f);
+  }
+  printf("  temblor 8 Hz: CAL más lenta en %u ms (16 fases)\n", (unsigned)peor);
+}
 // Ruido casi gaussiano: suma de 12 uniformes [0,1) del mismo LCG, menos 6 (σ = 1).
 static float gauss(float sigma) {
   float s = 0;
@@ -165,6 +186,7 @@ static float gauss(float sigma) {
 }
 static Vec3 conGauss(Vec3 v, float sigma) { return {v.x + gauss(sigma), v.y + gauss(sigma), v.z + gauss(sigma)}; }
 PRUEBA(sesgo_reposo_largo_ruido_gaussiano) {   // 120 s quieta: la ventana no se corta por el ruido
+  semilla = 12345;   // semilla propia: no depende del orden de las pruebas
   EstimadorSesgo e;
   const Vec3 B{0.02f, -0.01f, 0.015f};
   e.fijar(B);

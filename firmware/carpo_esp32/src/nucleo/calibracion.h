@@ -21,7 +21,7 @@ struct Bloque {
 // Calibración del cero del giroscopio: exige quietud sostenida. Por muestra: módulo del
 // acelerómetro razonable y giroscopio a < 0,35 rad/s de la primera muestra (descarta golpes
 // al instante, tolera el temblor de la mano). Por bloque: promedios de acel (< 0,05 g) y
-// giro (< 0,05 rad/s) cerca del primer bloque de la ventana.
+// giro (< 0,07 rad/s) cerca del primer bloque de la ventana.
 class Calibrador {
  public:
   void iniciar(uint32_t tMs);

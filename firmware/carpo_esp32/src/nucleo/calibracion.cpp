@@ -6,7 +6,9 @@ const float ACEL_MIN = 0.90f, ACEL_MAX = 1.10f;
 // Por muestra solo se descartan golpes: el temblor fisiológico de la mano apoyada (8-12 Hz,
 // ±0,1 rad/s, < 0,2° de movimiento) no debe impedir la calibración.
 const float GIRO_GOLPE = 0.35f;        // rad/s, por muestra respecto a la primera muestra
-const float GIRO_TOL_BLOQUE = 0.05f;   // rad/s, promedio de bloque respecto al primer bloque
+// rad/s, promedio de bloque respecto al primer bloque. Un temblor de 8 Hz no se anula en
+// 100 ms: con 0,14 rad/s dos bloques difieren hasta 0,063 rad/s según la fase.
+const float GIRO_TOL_BLOQUE = 0.07f;
 const uint32_t MIDIENDO_MS = 1000, CONVERGIENDO_MS = 1500, LIMITE_MS = 10000;
 const uint32_t ASENTAMIENTO_MS = 500;   // parte final de CONVERGIENDO_MS a beta normal
 const float RANGO_MAG_MIN = 30.0f;
