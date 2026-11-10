@@ -114,3 +114,70 @@ bool VigilanteSensor::debeReintentar(uint32_t tMs) {
   ultimoReintento_ = tMs;
   return true;
 }
+
+namespace {
+const float ACEL_RANGO_QUIETO = 0.05f, ACEL_DOMINANTE = 0.7f, ACEL_OTROS = 0.35f;
+const uint32_t ACEL_VENTANA_MS = 1000, ACEL_VENCE_MS = 180000;
+}
+
+void CalibradorAcel::iniciar(uint32_t tMs) {
+  caras_ = 0;
+  inicio_ = tMs;
+  for (int i = 0; i < 6; i++) valor_[i] = 0;
+  reiniciarVentana();
+}
+
+void CalibradorAcel::reiniciarVentana() {
+  hayVentana_ = false;
+  n_ = 0;
+  for (int e = 0; e < 3; e++) suma_[e] = 0;
+}
+
+bool CalibradorAcel::agregar(const Vec3& a, uint32_t tMs) {
+  const float v[3] = {a.x, a.y, a.z};
+  if (hayVentana_) {
+    for (int e = 0; e < 3; e++) {
+      if (v[e] < min_[e]) min_[e] = v[e];
+      if (v[e] > max_[e]) max_[e] = v[e];
+      if (max_[e] - min_[e] >= ACEL_RANGO_QUIETO) { hayVentana_ = false; break; }
+    }
+  }
+  if (!hayVentana_) {   // ventana nueva que empieza en esta muestra
+    n_ = 0;
+    for (int e = 0; e < 3; e++) { suma_[e] = 0; min_[e] = max_[e] = v[e]; }
+    inicioVentana_ = tMs;
+    hayVentana_ = true;
+  }
+  for (int e = 0; e < 3; e++) suma_[e] += v[e];
+  n_++;
+  if (tMs - inicioVentana_ < ACEL_VENTANA_MS) return false;
+
+  float m[3];
+  for (int e = 0; e < 3; e++) m[e] = suma_[e] / n_;
+  reiniciarVentana();   // la ventana vuelve a empezar en la muestra siguiente
+  for (int e = 0; e < 3; e++) {
+    if (fabsf(m[e]) <= ACEL_DOMINANTE) continue;
+    if (fabsf(m[(e + 1) % 3]) >= ACEL_OTROS || fabsf(m[(e + 2) % 3]) >= ACEL_OTROS) return false;
+    uint8_t cara = (uint8_t)(2 * e + (m[e] < 0 ? 1 : 0));
+    if (caras_ & (1u << cara)) return false;
+    caras_ |= (uint8_t)(1u << cara);
+    valor_[cara] = m[e];
+    return true;
+  }
+  return false;
+}
+
+bool CalibradorAcel::vencido(uint32_t tMs) const { return tMs - inicio_ >= ACEL_VENCE_MS; }
+
+Vec3 CalibradorAcel::desfase() const {
+  return {(valor_[0] + valor_[1]) / 2, (valor_[2] + valor_[3]) / 2, (valor_[4] + valor_[5]) / 2};
+}
+
+Vec3 CalibradorAcel::escala() const {
+  return {2 / (valor_[0] - valor_[1]), 2 / (valor_[2] - valor_[3]), 2 / (valor_[4] - valor_[5])};
+}
+
+const char* CalibradorAcel::nombreCara(uint8_t i) {
+  static const char* const N[6] = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
+  return i < 6 ? N[i] : "?";
+}

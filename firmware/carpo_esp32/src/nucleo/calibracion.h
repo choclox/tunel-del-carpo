@@ -52,3 +52,26 @@ class VigilanteSensor {
   bool perdido_ = false, huboReintento_ = false;
   uint32_t ultimoReintento_ = 0;
 };
+
+// Calibración del acelerómetro en 6 posiciones quietas: desfase y escala por eje.
+// Caras como bits: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z.
+class CalibradorAcel {
+ public:
+  void iniciar(uint32_t tMs);
+  // true si esta muestra completó la captura de una cara nueva.
+  bool agregar(const Vec3& acelSinCorregir, uint32_t tMs);
+  uint8_t caras() const { return caras_; }
+  bool completo() const { return caras_ == 0x3F; }
+  bool vencido(uint32_t tMs) const;
+  Vec3 desfase() const;   // válido solo si completo()
+  Vec3 escala() const;    // válido solo si completo()
+  static const char* nombreCara(uint8_t i);
+
+ private:
+  void reiniciarVentana();
+  uint8_t caras_ = 0;
+  uint32_t inicio_ = 0, inicioVentana_ = 0, n_ = 0;
+  bool hayVentana_ = false;
+  float suma_[3] = {0, 0, 0}, min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};
+  float valor_[6] = {0, 0, 0, 0, 0, 0};   // promedio del eje dominante por cara
+};

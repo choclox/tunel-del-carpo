@@ -74,4 +74,39 @@ PRUEBA(vigilante_reintenta_cada_segundo) {
   for (int i = 0; i < 5; i++) v.registrar(false, i * 10);
   VERIFICAR(v.debeReintentar(100)); VERIFICAR(!v.debeReintentar(600)); VERIFICAR(v.debeReintentar(1100));
 }
+// --- CalibradorAcel ---
+static void quieta(CalibradorAcel& c, uint32_t& t, Vec3 a, uint32_t ms) {
+  uint32_t ini = t;
+  while (t - ini < ms) { c.agregar(a, t); t += 10; }
+}
+const Vec3 DESF{0.07f, -0.02f, 0.05f}, GAN{0.98f, 1.03f, 1.01f};
+static Vec3 medida(Vec3 g) { return {g.x / GAN.x + DESF.x, g.y / GAN.y + DESF.y, g.z / GAN.z + DESF.z}; }
+PRUEBA(acel_seis_caras_recupera_desfase_y_escala) {
+  CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
+  const Vec3 caras[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+  for (auto& g : caras) { quieta(c, t, medida(g), 1500); quieta(c, t, medida({0.5f,0.5f,0.5f}), 300); }
+  VERIFICAR(c.completo());
+  CERCA(c.desfase().x, 0.07f, 1e-3f); CERCA(c.desfase().y, -0.02f, 1e-3f); CERCA(c.desfase().z, 0.05f, 1e-3f);
+  CERCA(c.escala().x, 0.98f, 1e-3f); CERCA(c.escala().y, 1.03f, 1e-3f); CERCA(c.escala().z, 1.01f, 1e-3f);
+}
+PRUEBA(acel_falta_una_cara) {
+  CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
+  quieta(c, t, {0,0,1}, 1500); quieta(c, t, {0,0,-1}, 1500);
+  VERIFICAR(!c.completo()); VERIFICAR(c.caras() == 0x30);
+}
+PRUEBA(acel_movimiento_no_captura) {   // sostenida en la mano: ±0,04 g alternando
+  CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
+  for (int i = 0; i < 300; i++, t += 10) c.agregar({0, 0, i % 2 ? 1.04f : 0.96f}, t);
+  VERIFICAR(c.caras() == 0);
+}
+PRUEBA(acel_inclinada_no_captura) {
+  CalibradorAcel c; uint32_t t = 0; c.iniciar(t);
+  quieta(c, t, {0.5f, 0, 0.85f}, 2000);
+  VERIFICAR(c.caras() == 0);
+}
+PRUEBA(acel_nombres_y_vencimiento) {
+  TEXTO_IGUAL(CalibradorAcel::nombreCara(0), "+X"); TEXTO_IGUAL(CalibradorAcel::nombreCara(5), "-Z");
+  CalibradorAcel c; c.iniciar(1000);
+  VERIFICAR(!c.vencido(180999)); VERIFICAR(c.vencido(181000));
+}
 int main() { return correrPruebas(); }
