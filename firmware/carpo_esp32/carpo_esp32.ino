@@ -41,6 +41,7 @@ static bool magCalibrado = false;     // hay un MAG guardado para este chip y es
 static bool acelCalibrado = false;    // hay un ACEL guardado (acelok en NVS)
 static bool avisoSinGiro = false;     // el aviso de giroscopio ausente ya se imprimió en este arranque
 static bool sembrarPendiente = true;  // sembrar el filtro con la próxima lectura válida
+static bool giroEnUso = false;        // usaGiro() tras el último inicio correcto del GY-85
 
 static Vec3 sesgoGiro{0, 0, 0};       // sesgo medido por el último CAL
 static Vec3 desfaseMag{0, 0, 0};
@@ -94,9 +95,11 @@ static void guardarMano() {
   pref.end();
 }
 
+// Como en ACEL: magok se baja antes de escribir y se sube al final.
 static void guardarDesfaseMag() {
   Preferences pref;
   pref.begin("carpo", false);
+  pref.putBool("magok", false);
   pref.putFloat("mx", desfaseMag.x);
   pref.putFloat("my", desfaseMag.y);
   pref.putFloat("mz", desfaseMag.z);
@@ -121,7 +124,8 @@ static void cargarPreferencias() {
   pref.end();
 }
 
-// Corrección del acelerómetro desde NVS; sin acelok, desfase {0,0,0} y escala {1,1,1}.
+// Corrección del acelerómetro desde NVS; sin acelok, o con valores fuera de rango, desfase
+// {0,0,0} y escala {1,1,1} (avisarSensor() imprime "#Acelerometro sin calibrar: envie ACEL").
 static void cargarCorreccionAcel() {
   Preferences pref;
   pref.begin("carpo", true);
@@ -131,16 +135,21 @@ static void cargarCorreccionAcel() {
                        pref.getFloat("adz", 0.0f)};
     escalaAcel = Vec3{pref.getFloat("asx", 1.0f), pref.getFloat("asy", 1.0f),
                       pref.getFloat("asz", 1.0f)};
-  } else {
+    acelCalibrado = correccionAcelValida(desfaseAcel, escalaAcel);
+  }
+  if (!acelCalibrado) {
     desfaseAcel = Vec3{0, 0, 0};
     escalaAcel = Vec3{1, 1, 1};
   }
   pref.end();
 }
 
+// El indicador se baja antes de escribir los valores y se sube al final: un corte a mitad de
+// camino deja acelok en false, nunca una corrección a medias.
 static void guardarCorreccionAcel() {
   Preferences pref;
   pref.begin("carpo", false);
+  pref.putBool("acelok", false);
   pref.putFloat("adx", desfaseAcel.x);
   pref.putFloat("ady", desfaseAcel.y);
   pref.putFloat("adz", desfaseAcel.z);
@@ -191,6 +200,7 @@ static void iniciarCalibracion(uint32_t ahora) {
   }
   calibrando = true;  // un CAL en curso se reinicia
   filtro.fijarBeta(BETA_NORMAL);
+  estimadorSesgo.fijar(estimadorSesgo.sesgo());  // nueva ventana tras el CAL; sesgo y ancla se conservan
   calibrador.iniciar(ahora);
   if (USAR_EMG) reposoEmg.iniciar();  // el reposo EMG se mide durante la calibración
 }
@@ -272,6 +282,17 @@ static void leerComandos(uint32_t ahora) {
   }
 }
 
+// CAL termina sin éxito: el estimador conserva su sesgo y su ancla, pero empieza una ventana
+// nueva (la quietud de antes del CAL ya no vale).
+static void terminarCalConError(const char* motivo) {
+  filtro.fijarBeta(BETA_NORMAL);
+  calibrando = false;
+  estimadorSesgo.fijar(estimadorSesgo.sesgo());
+  char buf[64];
+  formatearCalErr(buf, sizeof(buf), motivo);
+  Serial.println(buf);
+}
+
 // Calibración del cero del giroscopio y avance de su máquina de estados.
 // Al entrar en Convergiendo se siembra el filtro desde acel/mag (orientación absoluta); el
 // filtro converge a beta alta y los últimos 500 ms se asienta a beta normal antes de tomar qCal.
@@ -279,9 +300,7 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
                                  uint32_t ahora) {
   if (!calibrando) return;
   if (vigilante.perdido()) {
-    calibrando = false;
-    filtro.fijarBeta(BETA_NORMAL);
-    Serial.println("CAL,ERR,sensor");
+    terminarCalConError("sensor");
     return;
   }
   if (!ok) return;
@@ -292,6 +311,13 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
     filtro.fijarBeta(BETA_NORMAL);  // la quietud se perdió: vuelve a medir
   } else if (despues == EstadoCal::Convergiendo) {
     if (antes != EstadoCal::Convergiendo) {
+      // Un giro lento y constante durante CAL se mediría como sesgo: si no coincide con el
+      // aprendido en reposo, se rechaza.
+      if (!sesgoCalCoherente(calibrador.sesgoGiro(), estimadorSesgo.sesgo(),
+                             estimadorSesgo.confiable())) {
+        terminarCalConError("movimiento");
+        return;
+      }
       sesgoGiro = calibrador.sesgoGiro();
       sembrarPendiente = true;  // se siembra con la lectura del próximo ciclo
     }
@@ -300,15 +326,13 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
     qCal = orientacionActual();
     filtro.fijarBeta(BETA_NORMAL);
     calibrando = false;
-    estimadorSesgo.fijar(sesgoGiro);  // el estimador sigue la deriva desde el sesgo medido
+    // El estimador sigue la deriva desde el sesgo medido, que pasa a ser su ancla.
+    estimadorSesgo.fijar(sesgoGiro, true);
     if (USAR_EMG) reposoEmg.terminar();
     formatearCalOk(buf, sizeof(buf), calibrador.duracionMs());
     Serial.println(buf);
   } else if (despues == EstadoCal::Error) {
-    filtro.fijarBeta(BETA_NORMAL);
-    calibrando = false;
-    formatearCalErr(buf, sizeof(buf), calibrador.motivo());
-    Serial.println(buf);
+    terminarCalConError(calibrador.motivo());
   }
 }
 
@@ -371,6 +395,8 @@ static void gestionarAcel(const Vec3& acel, bool ok, uint32_t ahora) {
       primera = false;
     }
     Serial.println(buf);
+    sembrarPendiente = true;  // el filtro corrió con el acel sin corregir: el cero anterior ya no vale
+    Serial.println("#Recalibre");
   }
 }
 
@@ -428,14 +454,23 @@ static void vigilarSensor(bool ok, uint32_t ahora) {
   vigilante.registrar(ok, ahora);
   if (!vigilante.debeReintentar(ahora)) return;
   Serial.println("#Error de lectura del GY-85, reintentando");
-  if (!gy85.iniciar(Wire)) return;
+  if (!gy85.iniciar(Wire)) return;  // un inicio fallido deja tieneGiroscopio() en false: se compara con giroEnUso
   detectado = true;
   Serial.println("#GY-85 recuperado");
   if (!calibrandoAcel) aplicarCorreccionAcel();  // durante ACEL sigue la neutra
   avisarSensor();
   evaluarMag();
   sembrarPendiente = true;
-  if (!usarMag()) Serial.println("#Recalibre");  // en 6 ejes el rumbo sembrado es arbitrario
+  bool cambioModo = usaGiro() != giroEnUso;
+  giroEnUso = usaGiro();
+  if (cambioModo) {
+    // Otro giroscopio (o ninguno): el sesgo y el ancla del CAL anterior ya no valen.
+    estimadorSesgo.reiniciar();
+  } else {
+    estimadorSesgo.fijar(estimadorSesgo.sesgo());  // la quietud de antes del corte ya no vale
+  }
+  // En 6 ejes el rumbo sembrado es arbitrario; con otro modo, el cero anterior ya no vale.
+  if (cambioModo || !usarMag()) Serial.println("#Recalibre");
 }
 
 // Avanza el filtro con una lectura válida, o lo siembra desde acel/mag si está pendiente.
@@ -508,6 +543,7 @@ void setup() {
   aplicarCorreccionAcel();  // antes de la primera lectura
 
   detectado = gy85.iniciar(Wire);
+  giroEnUso = usaGiro();
   if (detectado) {
     Serial.print("#Carpo ESP32 listo, magnetometro: ");
     Serial.println(gy85.nombreMagnetometro());

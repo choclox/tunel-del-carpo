@@ -236,5 +236,71 @@ PRUEBA(sesgo_movimiento_reinicia_la_ventana) {
   e.agregar({0.5f, 0, 0}, {0, 0, 1}, 3010);
   VERIFICAR(!e.quieto());
 }
+PRUEBA(sesgo_hueco_reinicia_la_ventana) {   // 500 ms sin muestras (CAL, sensor perdido): la quietud vieja no vale
+  EstimadorSesgo e; e.fijar({0, 0, 0}, true);
+  const Vec3 g{0.01f, 0, 0};
+  for (uint32_t t = 0; t <= 3000; t += 10) e.agregar(g, G, t);
+  VERIFICAR(e.quieto());
+  const float antes = e.sesgo().x;
+  VERIFICAR(antes > 0);   // ya aprendía antes del hueco
+  for (uint32_t t = 3500; t < 5490; t += 10) {   // primeros 2 s tras el hueco
+    e.agregar(g, G, t);
+    VERIFICAR(!e.quieto());
+    CERCA(e.sesgo().x, antes, 1e-7f);
+  }
+  for (uint32_t t = 5490; t <= 5510; t += 10) e.agregar(g, G, t);
+  VERIFICAR(e.quieto());
+}
+PRUEBA(sesgo_fijar_sin_ancla_conserva_el_sesgo) {
+  EstimadorSesgo e; e.fijar({0.01f, 0, 0}, true);
+  e.fijar(e.sesgo());
+  CERCA(e.sesgo().x, 0.01f, 1e-7f); VERIFICAR(!e.quieto());
+}
+PRUEBA(sesgo_limitado_cerca_del_ancla) {   // giro lento constante de 0,02 rad/s en Z, gravedad constante, 60 s
+  EstimadorSesgo e; e.fijar({0, 0, 0}, true);
+  for (uint32_t t = 0; t <= 60000; t += 10) e.agregar({0, 0, 0.02f}, G, t);
+  VERIFICAR(e.sesgo().z <= 0.015f + 1e-6f);
+  VERIFICAR(e.sesgo().z >= -0.015f - 1e-6f);
+}
+PRUEBA(sesgo_limite_respeta_el_ancla_tras_reiniciar_ventana) {   // un fijar sin ancla no mueve el ancla
+  EstimadorSesgo e; e.fijar({0, 0, 0}, true);
+  for (uint32_t t = 0; t <= 30000; t += 10) e.agregar({0, 0, 0.02f}, G, t);
+  e.fijar(e.sesgo());
+  for (uint32_t t = 30010; t <= 60000; t += 10) e.agregar({0, 0, 0.02f}, G, t);
+  VERIFICAR(e.sesgo().z <= 0.015f + 1e-6f);
+}
+PRUEBA(sesgo_confiable_tras_quietud_desde_el_ancla) {
+  EstimadorSesgo e;
+  VERIFICAR(!e.confiable());
+  for (uint32_t t = 0; t <= 3000; t += 10) e.agregar({0, 0, 0}, G, t);
+  VERIFICAR(e.quieto()); VERIFICAR(!e.confiable());   // sin CAL no hay ancla
+  e.fijar({0.01f, 0, 0}, true);
+  VERIFICAR(!e.confiable());
+  for (uint32_t t = 3010; t <= 6000; t += 10) e.agregar({0.01f, 0, 0}, G, t);
+  VERIFICAR(e.confiable());
+  e.fijar(e.sesgo());   // reinicio de ventana (CAL, error, recuperación): sigue confiable
+  VERIFICAR(e.confiable());
+  e.reiniciar();        // cambio de modo de giroscopio: sin ancla ni sesgo
+  VERIFICAR(!e.confiable()); CERCA(e.sesgo().x, 0, 1e-7f);
+  for (uint32_t t = 0; t <= 60000; t += 10) e.agregar({0, 0, 0.02f}, G, t);
+  CERCA(e.sesgo().z, 0.02f, 1e-3f);   // sin ancla no hay límite
+}
+PRUEBA(cal_sesgo_coherente_con_el_estimador) {
+  const Vec3 est{0.02f, -0.01f, 0.03f};
+  VERIFICAR(sesgoCalCoherente({0.03f, -0.02f, 0.06f}, est, true));
+  VERIFICAR(!sesgoCalCoherente({0.02f, -0.01f, 0.09f}, est, true));    // 0,06 rad/s en Z
+  VERIFICAR(!sesgoCalCoherente({-0.04f, -0.01f, 0.03f}, est, true));   // 0,06 rad/s en X
+  VERIFICAR(sesgoCalCoherente({0.02f, -0.01f, 0.09f}, est, false));    // estimador sin sesgo confiable
+}
+PRUEBA(acel_correccion_guardada_valida) {
+  VERIFICAR(correccionAcelValida({0.07f, -0.02f, 0.15f}, {0.98f, 1.03f, 1.01f}));
+  VERIFICAR(correccionAcelValida({0, 0, 0}, {1, 1, 1}));
+  VERIFICAR(!correccionAcelValida({0, 0, 0.3f}, {1, 1, 1}));
+  VERIFICAR(!correccionAcelValida({-0.31f, 0, 0}, {1, 1, 1}));
+  VERIFICAR(!correccionAcelValida({0, 0, 0}, {1, 0.79f, 1}));
+  VERIFICAR(!correccionAcelValida({0, 0, 0}, {1, 1, 1.21f}));
+  VERIFICAR(!correccionAcelValida({NAN, 0, 0}, {1, 1, 1}));
+  VERIFICAR(!correccionAcelValida({0, 0, 0}, {INFINITY, 1, 1}));
+}
 
 int main() { return correrPruebas(); }

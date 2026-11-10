@@ -103,18 +103,33 @@ class CalibradorAcel {
 // promedios de acel < 0,03 g y promedio de giro a < 0,025 rad/s del sesgo); un golpe grande
 // de giroscopio (≥ 0,35 rad/s) corta la ventana al instante. Con la ventana quieta, el rango
 // de acel se vuelve a sembrar cada 2 s para que el ruido no corte un reposo largo.
-// El sesgo se actualiza muestra a muestra.
+// El sesgo se actualiza muestra a muestra. Un hueco de más de 50 ms entre muestras (CAL en
+// curso, sensor perdido) también reinicia la ventana: la quietud de antes ya no vale.
+// Ancla: el sesgo medido por el último CAL (fijar con esAncla = true). Con ancla, el sesgo no
+// se aparta más de 0,015 rad/s por eje de ella, para que un giro lento sostenido no se aprenda
+// sin límite; sin ancla (antes del primer CAL o tras reiniciar()) no hay límite.
 class EstimadorSesgo {
  public:
   explicit EstimadorSesgo(float alfa = 0.002f) : alfa_(alfa) {}
-  void fijar(const Vec3& sesgo);
+  // Fija el sesgo y reinicia la ventana. esAncla = true: el sesgo viene de un CAL y pasa a ser
+  // el ancla (y el estimador deja de ser confiable hasta volver a estar quieto); false: conserva
+  // el ancla, p. ej. fijar(sesgo()) solo reinicia la ventana.
+  void fijar(const Vec3& sesgo, bool esAncla = false);
+  // Sesgo {0,0,0}, sin ancla y sin confianza (p. ej. al cambiar el modo del giroscopio).
+  void reiniciar();
   void agregar(const Vec3& giroCrudo, const Vec3& acel, uint32_t tMs);
   Vec3 sesgo() const { return sesgo_; }
   bool quieto() const { return quieto_; }
+  // true si hay ancla y desde que se fijó el estimador estuvo quieto al menos una vez.
+  bool confiable() const { return confiable_; }
 
  private:
+  void limitarAlAncla();
   float alfa_;
-  Vec3 sesgo_{0, 0, 0};
+  Vec3 sesgo_{0, 0, 0}, ancla_{0, 0, 0};
+  bool hayAncla_ = false, confiable_ = false;
+  bool hayUltima_ = false;
+  uint32_t ultimaMs_ = 0;   // tiempo de la muestra anterior, para detectar huecos
   bool hayVentana_ = false, quieto_ = false;
   uint32_t inicioVentana_ = 0;
   float min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};   // min/max de promedios de bloque
@@ -122,3 +137,11 @@ class EstimadorSesgo {
   bool hayBloque_ = false;
   uint8_t bloques_ = 0;   // bloques completos desde la última siembra del rango de acel
 };
+
+// CAL puede aprender como sesgo un giro lento y constante. Si el estimador tiene un sesgo
+// confiable (aprendido en reposo desde el último CAL), el sesgo del CAL nuevo debe estar a
+// ≤ 0,05 rad/s de él en cada eje; sin sesgo confiable siempre es coherente.
+bool sesgoCalCoherente(const Vec3& sesgoCal, const Vec3& sesgoEstimador, bool estimadorConfiable);
+
+// Corrección del acelerómetro leída de NVS: finita, escala en [0,8, 1,2] y |desfase| < 0,3 g por eje.
+bool correccionAcelValida(const Vec3& desfase, const Vec3& escala);

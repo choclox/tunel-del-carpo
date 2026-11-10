@@ -226,10 +226,19 @@ const uint32_t SESGO_VENTANA_MS = 2000;
 // Con la ventana ya quieta, el rango de acel se vuelve a sembrar desde el bloque actual cada
 // tantos bloques (2 s): si no, el rango de un ruido real crece sin fin y corta el reposo largo.
 const uint8_t SESGO_BLOQUES_RESIEMBRA = 20;
+const uint32_t SESGO_HUECO_MS = 50;      // más tiempo sin muestras reinicia la ventana
+const float SESGO_ANCLA_MAX = 0.015f;    // rad/s, |sesgo - ancla| por eje
+const float SESGO_CAL_TOL = 0.05f;       // rad/s, sesgo de CAL frente al del estimador
+const float ACEL_DESFASE_MAX = 0.3f, ACEL_ESCALA_MIN = 0.8f, ACEL_ESCALA_MAX = 1.2f;
 }
 
-void EstimadorSesgo::fijar(const Vec3& sesgo) {
+void EstimadorSesgo::fijar(const Vec3& sesgo, bool esAncla) {
   sesgo_ = sesgo;
+  if (esAncla) {
+    ancla_ = sesgo;
+    hayAncla_ = true;
+    confiable_ = false;   // hasta volver a estar quieto con este sesgo
+  }
   hayVentana_ = false;
   hayBloque_ = false;
   bloques_ = 0;
@@ -239,6 +248,10 @@ void EstimadorSesgo::fijar(const Vec3& sesgo) {
 }
 
 void EstimadorSesgo::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
+  // Hueco sin muestras: la ventana nueva empieza en esta muestra, con el mismo sesgo y ancla.
+  if (hayUltima_ && tMs - ultimaMs_ > SESGO_HUECO_MS) fijar(sesgo_);
+  hayUltima_ = true;
+  ultimaMs_ = tMs;
   // Por muestra solo se descartan golpes grandes; el resto se juzga por bloque.
   if (!(fabsf(g.x - sesgo_.x) < SESGO_GIRO_GOLPE && fabsf(g.y - sesgo_.y) < SESGO_GIRO_GOLPE &&
         fabsf(g.z - sesgo_.z) < SESGO_GIRO_GOLPE)) {
@@ -279,7 +292,47 @@ void EstimadorSesgo::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
   }
   if (tMs - inicioVentana_ < SESGO_VENTANA_MS) return;
   quieto_ = true;
+  if (hayAncla_) confiable_ = true;
   sesgo_.x += alfa_ * (g.x - sesgo_.x);
   sesgo_.y += alfa_ * (g.y - sesgo_.y);
   sesgo_.z += alfa_ * (g.z - sesgo_.z);
+  limitarAlAncla();
+}
+
+void EstimadorSesgo::reiniciar() {
+  hayAncla_ = false;
+  confiable_ = false;
+  ancla_ = {0, 0, 0};
+  fijar({0, 0, 0});
+}
+
+static float limitar(float v, float centro, float margen) {
+  if (v > centro + margen) return centro + margen;
+  if (v < centro - margen) return centro - margen;
+  return v;
+}
+
+void EstimadorSesgo::limitarAlAncla() {
+  if (!hayAncla_) return;
+  sesgo_.x = limitar(sesgo_.x, ancla_.x, SESGO_ANCLA_MAX);
+  sesgo_.y = limitar(sesgo_.y, ancla_.y, SESGO_ANCLA_MAX);
+  sesgo_.z = limitar(sesgo_.z, ancla_.z, SESGO_ANCLA_MAX);
+}
+
+bool sesgoCalCoherente(const Vec3& c, const Vec3& e, bool confiable) {
+  if (!confiable) return true;
+  return fabsf(c.x - e.x) <= SESGO_CAL_TOL && fabsf(c.y - e.y) <= SESGO_CAL_TOL &&
+         fabsf(c.z - e.z) <= SESGO_CAL_TOL;
+}
+
+bool correccionAcelValida(const Vec3& d, const Vec3& s) {
+  const float v[6] = {d.x, d.y, d.z, s.x, s.y, s.z};
+  for (int i = 0; i < 6; i++) {
+    if (!isfinite(v[i])) return false;
+  }
+  for (int i = 0; i < 3; i++) {
+    if (!(fabsf(v[i]) < ACEL_DESFASE_MAX)) return false;
+    if (!(v[3 + i] >= ACEL_ESCALA_MIN && v[3 + i] <= ACEL_ESCALA_MAX)) return false;
+  }
+  return true;
 }
