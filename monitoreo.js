@@ -293,7 +293,7 @@ function mostrarAvisoDispositivo(linea) {
     mv.cal = { ...mv.cal, ok: false, motivo: 'el dispositivo pidió recalibrar' };
     if (mv.sesion) mv.sesion.calibracion = mv.cal;
     // Cuenta regresiva en curso: iniciarEjercicio se negaría a arrancar; el paso pasa a conteo manual.
-    if (mv.paso && debeAnularMedicion({ enEspera: mv.paso.enEspera, hayEjercicio: !!mv.ej })) mv.paso.medicion = null;
+    if (mv.paso && debeAnularMedicion({ enEspera: mv.paso.enEspera, hayEjercicio: !!mv.ej, fuente: mv.paso.medicion?.fuente })) mv.paso.medicion = null;
     renderMonitorControles();
   }
 }

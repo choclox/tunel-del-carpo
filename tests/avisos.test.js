@@ -37,8 +37,10 @@ test('debeMostrar limita por clave', () => {
   assert.strictEqual(debeMostrar('b', 11000, u), true);
 });
 
-test('debeAnularMedicion solo en la cuenta regresiva sin ejercicio', () => {
-  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: false }), true);
-  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: true }), false);
-  assert.strictEqual(debeAnularMedicion({ enEspera: false, hayEjercicio: false }), false);
+test('debeAnularMedicion solo en la cuenta regresiva de un paso IMU sin ejercicio', () => {
+  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: false, fuente: 'imu' }), true);
+  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: false, fuente: 'emg' }), false);
+  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: false }), false);
+  assert.strictEqual(debeAnularMedicion({ enEspera: true, hayEjercicio: true, fuente: 'imu' }), false);
+  assert.strictEqual(debeAnularMedicion({ enEspera: false, hayEjercicio: false, fuente: 'imu' }), false);
 });

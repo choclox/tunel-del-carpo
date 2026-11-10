@@ -46,10 +46,10 @@ function debeMostrar(clave, ahoraMs, ultimos, intervaloMs = 10000) {
   return true;
 }
 
-// En la cuenta regresiva de un paso (enEspera, sin ejercicio en marcha) una calibración invalidada
-// deja el paso en conteo manual; un ejercicio ya en marcha no se toca.
-function debeAnularMedicion({ enEspera, hayEjercicio }) {
-  return !!enEspera && !hayEjercicio;
+// En la cuenta regresiva de un paso IMU (enEspera, sin ejercicio en marcha) una calibración invalidada
+// deja el paso en conteo manual; un ejercicio en marcha o un paso EMG (no usa calibración) no se tocan.
+function debeAnularMedicion({ enEspera, hayEjercicio, fuente }) {
+  return !!enEspera && !hayEjercicio && fuente === 'imu';
 }
 
 if (typeof module !== 'undefined') module.exports = { avisoDispositivo, debeMostrar, debeAnularMedicion };
