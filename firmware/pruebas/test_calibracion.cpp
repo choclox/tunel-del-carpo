@@ -125,13 +125,18 @@ PRUEBA(sesgo_no_cambia_en_los_primeros_2_s) {
   for (uint32_t t = 0; t < 1990; t += 10) e.agregar({0.02f, 0, 0}, {0, 0, 1}, t);
   VERIFICAR(!e.quieto()); CERCA(e.sesgo().x, 0, 1e-6f);
 }
-PRUEBA(sesgo_giro_lento_no_se_aprende) {   // 0,04 rad/s en Z durante 20 s: el acel (gravedad en el marco del sensor) cambia
+PRUEBA(sesgo_giro_lento_no_se_aprende) {   // 0,04 rad/s en Y durante 20 s: el acel (gravedad en el marco del sensor) cambia
   EstimadorSesgo e; e.fijar({0, 0, 0});
   for (uint32_t t = 0; t <= 20000; t += 10) {
     float ang = 0.04f * t / 1000;   // gira sobre Y para que cambie la gravedad
     e.agregar({0, 0.04f, 0}, {sinf(ang), 0, cosf(ang)}, t);
   }
   CERCA(e.sesgo().y, 0, 1e-3f);
+}
+PRUEBA(sesgo_giro_lento_vertical_no_se_aprende) {   // 0,03 rad/s en Z con la gravedad constante
+  EstimadorSesgo e; e.fijar({0, 0, 0});
+  for (uint32_t t = 0; t <= 20000; t += 10) e.agregar({0, 0, 0.03f}, {0, 0, 1}, t);
+  CERCA(e.sesgo().z, 0, 1e-3f);
 }
 PRUEBA(sesgo_movimiento_reinicia_la_ventana) {
   EstimadorSesgo e; e.fijar({0, 0, 0});

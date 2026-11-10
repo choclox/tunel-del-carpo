@@ -188,7 +188,7 @@ const char* CalibradorAcel::nombreCara(uint8_t i) {
 }
 
 namespace {
-const float SESGO_GIRO_TOL = 0.05f, SESGO_ACEL_RANGO = 0.03f;
+const float SESGO_GIRO_TOL = 0.025f, SESGO_ACEL_RANGO = 0.03f;
 const uint32_t SESGO_VENTANA_MS = 2000;
 }
 
