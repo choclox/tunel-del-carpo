@@ -19,8 +19,9 @@ struct Bloque {
 };
 
 // Calibración del cero del giroscopio: exige quietud sostenida. Por muestra: módulo del
-// acelerómetro razonable y giroscopio cerca de la primera muestra (descarta golpes al
-// instante). Por bloque: promedios de acel y giro cerca del primer bloque de la ventana.
+// acelerómetro razonable y giroscopio a < 0,35 rad/s de la primera muestra (descarta golpes
+// al instante, tolera el temblor de la mano). Por bloque: promedios de acel (< 0,05 g) y
+// giro (< 0,05 rad/s) cerca del primer bloque de la ventana.
 class Calibrador {
  public:
   void iniciar(uint32_t tMs);
@@ -100,7 +101,9 @@ class CalibradorAcel {
 // Sesgo del giroscopio en reposo: se aprende solo con la mano quieta (giroscopio y
 // acelerómetro estables) durante al menos 2 s. La quietud se juzga por bloque (rango de
 // promedios de acel < 0,03 g y promedio de giro a < 0,025 rad/s del sesgo); un golpe grande
-// de giroscopio corta la ventana al instante. El sesgo se actualiza muestra a muestra.
+// de giroscopio (≥ 0,35 rad/s) corta la ventana al instante. Con la ventana quieta, el rango
+// de acel se vuelve a sembrar cada 2 s para que el ruido no corte un reposo largo.
+// El sesgo se actualiza muestra a muestra.
 class EstimadorSesgo {
  public:
   explicit EstimadorSesgo(float alfa = 0.002f) : alfa_(alfa) {}
@@ -117,4 +120,5 @@ class EstimadorSesgo {
   float min_[3] = {0, 0, 0}, max_[3] = {0, 0, 0};   // min/max de promedios de bloque
   Bloque bloqueAcel_, bloqueGiro_;
   bool hayBloque_ = false;
+  uint8_t bloques_ = 0;   // bloques completos desde la última siembra del rango de acel
 };

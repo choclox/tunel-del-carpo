@@ -2,7 +2,11 @@
 #include <math.h>
 
 namespace {
-const float ACEL_MIN = 0.90f, ACEL_MAX = 1.10f, GIRO_TOL = 0.10f;
+const float ACEL_MIN = 0.90f, ACEL_MAX = 1.10f;
+// Por muestra solo se descartan golpes: el temblor fisiológico de la mano apoyada (8-12 Hz,
+// ±0,1 rad/s, < 0,2° de movimiento) no debe impedir la calibración.
+const float GIRO_GOLPE = 0.35f;        // rad/s, por muestra respecto a la primera muestra
+const float GIRO_TOL_BLOQUE = 0.05f;   // rad/s, promedio de bloque respecto al primer bloque
 const uint32_t MIDIENDO_MS = 1000, CONVERGIENDO_MS = 1500, LIMITE_MS = 10000;
 const uint32_t ASENTAMIENTO_MS = 500;   // parte final de CONVERGIENDO_MS a beta normal
 const float RANGO_MAG_MIN = 30.0f;
@@ -52,9 +56,9 @@ EstadoCal Calibrador::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
   }
   float m = sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
   bool quieta = m >= ACEL_MIN && m <= ACEL_MAX &&           // por muestra: golpes al instante
-                fabsf(g.x - referencia_.x) < GIRO_TOL &&
-                fabsf(g.y - referencia_.y) < GIRO_TOL &&
-                fabsf(g.z - referencia_.z) < GIRO_TOL;
+                fabsf(g.x - referencia_.x) < GIRO_GOLPE &&
+                fabsf(g.y - referencia_.y) < GIRO_GOLPE &&
+                fabsf(g.z - referencia_.z) < GIRO_GOLPE;
   if (!quieta) {
     nuevaVentana();                           // la muestra no inicia la ventana nueva
     return estado_;
@@ -68,8 +72,8 @@ EstadoCal Calibrador::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
       giroRef_ = mg;
       hayBloqueRef_ = true;
     } else if (!(fabsf(ma.x - acelRef_.x) < ACEL_TOL_CAL && fabsf(ma.y - acelRef_.y) < ACEL_TOL_CAL &&
-                 fabsf(ma.z - acelRef_.z) < ACEL_TOL_CAL && fabsf(mg.x - giroRef_.x) < GIRO_TOL &&
-                 fabsf(mg.y - giroRef_.y) < GIRO_TOL && fabsf(mg.z - giroRef_.z) < GIRO_TOL)) {
+                 fabsf(ma.z - acelRef_.z) < ACEL_TOL_CAL && fabsf(mg.x - giroRef_.x) < GIRO_TOL_BLOQUE &&
+                 fabsf(mg.y - giroRef_.y) < GIRO_TOL_BLOQUE && fabsf(mg.z - giroRef_.z) < GIRO_TOL_BLOQUE)) {
       nuevaVentana();                         // la ventana nueva empieza en la muestra siguiente
       return estado_;
     }
@@ -215,14 +219,18 @@ const char* CalibradorAcel::nombreCara(uint8_t i) {
 
 namespace {
 const float SESGO_GIRO_TOL = 0.025f, SESGO_ACEL_RANGO = 0.03f;
-const float SESGO_GIRO_GOLPE = 0.10f;   // rad/s, por muestra (≈ 14 σ del ruido del ITG3205)
+const float SESGO_GIRO_GOLPE = 0.35f;   // rad/s, por muestra: golpes, no el temblor de la mano
 const uint32_t SESGO_VENTANA_MS = 2000;
+// Con la ventana ya quieta, el rango de acel se vuelve a sembrar desde el bloque actual cada
+// tantos bloques (2 s): si no, el rango de un ruido real crece sin fin y corta el reposo largo.
+const uint8_t SESGO_BLOQUES_RESIEMBRA = 20;
 }
 
 void EstimadorSesgo::fijar(const Vec3& sesgo) {
   sesgo_ = sesgo;
   hayVentana_ = false;
   hayBloque_ = false;
+  bloques_ = 0;
   bloqueAcel_.vaciar();
   bloqueGiro_.vaciar();
   quieto_ = false;
@@ -260,6 +268,11 @@ void EstimadorSesgo::agregar(const Vec3& g, const Vec3& a, uint32_t tMs) {
     if (!quieta) {
       fijar(sesgo_);   // la ventana nueva empieza en la muestra siguiente
       return;
+    }
+    if (bloques_ < 255) bloques_++;   // bloques desde la última siembra del rango
+    if (quieto_ && bloques_ >= SESGO_BLOQUES_RESIEMBRA) {   // sin perder quieto()
+      for (int e = 0; e < 3; e++) min_[e] = max_[e] = v[e];
+      bloques_ = 0;
     }
   }
   if (tMs - inicioVentana_ < SESGO_VENTANA_MS) return;

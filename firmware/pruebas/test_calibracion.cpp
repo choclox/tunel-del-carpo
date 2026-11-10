@@ -143,6 +143,40 @@ PRUEBA(cal_quieto_con_ruido) {
   VERIFICAR(listo);
   CERCA(c.sesgoGiro().x, SESGO.x, 2e-3f); CERCA(c.sesgoGiro().y, SESGO.y, 2e-3f); CERCA(c.sesgoGiro().z, SESGO.z, 2e-3f);
 }
+PRUEBA(cal_temblor_de_mano) {   // temblor fisiológico 8-12 Hz de ±0,1 rad/s: la mano se mueve < 0,2°
+  Calibrador c; c.iniciar(0);
+  const float PI2 = 2 * 3.14159265f;
+  bool listo = false;
+  uint32_t t = 0;
+  for (; t <= 3000 && !listo; t += 10) {
+    float s = t / 1000.0f;
+    Vec3 g{SESGO.x + 0.12f * sinf(PI2 * 10 * s), SESGO.y + 0.06f * sinf(PI2 * 9 * s + 1),
+           SESGO.z + 0.02f * sinf(PI2 * 11 * s)};
+    listo = c.agregar(g, conRuido(G, RUIDO_ACEL), t) == EstadoCal::Listo;
+  }
+  VERIFICAR(listo);
+  CERCA(c.sesgoGiro().x, SESGO.x, 5e-3f); CERCA(c.sesgoGiro().y, SESGO.y, 5e-3f); CERCA(c.sesgoGiro().z, SESGO.z, 5e-3f);
+}
+// Ruido casi gaussiano: suma de 12 uniformes [0,1) del mismo LCG, menos 6 (σ = 1).
+static float gauss(float sigma) {
+  float s = 0;
+  for (int i = 0; i < 12; i++) s += ruido(0.5f) + 0.5f;
+  return (s - 6) * sigma;
+}
+static Vec3 conGauss(Vec3 v, float sigma) { return {v.x + gauss(sigma), v.y + gauss(sigma), v.z + gauss(sigma)}; }
+PRUEBA(sesgo_reposo_largo_ruido_gaussiano) {   // 120 s quieta: la ventana no se corta por el ruido
+  EstimadorSesgo e;
+  const Vec3 B{0.02f, -0.01f, 0.015f};
+  e.fijar(B);
+  uint32_t quietas = 0, total = 0;
+  for (uint32_t t = 0; t <= 120000; t += 10) {
+    e.agregar(conGauss(B, 0.007f), conGauss(G, 0.017f), t);
+    if (t >= 2000) { total++; if (e.quieto()) quietas++; }
+  }
+  printf("  reposo largo: %u/%u muestras quietas\n", (unsigned)quietas, (unsigned)total);
+  VERIFICAR(quietas * 100 >= total * 95);
+  CERCA(e.sesgo().x, B.x, 1e-3f); CERCA(e.sesgo().y, B.y, 1e-3f); CERCA(e.sesgo().z, B.z, 1e-3f);
+}
 PRUEBA(sesgo_converge_con_ruido) {
   EstimadorSesgo e; e.fijar({0, 0, 0});
   const Vec3 B{0.02f, -0.01f, 0.015f};
