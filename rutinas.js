@@ -8,7 +8,8 @@
  *
  * `medicion` dice cómo se cuenta cada paso: `{ fuente: 'imu', tipo }` (ángulo, tipo de EJERCICIOS),
  * `{ fuente: 'emg', musculo }` (activación del músculo) o `null` (conteo manual). `tipo` repite el
- * tipo IMU (o `null`) para las sesiones guardadas. `recalibrar`: pide CAL al empezar el paso.
+ * tipo IMU (o `null`) para las sesiones guardadas. `ceroDePostura`: el paso empieza en otra postura y
+ * toma un cero instantáneo (CERO) al terminar la cuenta; la calibración es solo la del inicio.
  */
 
 const IMU = (tipo) => ({ fuente: 'imu', tipo });
@@ -61,13 +62,13 @@ const ETAPAS = [
         indicacion: 'Antebrazo apoyado, palma hacia abajo; baje la mano.', cuidado: [] },
       { id: 'extension', nombre: 'Extensión de muñeca', tipo: 'extension', medicion: IMU('extension'), reps: 10, sostenerS: 5,
         indicacion: 'Antebrazo apoyado, palma hacia abajo; suba la mano.', cuidado: [] },
-      { id: 'desv_radial', nombre: 'Desviación radial', tipo: 'desv_radial', medicion: IMU('desv_radial'), recalibrar: true, reps: 10, sostenerS: 3,
+      { id: 'desv_radial', nombre: 'Desviación radial', tipo: 'desv_radial', medicion: IMU('desv_radial'), ceroDePostura: true, reps: 10, sostenerS: 3,
         indicacion: INDICACION_DESVIACION, cuidado: [] },
-      { id: 'desv_cubital', nombre: 'Desviación cubital', tipo: 'desv_cubital', medicion: IMU('desv_cubital'), recalibrar: true, reps: 10, sostenerS: 3,
+      { id: 'desv_cubital', nombre: 'Desviación cubital', tipo: 'desv_cubital', medicion: IMU('desv_cubital'), ceroDePostura: true, reps: 10, sostenerS: 3,
         indicacion: INDICACION_DESVIACION, cuidado: [] },
-      { id: 'pronacion', nombre: 'Pronación de antebrazo', tipo: 'pronacion', medicion: IMU('pronacion'), recalibrar: true, reps: 10, sostenerS: 3,
+      { id: 'pronacion', nombre: 'Pronación de antebrazo', tipo: 'pronacion', medicion: IMU('pronacion'), ceroDePostura: true, reps: 10, sostenerS: 3,
         indicacion: 'Codo pegado al cuerpo a 90° y pulgar hacia arriba; gire la palma hacia abajo.', cuidado: [] },
-      { id: 'supinacion', nombre: 'Supinación de antebrazo', tipo: 'supinacion', medicion: IMU('supinacion'), recalibrar: true, reps: 10, sostenerS: 3,
+      { id: 'supinacion', nombre: 'Supinación de antebrazo', tipo: 'supinacion', medicion: IMU('supinacion'), ceroDePostura: true, reps: 10, sostenerS: 3,
         indicacion: 'Codo pegado al cuerpo a 90° y pulgar hacia arriba; gire la palma hacia arriba.', cuidado: [] },
       { id: 'puno_completo', nombre: 'Puño completo', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 3,
         indicacion: 'Cierre la mano por completo y ábrala del todo.', cuidado: ['No apriete el puño.'] },
@@ -98,7 +99,7 @@ const ETAPAS = [
       { id: 'flexion_carga', nombre: 'Flexión de muñeca con peso ligero', tipo: 'flexion', medicion: IMU('flexion'), reps: 10, sostenerS: 2,
         indicacion: 'Antebrazo apoyado, palma hacia arriba; suba el peso despacio.',
         cuidado: ['Use 0,5 kg al principio.'] },
-      { id: 'pronosup_martillo', nombre: 'Prono-supinación con martillo', tipo: 'supinacion', medicion: IMU('supinacion'), recalibrar: true, reps: 10, sostenerS: 2,
+      { id: 'pronosup_martillo', nombre: 'Prono-supinación con martillo', tipo: 'supinacion', medicion: IMU('supinacion'), ceroDePostura: true, reps: 10, sostenerS: 2,
         indicacion: 'Sujete un martillo por el mango con el pulgar hacia arriba y gírelo despacio a cada lado.',
         cuidado: ['Agarre más cerca de la cabeza si cuesta.'] },
     ],

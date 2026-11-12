@@ -58,6 +58,15 @@ PRUEBA(comando_prueba_emg) {
   VERIFICAR(parsearComando("PR,-") == TipoComando::Prueba);
   VERIFICAR(parsearComando("PR") == TipoComando::Desconocido);
 }
+PRUEBA(comandos_cero) {
+  VERIFICAR(parsearComando("CERO") == TipoComando::Cero);
+  VERIFICAR(parsearComando("CERO,-") == TipoComando::QuitarCero);
+  VERIFICAR(parsearComando("CERO,") == TipoComando::Desconocido);
+  VERIFICAR(parsearComando("CEROX") == TipoComando::Desconocido);
+  char b[64];
+  formatearCeroOk(b, sizeof b);                    TEXTO_IGUAL(b, "CERO,OK");
+  formatearCeroErr(b, sizeof b, "sin calibrar");   TEXTO_IGUAL(b, "CERO,ERR,sin calibrar");
+}
 
 int main() { return correrPruebas(); }
 PRUEBA(comandos_acel_y_estado) {

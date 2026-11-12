@@ -14,3 +14,20 @@ AngulosMuneca angulosRelativos(const Cuaternion& qCal, const Cuaternion& qAhora,
   if (manoIzquierda) { a.rc = -a.rc; a.ps = -a.ps; }
   return a;
 }
+
+void ReferenciaAngulos::calibrar(const Cuaternion& q) {
+  qCal_ = q;
+  calibrada_ = true;
+  hayCero_ = false;
+}
+
+bool ReferenciaAngulos::fijarCero(const Cuaternion& q) {
+  if (!calibrada_) return false;
+  qCero_ = q;
+  hayCero_ = true;
+  return true;
+}
+
+AngulosMuneca ReferenciaAngulos::angulos(const Cuaternion& qAhora, bool manoIzquierda) const {
+  return angulosRelativos(hayCero_ ? qCero_ : qCal_, qAhora, manoIzquierda);
+}

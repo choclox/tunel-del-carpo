@@ -48,7 +48,7 @@ static Vec3 desfaseMag{0, 0, 0};
 // Corrección del acelerómetro guardada; sin acelok es neutra, nunca la de otro módulo.
 static Vec3 desfaseAcel{0, 0, 0};
 static Vec3 escalaAcel{1, 1, 1};
-static Cuaternion qCal;
+static ReferenciaAngulos referencia;  // qCal del último CAL y, si hay, el cero de postura (CERO)
 
 // Calibración del magnetómetro guardada en NVS (indicador, chip y huella del montaje).
 static bool magOkGuardado = false;
@@ -250,6 +250,16 @@ static void procesarComando(const char* linea, uint32_t ahora) {
       break;
     case TipoComando::Stop: transmitiendo = false; break;  // no cancela la calibración
     case TipoComando::Cal: iniciarCalibracion(ahora); break;
+    case TipoComando::Cero: {
+      // Instantáneo: solo cambia la referencia de los ángulos (sesgo, filtro y reposo EMG siguen
+      // siendo los del CAL).
+      char buf[32];
+      if (referencia.fijarCero(orientacionActual())) formatearCeroOk(buf, sizeof(buf));
+      else formatearCeroErr(buf, sizeof(buf), "sin calibrar");
+      Serial.println(buf);
+      break;
+    }
+    case TipoComando::QuitarCero: referencia.quitarCero(); break;
     case TipoComando::Ej: break;
     case TipoComando::Prueba: break;  // informativo: la prueba EMG la guía la interfaz
     case TipoComando::Mag: iniciarMag(ahora); break;
@@ -326,7 +336,7 @@ static void gestionarCalibracion(const Vec3& giroCrudo, const Vec3& acel, bool o
     }
     filtro.fijarBeta(calibrador.asentando(ahora) ? BETA_NORMAL : BETA_CONVERGENCIA);
   } else if (despues == EstadoCal::Listo) {
-    qCal = orientacionActual();
+    referencia.calibrar(orientacionActual());  // también borra el cero de postura
     filtro.fijarBeta(BETA_NORMAL);
     calibrando = false;
     // El estimador sigue la deriva desde el sesgo medido, que pasa a ser su ancla.
@@ -423,7 +433,7 @@ static void muestrearEmgCrudo(uint32_t ahora) {
 }
 
 static void enviarMuestra(uint32_t ahora) {
-  AngulosMuneca a = angulosRelativos(qCal, orientacionActual(), manoIzquierda);
+  AngulosMuneca a = referencia.angulos(orientacionActual(), manoIzquierda);
   char buf[80];
   if (USAR_EMG) {
     uint16_t emg[3];

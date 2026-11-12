@@ -11,6 +11,7 @@
  *                                      ps:  prono-supinación (+supinación/−pronación) en grados.
  *     CAL,OK,<ms>                      Calibración terminada (ms que tardó en el dispositivo).
  *     CAL,ERR,<motivo>                 Calibración fallida.
+ *     CERO,OK | CERO,ERR,<motivo>      Respuesta a CERO.
  *     BAT,<porcentaje>                 Nivel de batería (opcional).
  *     #<texto>                         Mensaje libre de depuración (se ignora).
  *
@@ -18,6 +19,7 @@
  *     START                            Empezar a transmitir muestras.
  *     STOP                             Dejar de transmitir.
  *     CAL                              Ejecutar calibración (posición neutra = 0°).
+ *     CERO | CERO,-                    Cero de postura instantáneo / quitarlo (solo la referencia de los ángulos).
  *     EJ,<tipo>,<objetivo> | EJ,-      Ejercicio en curso / ninguno (informativo para el dispositivo).
  *     PR,<musculo> | PR,-              Contracción de la prueba de fuerza EMG (informativo).
  *
@@ -134,6 +136,12 @@ class TransporteSimulado {
     if (c === 'START') this.transmitiendo = true;
     if (c === 'STOP') this.transmitiendo = false;
     if (c === 'CAL') this.cal = { inicio: performance.now(), dur: 3000 + this.rand() * 5000 };
+    // Cero de postura: inmediato. SIMULADOR_SIN_CERO imita un firmware que no lo conoce.
+    // SIMULADOR_CERO_ERR imita una placa que se reinició y perdió la calibración.
+    if (cmd === 'CERO' && !(typeof window !== 'undefined' && window.SIMULADOR_SIN_CERO === true)) {
+      const err = typeof window !== 'undefined' && window.SIMULADOR_CERO_ERR === true;
+      setTimeout(() => this.onLinea?.(err ? 'CERO,ERR,sin calibrar' : 'CERO,OK'), 20);
+    }
     if (c === 'PR') this.contraccion = MUSCULOS.includes(tipo) ? { musculo: tipo, amp: 400 + this.rand() * 100 } : null;
     if (c === 'EJ' && tipo?.startsWith('emg-') && MUSCULOS.includes(tipo.slice(4))) {
       const reps = Math.max(1, Number(objetivo) - (this.rand() < 0.3 ? 1 : 0));
@@ -254,24 +262,27 @@ function procesarLinea(linea) {
         ? { tiempoS, ok: tiempoS <= CAL_TIMEOUT_S }
         : { tiempoS, ok: false, motivo: partes.slice(2).join(',') || 'error del dispositivo' };
       mv.calInicio = null;
-      // Calibración pedida por un paso en su propia postura (antebrazo vertical, pulgar arriba…): solo vale
-      // para ese tipo de paso; los demás y la sesión siguiente vuelven a calibrar en posición neutra.
-      if (mv.cal.ok && mv.calEnPostura) mv.cal.postura = 'paso';
       // Las muestras anteriores usan el cero viejo: el reposo del ejercicio no puede salir de ellas.
       if (mv.cal.ok) mv.buffer = [];
       if (mv.sesion) mv.sesion.calibracion = mv.cal;
-      if (mv.paso?.esperandoCal) {
-        if (!mv.cal.ok) {
-          mv.paso.esperandoCal = false;
-          mv.paso.medicion = null; // sin calibración: conteo manual
-        } else if (mv.cal.postura && !mv.paso.paso.recalibrar) {
-          pedirCalibracion(false); // terminó la del paso anterior, en su postura: falta la neutra
-        } else {
-          mv.paso.esperandoCal = false;
-          medirPaso();
-        }
-      }
       renderMonitorControles();
+      break;
+    }
+    case 'CERO': {
+      // Respuesta al cero de postura del paso en curso; una tardía (de un paso ya cerrado) se ignora.
+      const actual = mv.paso;
+      if (!actual?.esperandoCero) return;
+      if (partes[1] === 'OK') mv.buffer = []; // el reposo sale de las muestras con el cero nuevo
+      else if (partes[2] === 'sin calibrar') {
+        // La placa se reinició y perdió la calibración: ningún ángulo vale hasta volver a calibrar.
+        mv.cal = { ...mv.cal, ok: false, motivo: 'el dispositivo perdió la calibración' };
+        if (mv.sesion) mv.sesion.calibracion = mv.cal;
+        actual.medicion = null;
+        toast('El dispositivo perdió la calibración (¿se reinició?): calibre de nuevo; mientras tanto cuente a mano.');
+        tono('alerta');
+      } else toast(`El dispositivo no tomó el cero de postura (${partes.slice(2).join(',') || 'error'}): se mide desde la calibración inicial.`);
+      if (actual.medicion) empezarTrasCero(actual);
+      else { clearTimeout(actual.timerCero); actual.esperandoCero = false; renderMonitorControles(); }
       break;
     }
     case 'BAT':
@@ -331,8 +342,7 @@ function nuevaSesion() {
 function iniciarEjercicio(tipo, objetivo) {
   objetivo = Math.max(1, parseInt(objetivo, 10) || 10);
   if (!mv.conectado || mv.ej || !EJERCICIOS[tipo]) return;
-  const enPostura = !!mv.paso?.paso.recalibrar;
-  if (!mv.cal?.ok || (mv.cal.postura && !enPostura)) { toast('Calibre el dispositivo antes de iniciar.'); return; }
+  if (!mv.cal?.ok) { toast('Calibre el dispositivo antes de iniciar.'); return; }
 
   if (!mv.sesion) mv.sesion = nuevaSesion();
 
@@ -443,8 +453,9 @@ function iniciarSesionRutina(etapa) {
 
 const TEXTO_PASO_SIN_EMG = 'Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.';
 
-// medicion: cómo se cuenta el paso hoy (rutinas.js), o null si se cuenta a mano. Los pasos IMU con
-// `recalibrar` piden CAL en la postura del paso y empiezan a contar cuando el dispositivo responde.
+// medicion: cómo se cuenta el paso hoy (rutinas.js), o null si se cuenta a mano. La calibración es una
+// sola, la del inicio: los pasos IMU con `ceroDePostura` piden al terminar la cuenta un CERO instantáneo
+// (la postura del paso pasa a ser 0°) y lo quitan con CERO,- al cerrar el paso.
 // antesDeMedir(medir): la rutina hace ahí la cuenta regresiva; hasta que llame a medir() no se graba nada.
 function iniciarPasoRutina(paso, antesDeMedir = (medir) => medir()) {
   if (mv.paso) finalizarPasoRutina();
@@ -452,17 +463,22 @@ function iniciarPasoRutina(paso, antesDeMedir = (medir) => medir()) {
   let medicion = mv.conectado ? medicionDelPaso(paso, chequeo) : null;
   let sinEmg = false;
   if (medicion?.fuente === 'emg' && !mv.conEmg) { medicion = null; sinEmg = true; }
-  // Sin calibración válida (y sin una en curso) no se puede medir el ángulo: conteo manual.
-  if (medicion?.fuente === 'imu' && !paso.recalibrar && mv.calInicio == null && !mv.cal?.ok) medicion = null;
-  mv.paso = { paso, muestras: [], medicion, sinEmg, esperandoCal: false, enEspera: false, antesDeMedir };
-  const calDeOtraPostura = !paso.recalibrar && !!mv.cal?.postura;
-  if (medicion?.fuente === 'imu' && (paso.recalibrar || mv.calInicio != null || calDeOtraPostura)) {
-    // Espera la calibración: la que pide este paso (en su postura, o neutra si la vigente es de
-    // la postura de otro paso) o la que sigue en curso desde el anterior.
-    mv.paso.esperandoCal = true;
-    mv.transporte.enviar('EJ,-').catch(() => {});
-    if (mv.calInicio == null) pedirCalibracion(!!paso.recalibrar);
-  } else medirPaso();
+  // Sin calibración válida no se puede medir el ángulo: conteo manual.
+  if (medicion?.fuente === 'imu' && !mv.cal?.ok) medicion = null;
+  mv.paso = { paso, muestras: [], medicion, sinEmg, enEspera: false, esperandoCero: false, usaCero: false, antesDeMedir };
+  medirPaso();
+  renderMonitorControles();
+}
+
+const ESPERA_CERO_MS = 1000; // sin CERO,OK en este plazo (firmware antiguo) se mide igual
+let avisoSinCero = false;    // el aviso de "no confirmó el cero" sale una vez por página
+
+// Arranca el ejercicio IMU tras el cero de postura (confirmado, rechazado o vencido el plazo).
+function empezarTrasCero(actual) {
+  clearTimeout(actual.timerCero);
+  actual.esperandoCero = false;
+  if (mv.paso !== actual || !mv.conectado) return;
+  iniciarEjercicio(actual.medicion.tipo, actual.paso.reps);
   renderMonitorControles();
 }
 
@@ -473,17 +489,26 @@ function medirPaso() {
     if (mv.paso !== actual) return; // se canceló durante la cuenta
     actual.enEspera = false;
     const { paso, medicion } = actual;
-    if (medicion?.fuente === 'imu') iniciarEjercicio(medicion.tipo, paso.reps);
+    if (medicion?.fuente === 'imu' && paso.ceroDePostura && mv.conectado) {
+      actual.esperandoCero = actual.usaCero = true;
+      mv.transporte.enviar('CERO').catch(() => {});
+      actual.timerCero = setTimeout(() => {
+        if (!actual.esperandoCero) return;
+        if (!avisoSinCero) { avisoSinCero = true; toast('El dispositivo no confirmó el cero de postura: se mide desde la calibración inicial.'); }
+        empezarTrasCero(actual);
+      }, ESPERA_CERO_MS);
+    } else if (medicion?.fuente === 'imu') iniciarEjercicio(medicion.tipo, paso.reps);
     else if (medicion?.fuente === 'emg') iniciarEjercicioEmg(medicion.musculo, paso.reps);
     else mv.transporte?.enviar('EJ,-').catch(() => {});
     renderMonitorControles();
   });
 }
 
-// Para el contador de la rutina: 'calibrando' | 'medido' | 'sin-emg' | 'manual' (null sin paso).
+// Para el contador de la rutina: 'medido' | 'sin-emg' | 'manual' (null sin paso). Mientras espera
+// el cero de postura (como mucho ESPERA_CERO_MS) ya cuenta como 'medido'.
 function medicionEnCurso() {
   if (!mv.paso) return null;
-  if (mv.paso.esperandoCal) return 'calibrando';
+  if (mv.paso.esperandoCero) return 'medido';
   if (mv.ej) return 'medido';
   return mv.paso.sinEmg ? 'sin-emg' : 'manual';
 }
@@ -493,6 +518,9 @@ function finalizarPasoRutina() {
   if (!actual) return;
   // Si la conexión se perdió durante el paso, el registro ya quedó guardado en actual.registro.
   const registro = mv.ej ? finalizarEjercicio() : actual.registro ?? null;
+  clearTimeout(actual.timerCero);
+  actual.esperandoCero = false;
+  if (actual.usaCero && mv.conectado) mv.transporte.enviar('CERO,-').catch(() => {});
   mv.paso = null;
   renderMonitorControles();
 
@@ -527,7 +555,7 @@ function estadoDispositivo() {
     conectado: mv.conectado,
     origen: mv.conectado ? mv.origen : null,
     calibrando: mv.calInicio != null,
-    calOk: !!cal?.ok && !cal.postura, // la de un paso (en su postura) no vale para empezar
+    calOk: !!cal?.ok,
     calMotivo: cal && !cal.ok ? cal.motivo || `tardó ${fmt(cal.tiempoS, 1)} s (> ${CAL_TIMEOUT_S} s)` : null,
     calTiempoS: cal ? cal.tiempoS : null,
     conEmg: mv.conEmg,
@@ -662,7 +690,7 @@ function alPerderConexion(motivo) {
   mv.conectado = false;
   mv.transporte = null;
   mv.calInicio = null;
-  if (mv.paso?.esperandoCal) { mv.paso.esperandoCal = false; mv.paso.medicion = null; }
+  if (mv.paso?.esperandoCero) { clearTimeout(mv.paso.timerCero); mv.paso.esperandoCero = false; }
   clearInterval(mv.timer);
   renderMonitor();
   if (typeof pintarModoRutina === 'function') pintarModoRutina();
@@ -676,16 +704,10 @@ async function desconectar() {
 
 function calibrar() {
   if (!mv.conectado || mv.ej || mv.paso || mv.calInicio != null) return;
-  pedirCalibracion(false);
-  renderMonitorControles();
-}
-
-// enPostura: la pide un paso `recalibrar` en su propia postura (no sirve como calibración neutra).
-function pedirCalibracion(enPostura) {
   mv.calInicio = performance.now();
-  mv.calEnPostura = enPostura;
   mv.cal = null;
   mv.transporte.enviar('CAL');
+  renderMonitorControles();
 }
 
 /* ======================= Render ======================= */
@@ -752,7 +774,6 @@ function refrescar() {
   if (mv.calInicio != null && (performance.now() - mv.calInicio) / 1000 > CAL_TIMEOUT_S) {
     mv.cal = { tiempoS: CAL_TIMEOUT_S, ok: false, motivo: `el dispositivo no respondió en ${CAL_TIMEOUT_S} s` };
     mv.calInicio = null;
-    if (mv.paso?.esperandoCal) { mv.paso.esperandoCal = false; mv.paso.medicion = null; }
     renderMonitorControles();
   }
   if (estado.seccion !== 'ejercicios') return;

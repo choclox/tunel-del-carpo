@@ -49,17 +49,15 @@ test('tipo sigue a la medición IMU y ningún paso usa puño', () => {
   }
 });
 
-test('desviaciones: recalibrar y antebrazo vertical', () => {
+test('pasos con cero de postura', () => {
   const ind = 'Codo apoyado en la mesa, antebrazo vertical, dedos hacia arriba y la palma hacia usted. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
-  for (const id of ['desv_radial', 'desv_cubital']) {
-    const p = etapaPorNumero(2).pasos.find((x) => x.id === id);
-    assert.strictEqual(p.recalibrar, true);
-    assert.strictEqual(p.indicacion, ind);
-  }
-  // Prono-supinación también: se calibra con el pulgar hacia arriba para que `ps` no pase de ±180°.
-  const otros = ETAPAS.flatMap((e) => e.pasos).filter((p) => p.recalibrar);
-  assert.deepStrictEqual(otros.map((p) => p.id), ['desv_radial', 'desv_cubital', 'pronacion', 'supinacion', 'pronosup_martillo']);
-  for (const p of otros.slice(2)) assert.match(p.indicacion, /pulgar hacia arriba/);
+  for (const id of ['desv_radial', 'desv_cubital']) assert.strictEqual(etapaPorNumero(2).pasos.find((x) => x.id === id).indicacion, ind);
+  // Empiezan en otra postura: toman un cero instantáneo (CERO) en vez de recalibrar.
+  const todos = ETAPAS.flatMap((e) => e.pasos);
+  const conCero = todos.filter((p) => p.ceroDePostura === true);
+  assert.deepStrictEqual(conCero.map((p) => p.id), ['desv_radial', 'desv_cubital', 'pronacion', 'supinacion', 'pronosup_martillo']);
+  for (const p of conCero.slice(2)) assert.match(p.indicacion, /pulgar hacia arriba/);
+  assert.ok(todos.every((p) => !('recalibrar' in p)), 'ningún paso recalibra');
 });
 
 test('pronación y supinación por el canal ps', () => {

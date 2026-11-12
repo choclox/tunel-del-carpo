@@ -53,6 +53,9 @@ class TestBanco(unittest.TestCase):
         self.assertEqual(r["invalidas"], 1)
         self.assertEqual(banco.contar_malformadas(["D,1,20,0,0,0", "#x"]), 0)
 
+    def test_lineas_cero_validas(self):
+        self.assertEqual(banco.contar_malformadas(["CERO,OK", "CERO,ERR,sin calibrar"]), 0)
+
     def test_parsear_estado(self):
         e = banco.parsear_estado("#ESTADO,giro=1,mag=QMC5883L,magcal=0,acelcal=1,mano=D")
         self.assertEqual(e, {"giro": 1, "mag": "QMC5883L", "magcal": 0,

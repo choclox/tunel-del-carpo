@@ -3,8 +3,8 @@
  * Compatible con Arduino (UNO, Nano, Mega) y ESP32.
  *
  * Implementa el protocolo descrito en interfaz-medico/monitoreo.js:
- *   Dispositivo -> PC:  D,<seq>,<t_ms>,<fe>,<rc>,<mcf>   |  CAL,OK,<ms>  |  CAL,ERR,<motivo>  |  BAT,<pct>
- *   PC -> Dispositivo:  START | STOP | CAL | EJ,<tipo>,<objetivo> | EJ,-
+ *   Dispositivo -> PC:  D,<seq>,<t_ms>,<fe>,<rc>,<mcf>   |  CAL,OK,<ms>  |  CAL,ERR,<motivo>  |  CERO,OK  |  BAT,<pct>
+ *   PC -> Dispositivo:  START | STOP | CAL | CERO | CERO,- | EJ,<tipo>,<objetivo> | EJ,-
  *
  * LO ÚNICO QUE DEBE REEMPLAZAR EL EQUIPO: leerAngulosCrudos() con la lectura
  * real de sus sensores (IMU, flexosensores, encoders, etc.). Mientras tanto,
@@ -22,6 +22,9 @@ unsigned long proximaBateria = 0;
 
 // Desfases obtenidos en la calibración (posición neutra = 0°)
 float offFe = 0, offRc = 0, offMcf = 0;
+// Los de la calibración, guardados mientras hay un cero de postura (CERO)
+float calFe = 0, calRc = 0;
+bool hayCero = false;
 
 String comando = "";
 
@@ -58,10 +61,29 @@ void calibrar() {
   Serial.println(millis() - inicio);
 }
 
+// CERO: la postura actual pasa a ser 0° al instante (una lectura, sin promediar ni recalibrar).
+void fijarCero() {
+  if (!hayCero) { calFe = offFe; calRc = offRc; }
+  float fe, rc, mcf;
+  leerAngulosCrudos(fe, rc, mcf);
+  offFe = fe;
+  offRc = rc;
+  hayCero = true;
+  Serial.println("CERO,OK");
+}
+
+// CERO,-: vuelve al cero de la calibración.
+void quitarCero() {
+  if (hayCero) { offFe = calFe; offRc = calRc; }
+  hayCero = false;
+}
+
 void procesarComando(const String &c) {
   if (c == "START") { transmitiendo = true; }
   else if (c == "STOP") { transmitiendo = false; }
-  else if (c == "CAL") { calibrar(); }
+  else if (c == "CAL") { hayCero = false; calibrar(); }
+  else if (c == "CERO") { fijarCero(); }
+  else if (c == "CERO,-") { quitarCero(); }
   else if (c.startsWith("EJ,")) { /* informativo: se puede usar para LEDs o registro local */ }
   else { Serial.print("#Comando desconocido: "); Serial.println(c); }
 }
