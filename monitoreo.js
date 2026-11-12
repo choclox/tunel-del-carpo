@@ -137,7 +137,11 @@ class TransporteSimulado {
     if (c === 'STOP') this.transmitiendo = false;
     if (c === 'CAL') this.cal = { inicio: performance.now(), dur: 3000 + this.rand() * 5000 };
     // Cero de postura: inmediato. SIMULADOR_SIN_CERO imita un firmware que no lo conoce.
-    if (cmd === 'CERO' && !(typeof window !== 'undefined' && window.SIMULADOR_SIN_CERO === true)) setTimeout(() => this.onLinea?.('CERO,OK'), 20);
+    // SIMULADOR_CERO_ERR imita una placa que se reinició y perdió la calibración.
+    if (cmd === 'CERO' && !(typeof window !== 'undefined' && window.SIMULADOR_SIN_CERO === true)) {
+      const err = typeof window !== 'undefined' && window.SIMULADOR_CERO_ERR === true;
+      setTimeout(() => this.onLinea?.(err ? 'CERO,ERR,sin calibrar' : 'CERO,OK'), 20);
+    }
     if (c === 'PR') this.contraccion = MUSCULOS.includes(tipo) ? { musculo: tipo, amp: 400 + this.rand() * 100 } : null;
     if (c === 'EJ' && tipo?.startsWith('emg-') && MUSCULOS.includes(tipo.slice(4))) {
       const reps = Math.max(1, Number(objetivo) - (this.rand() < 0.3 ? 1 : 0));
@@ -269,8 +273,16 @@ function procesarLinea(linea) {
       const actual = mv.paso;
       if (!actual?.esperandoCero) return;
       if (partes[1] === 'OK') mv.buffer = []; // el reposo sale de las muestras con el cero nuevo
-      else toast(`El dispositivo no tomó el cero de postura (${partes.slice(2).join(',') || 'error'}): se mide desde la calibración inicial.`);
-      empezarTrasCero(actual);
+      else if (partes[2] === 'sin calibrar') {
+        // La placa se reinició y perdió la calibración: ningún ángulo vale hasta volver a calibrar.
+        mv.cal = { ...mv.cal, ok: false, motivo: 'el dispositivo perdió la calibración' };
+        if (mv.sesion) mv.sesion.calibracion = mv.cal;
+        actual.medicion = null;
+        toast('El dispositivo perdió la calibración (¿se reinició?): calibre de nuevo; mientras tanto cuente a mano.');
+        tono('alerta');
+      } else toast(`El dispositivo no tomó el cero de postura (${partes.slice(2).join(',') || 'error'}): se mide desde la calibración inicial.`);
+      if (actual.medicion) empezarTrasCero(actual);
+      else { clearTimeout(actual.timerCero); actual.esperandoCero = false; renderMonitorControles(); }
       break;
     }
     case 'BAT':

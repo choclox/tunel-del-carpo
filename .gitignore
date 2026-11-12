@@ -13,3 +13,4 @@ desktop.ini
 # Espacio de trabajo de los planes
 .superpowers/
 node_modules/
+__pycache__/

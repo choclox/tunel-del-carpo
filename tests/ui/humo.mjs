@@ -653,6 +653,14 @@ await verificar('cero sin respuesta', async (page) => {
   afirmar(r.medicion?.fuente === 'imu' && r.repeticiones > 0, JSON.stringify(r).slice(0, 200));
 }, { init: () => { window.SIMULADOR_SIN_CERO = true; } });
 
+// La placa se reinició a mitad de sesión y perdió la calibración: no se puede seguir midiendo ángulos.
+await verificar('cero sin calibrar invalida la calibración', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  await page.waitForFunction(() => !mv.paso?.esperandoCero, null, { timeout: 3000 });
+  afirmar(await page.evaluate(() => !estadoDispositivo().calOk && mv.ej === null && mv.paso.medicion === null), 'sigue midiendo sin calibración');
+  afirmar((await page.textContent('#rt-contador')).startsWith('Cuente las repeticiones'), await page.textContent('#rt-contador'));
+}, { init: () => { window.SIMULADOR_CERO_ERR = true; } });
+
 await verificar('cero y desconexión', async (page) => {
   await rutinaHastaPaso(page, 2, 'desv_radial');
   afirmar(await page.evaluate(() => mv.paso?.esperandoCero === true), 'no está esperando el cero');
