@@ -171,7 +171,6 @@ function actualizarContador() {
     const texto = `${reps ?? '—'} / ${paso.reps}`;
     if ($('#rt-contador b')?.textContent !== texto) el.innerHTML = `Detectadas: <b>${texto}</b>`;
   }
-  else if (modo === 'calibrando') el.textContent = 'Calibrando… mantenga la mano quieta en la posición del ejercicio.';
   else if (modo === 'sin-emg') el.textContent = TEXTO_PASO_SIN_EMG;
   else if (!mv.conectado) el.textContent = 'Sin conexión: cuente las repeticiones y anótelas al final.';
   else el.textContent = 'Cuente las repeticiones; las anotará al final.';

@@ -578,48 +578,96 @@ await verificar('pronación con IMU', async (page) => {
   afirmar(s.ejercicios.some((e) => e.tipo === 'pronacion' && e.anguloMax > 20), 'sin ángulo de pronación');
 });
 
-await verificar('desviación pide recalibrar', async (page) => {
-  await rutinaHastaPaso(page, 2, 'desv_radial');
-  afirmar(await page.evaluate(() => window.comandos.includes('CAL')), 'no envió CAL');
-  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), await page.textContent('#rt-contador'));
-  await esperarDetectadas(page);
+const comandosCero = (page) => page.evaluate(() => window.comandos.filter((c) => c === 'CERO' || c === 'CERO,-'));
+
+await verificar('una sola calibración en la rutina', async (page) => {
+  await rutinaHastaPaso(page, 2, 'flexion');
+  for (let i = 0; i < 12; i++) {
+    if (await page.evaluate(() => mv.paso?.medicion?.fuente === 'imu')) {
+      await esperarDetectadas(page);
+      // Sin cuenta regresiva, el reposo del paso siguiente sale de las últimas muestras: el paciente
+      // simulado descansa antes de pasar de ejercicio, como en una sesión real.
+      await page.evaluate(() => { mv.transporte.ejercicio = null; });
+      await page.waitForTimeout(600);
+    }
+    else await page.waitForTimeout(1200); // un paso necesita ≥ 1 s para guardarse
+    if ((await page.textContent('#rt-siguiente-txt')).trim() === 'Terminar rutina') break;
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(450);
+  }
+  afirmar(!(await page.evaluate(() => window.comandos.includes('CAL'))), 'la rutina volvió a enviar CAL');
+  const s = await terminarYGuardar(page);
+  const imu = s.rutina.pasos.filter((r) => r.tipo);
+  afirmar(imu.length === 6 && imu.every((r) => r.medicion?.fuente === 'imu' && r.repeticiones > 0), JSON.stringify(imu.map((r) => [r.id, r.repeticiones, r.medicion?.fuente])));
+  afirmar(s.calibracion?.ok === true, JSON.stringify(s.calibracion));
 });
 
-await verificar('calibración de canto no vale para flexión', async (page) => {
+await verificar('cero por paso', async (page) => {
   await rutinaHastaPaso(page, 2, 'desv_radial');
-  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 15000 });
-  afirmar(await page.evaluate(() => !estadoDispositivo().calOk), 'la calibración de canto cuenta como válida para la sesión');
-  const cal0 = await page.evaluate(() => window.comandos.filter((c) => c === 'CAL').length);
+  await page.waitForFunction(() => window.comandos.includes('CERO'), null, { timeout: 5000 });
+  afirmar(!(await page.textContent('#rt-contador')).startsWith('Calibrando'), await page.textContent('#rt-contador'));
+  await esperarDetectadas(page);
+  await page.click('#rt-siguiente');
+  await page.waitForTimeout(450);
+  const ceros = await comandosCero(page);
+  afirmar(JSON.stringify(ceros.slice(-3)) === JSON.stringify(['CERO', 'CERO,-', 'CERO']), JSON.stringify(ceros));
+  await esperarDetectadas(page);
+  afirmar(await page.evaluate(() => mv.ej?.tipo) === 'desv_cubital', 'cubital no mide');
+});
+
+await verificar('cero se quita al salir', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 5000 });
   await page.click('#rt-anterior');
   await page.waitForTimeout(450);
   await page.click('#rt-anterior');
   await page.waitForTimeout(450);
   afirmar((await page.textContent('#rt-nombre')).trim() === 'Flexión de muñeca', await page.textContent('#rt-nombre'));
-  // Si la flexión ya quedó grabada se vuelve a grabar; si no, empieza sola al volver.
   if (await page.isVisible('#rt-regrabar')) await page.click('#rt-regrabar');
-  await page.waitForTimeout(200);
-  afirmar(await page.evaluate((n) => window.comandos.filter((c) => c === 'CAL').length > n, cal0), 'no recalibró en la postura neutra');
-  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), await page.textContent('#rt-contador'));
-  await page.waitForFunction(() => mv.ej?.tipo === 'flexion', null, { timeout: 15000 });
-  afirmar(await page.evaluate(() => estadoDispositivo().calOk), 'tras calibrar en neutro la calibración no vuelve a ser válida');
+  await page.waitForFunction(() => mv.ej?.tipo === 'flexion', null, { timeout: 5000 });
+  const ceros = await comandosCero(page);
+  afirmar(ceros[ceros.length - 1] === 'CERO,-', JSON.stringify(ceros));
 });
 
-await verificar('reposo tomado después de recalibrar', async (page) => {
-  await rutinaHastaPaso(page, 2, 'desv_radial');
-  afirmar((await page.textContent('#rt-contador')).startsWith('Calibrando…'), 'no está calibrando');
-  // Muestras con el cero anterior (mano de canto con la muñeca algo flexionada): rc ≈ 30.
-  // Se meten justo antes de que llegue CAL,OK, como las que el dispositivo sigue enviando mientras calibra.
+await verificar('reposo tomado después del cero', async (page) => {
+  // Muestras con la referencia anterior (rc ≈ 30), como las que llegan justo antes de CERO,OK.
+  await rutinaHastaPaso(page, 2, 'extension');
   await page.evaluate(() => {
     const t = mv.transporte, onLinea = t.onLinea;
     t.onLinea = (l) => {
-      if (l.startsWith('CAL,OK')) { const u = mv.buffer[mv.buffer.length - 1]; for (let i = 0; i < 25; i++) mv.buffer.push({ ...u, rc: 30 }); }
+      if (l === 'CERO,OK') { const u = mv.buffer[mv.buffer.length - 1]; for (let i = 0; i < 25; i++) mv.buffer.push({ ...u, rc: 30 }); }
       onLinea(l);
     };
   });
-  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 15000 });
+  await page.click('#rt-siguiente');
+  await page.waitForFunction(() => mv.ej?.tipo === 'desv_radial', null, { timeout: 5000 });
   const base = await page.evaluate(() => mv.ej.base);
-  afirmar(Math.abs(base) < 3, `reposo ${base}: usa muestras de antes de la calibración`);
+  afirmar(Math.abs(base) < 3, `reposo ${base}: usa muestras de antes del cero`);
 });
+
+await verificar('cero sin respuesta', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  await esperarDetectadas(page);
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'desv_radial');
+  afirmar(r.medicion?.fuente === 'imu' && r.repeticiones > 0, JSON.stringify(r).slice(0, 200));
+}, { init: () => { window.SIMULADOR_SIN_CERO = true; } });
+
+await verificar('cero y desconexión', async (page) => {
+  await rutinaHastaPaso(page, 2, 'desv_radial');
+  afirmar(await page.evaluate(() => mv.paso?.esperandoCero === true), 'no está esperando el cero');
+  await page.evaluate(() => desconectar());
+  await page.waitForTimeout(1500); // pasa el plazo de espera del cero
+  afirmar(await page.evaluate(() => mv.ej === null && !mv.paso.esperandoCero), 'empezó a medir sin conexión o sigue esperando');
+  // La rutina se termina sin errores (sin datos suficientes no hay nada que guardar).
+  for (let i = 0; i < 20 && (await page.textContent('#rt-siguiente-txt')).trim() !== 'Terminar rutina'; i++) {
+    await page.click('#rt-siguiente');
+    await page.waitForTimeout(450);
+  }
+  await page.click('#rt-siguiente');
+  await page.waitForSelector('#dlg-fin[open]');
+  afirmar(await page.evaluate(() => mv.paso === null), 'quedó un paso abierto');
+}, { init: () => { window.SIMULADOR_SIN_CERO = true; } });
 
 await verificar('paso EMG sin electrodos', async (page) => {
   await rutinaHastaPaso(page, 1, 'tendon_recto');
