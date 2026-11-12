@@ -838,6 +838,8 @@ await verificar('resumen: Esc vuelve al inicio', async (page) => {
 
 await verificar('hoja: imprime una página', async (page) => {
   await rutinaHastaCierre(page);
+  // La hoja solo se entrega con mediciones reales: la sesión grabada pasa como si viniera del dispositivo USB.
+  await page.evaluate(() => { mv.sesion.origen = 'usb'; });
   await page.click('#fin-guardar');
   await page.click('#rs-hoja');
   afirmar(await page.evaluate(() => window.__impreso) === 1, 'no llamó a imprimir');
@@ -849,6 +851,13 @@ await verificar('hoja: imprime una página', async (page) => {
   const paginas = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
   afirmar(paginas === 1, `la hoja ocupa ${paginas} páginas`);
 }, { init: () => { window.print = () => { window.__impreso = (window.__impreso || 0) + 1; }; } });
+
+await verificar('hoja: no se ofrece en una sesión simulada', async (page) => {
+  await rutinaHastaCierre(page);
+  await page.click('#fin-guardar');
+  await page.waitForSelector('#dlg-resumen[open]');
+  afirmar(await page.isHidden('#rs-hoja'), 'ofrece la hoja para el paciente con datos del simulador');
+});
 
 /* ---------- Prueba de fuerza muscular ---------- */
 
