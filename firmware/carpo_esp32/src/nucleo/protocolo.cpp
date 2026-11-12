@@ -13,6 +13,8 @@ TipoComando parsearComando(const char* linea) {
   if (strcmp(linea, "START") == 0) return TipoComando::Start;
   if (strcmp(linea, "STOP") == 0) return TipoComando::Stop;
   if (strcmp(linea, "CAL") == 0) return TipoComando::Cal;
+  if (strcmp(linea, "CERO") == 0) return TipoComando::Cero;
+  if (strcmp(linea, "CERO,-") == 0) return TipoComando::QuitarCero;
   if (strcmp(linea, "MAG") == 0) return TipoComando::Mag;
   if (strcmp(linea, "RAW") == 0) return TipoComando::Raw;
   if (strcmp(linea, "ACEL") == 0) return TipoComando::Acel;
@@ -84,6 +86,12 @@ int formatearCalOk(char* buf, size_t tam, uint32_t ms) {
 
 int formatearCalErr(char* buf, size_t tam, const char* motivo) {
   return snprintf(buf, tam, "CAL,ERR,%s", motivo);
+}
+
+int formatearCeroOk(char* buf, size_t tam) { return snprintf(buf, tam, "CERO,OK"); }
+
+int formatearCeroErr(char* buf, size_t tam, const char* motivo) {
+  return snprintf(buf, tam, "CERO,ERR,%s", motivo);
 }
 
 int formatearBateria(char* buf, size_t tam, int pct) {

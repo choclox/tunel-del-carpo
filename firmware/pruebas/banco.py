@@ -54,7 +54,7 @@ def _parsear_d(linea):
 
 
 def contar_malformadas(lineas):
-    """Líneas que la interfaz cuenta como no válidas: el primer campo no es D, CAL ni BAT y
+    """Líneas que la interfaz cuenta como no válidas: el primer campo no es D, CAL, CERO ni BAT y
     no empiezan con '#'. Las vacías se descartan, como en la interfaz. Las D mal formadas
     se cuentan aparte (invalidas)."""
     n = 0
@@ -62,7 +62,7 @@ def contar_malformadas(lineas):
         linea = linea.strip()
         if not linea or linea.startswith("#"):
             continue
-        if linea.split(",")[0] not in ("D", "CAL", "BAT"):
+        if linea.split(",")[0] not in ("D", "CAL", "CERO", "BAT"):
             n += 1
     return n
 

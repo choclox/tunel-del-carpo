@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum class TipoComando { Start, Stop, Cal, Ej, Mag, Raw, Mano, Prueba, Acel, Estado, Desconocido };
+enum class TipoComando { Start, Stop, Cal, Cero, QuitarCero, Ej, Mag, Raw, Mano, Prueba, Acel, Estado, Desconocido };
+// "CERO" fija el cero de postura de los ángulos (responde CERO,OK o CERO,ERR); "CERO,-" lo quita.
 // "ACEL" (calibracion del acelerometro en 6 caras) y "ESTADO" son solo para la preparacion.
 
 // Comparacion exacta y sensible a mayusculas. "EJ,", "MANO," y "PR," se reconocen por prefijo.
@@ -36,4 +37,6 @@ int formatearMuestraEmg(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float
                         float mcf, const uint16_t emg[3]);
 int formatearCalOk(char* buf, size_t tam, uint32_t ms);
 int formatearCalErr(char* buf, size_t tam, const char* motivo);
+int formatearCeroOk(char* buf, size_t tam);                       // "CERO,OK"
+int formatearCeroErr(char* buf, size_t tam, const char* motivo);  // "CERO,ERR,<motivo>"
 int formatearBateria(char* buf, size_t tam, int pct);
