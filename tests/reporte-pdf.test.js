@@ -46,8 +46,8 @@ test('datos de una sesión completa', () => {
   assert.strictEqual(d.chequeo.recomendacion, 'Precaución');
   assert.deepStrictEqual(d.ejercicios.map((e) => [e.nombre, e.anguloMax, e.cambio, e.pctNormal]), [['Flexión de muñeca', '48°', '+8°', '60 %']]);
   assert.strictEqual(d.rutina.length, 1);
-  assert.deepStrictEqual(d.emg.musculos.map((m) => m.nombre), ['Pulgar (tenar)', 'Flexores', 'Extensores']);
-  assert.strictEqual(d.emg.cocontraccion, '20 %');
+  // EMG desactivado: el PDF no trae la prueba aunque la sesión guardada la tenga.
+  assert.strictEqual(d.emg, null);
   assert.deepStrictEqual(d.avisos, ['Dolor: subió de 3 a 5.']);
   assert.strictEqual(d.notas, 'Buena tolerancia.');
   assert.notStrictEqual(d.proximaCita, 'Por definir');
@@ -82,4 +82,17 @@ test('datosReporteSesion: la rutina dice con qué se midió cada paso', () => {
   };
   const d = datosReporteSesion({ ...pac, sesiones: [s1, s2, f1] }, f1, '2026-10-28', avisosDe);
   assert.deepStrictEqual(d.rutina.map((r) => r.medidoCon), ['EMG (flexores)', 'Manual', 'IMU', 'IMU', 'Manual']);
+});
+
+test('rutina con arrastre de la tapa: medidas en el PDF', () => {
+  const s = { id: 'A', fecha: '2026-10-27', ejercicios: [], rutina: { etapa: 1, pasos: [
+    { id: 'arrastre_tapa', nombre: 'Arrastre de la tapa con los dedos', tipo: null, medicion: { fuente: 'deslizamiento' }, repeticionesObjetivo: 10, repeticiones: 9, repeticionesManual: null,
+      deslizamiento: { repeticiones: 9, desplazamientoCm: 7.1, desplazamientoMaxCm: 8.4, velocidadMediaCms: 6.2, duracionRepS: 2.6, variabilidadPct: 5.3 } },
+    { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, medicion: null, repeticionesObjetivo: 5, repeticiones: null, repeticionesManual: 5 },
+  ] } };
+  const d = datosReporteSesion({ id: 'P', nombre: 'X', sesiones: [s] }, s, '2026-10-27', () => []);
+  assert.deepStrictEqual(d.rutina.map((r) => r.medidoCon), ['IMU (tapa)', 'Manual']);
+  assert.ok(d.rutina[0].medidas.startsWith('desplazamiento ≈ 7,1 cm'), d.rutina[0].medidas);
+  assert.strictEqual(d.rutina[1].medidas, '');
+  assert.strictEqual(textoPdf('≈ 7 cm'), '~ 7 cm');
 });

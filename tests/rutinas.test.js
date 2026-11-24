@@ -25,12 +25,14 @@ test('tipos válidos y sin repetir por etapa', () => {
 
 const IMU = (tipo) => ({ fuente: 'imu', tipo });
 const EMG = (musculo) => ({ fuente: 'emg', musculo });
+// EMG desactivado: los pasos que se medían con EMG se cuentan a mano; el arrastre de la tapa
+// (antes "mano recta") se mide con el sensor dentro de la tapa.
 const MEDICION_ESPERADA = {
-  1: { tendon_recto: EMG('flexores'), puno_gancho: EMG('flexores'), puno_completo: EMG('flexores'), mesa: EMG('flexores'),
-    puno_recto: EMG('flexores'), pulgar_oposicion: { ...EMG('tenar'), manualSiHerida: true }, nervio_mediano: null },
+  1: { arrastre_tapa: { fuente: 'deslizamiento' }, puno_gancho: null, puno_completo: null, mesa: null,
+    puno_recto: null, pulgar_oposicion: null, nervio_mediano: null },
   2: { flexion: IMU('flexion'), extension: IMU('extension'), desv_radial: IMU('desv_radial'), desv_cubital: IMU('desv_cubital'),
-    pronacion: IMU('pronacion'), supinacion: IMU('supinacion'), puno_completo: EMG('flexores'), pulgar_abduccion: EMG('tenar') },
-  3: { pelota: EMG('flexores'), pinza: EMG('tenar'), extension_carga: IMU('extension'), flexion_carga: IMU('flexion'),
+    pronacion: IMU('pronacion'), supinacion: IMU('supinacion'), puno_completo: null, pulgar_abduccion: null },
+  3: { pelota: null, pinza: null, extension_carga: IMU('extension'), flexion_carga: IMU('flexion'),
     pronosup_martillo: IMU('supinacion') },
 };
 
@@ -65,13 +67,16 @@ test('pronación y supinación por el canal ps', () => {
   assert.deepStrictEqual([EJERCICIOS.supinacion.canal, EJERCICIOS.supinacion.signo, EJERCICIOS.supinacion.ref], ['ps', 1, 80]);
 });
 
-test('medicionDelPaso: herida distinta de bien pasa la oposición a manual', () => {
-  const op = etapaPorNumero(1).pasos.find((x) => x.id === 'pulgar_oposicion');
+test('ningún paso se mide con EMG', () => {
+  for (const e of ETAPAS) for (const p of e.pasos) assert.notStrictEqual(p.medicion?.fuente, 'emg', p.id);
+});
+
+test('medicionDelPaso: herida distinta de bien pasa a manual los pasos marcados', () => {
+  const op = { id: 'x', medicion: { ...EMG('tenar'), manualSiHerida: true } };
   assert.deepStrictEqual(medicionDelPaso(op, { herida: 'bien' }), EMG('tenar'));
   assert.deepStrictEqual(medicionDelPaso(op, null), EMG('tenar'));
   assert.strictEqual(medicionDelPaso(op, { herida: 'roja' }), null);
-  const pelota = etapaPorNumero(3).pasos.find((x) => x.id === 'pelota');
-  assert.deepStrictEqual(medicionDelPaso(pelota, { herida: 'roja' }), EMG('flexores'));
+  assert.strictEqual(medicionDelPaso(etapaPorNumero(3).pasos.find((x) => x.id === 'pelota'), { herida: 'roja' }), null);
   const flex = etapaPorNumero(2).pasos.find((x) => x.id === 'flexion');
   assert.deepStrictEqual(medicionDelPaso(flex, { herida: 'roja' }), IMU('flexion'));
 });

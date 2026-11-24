@@ -123,6 +123,7 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 
   Un paso EMG sin electrodos conectados se cuenta a mano, con el aviso "Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.". Los pasos sin medir guardan la señal cruda de los 3 canales. El reporte y el PDF dicen en la columna "Medido con" cómo se contó cada paso.
 - **Desviaciones radial y cubital.** Con la palma sobre la mesa, la desviación es un giro alrededor del eje vertical: la gravedad no cambia, el acelerómetro no puede corregirlo y el ángulo depende del giroscopio (deriva) y del magnetómetro (perturbado por metal y por el propio ESP32). Por eso se hacen con el codo apoyado, el antebrazo vertical, los dedos hacia arriba y la palma hacia el paciente: así el giro cambia la gravedad en el marco del sensor y la fusión lo corrige con el acelerómetro. La calibración es una sola, la de "¿Listos para empezar?": al terminar la cuenta regresiva de estos pasos (y de la prono-supinación, con el pulgar hacia arriba) la rutina envía `CERO`, que toma la postura de inicio como 0° al instante, sin esperar quietud, y lo quita con `CERO,-` al cerrar el paso; el reposo del ejercicio sale de las muestras posteriores al cero. Si el dispositivo no confirma con `CERO,OK` en 1 s (firmware antiguo), el paso se mide igual desde la calibración inicial y avisa una vez. Si responde `CERO,ERR,sin calibrar` (la placa se reinició y perdió la calibración), la calibración deja de valer: el paso pasa a conteo manual y hay que calibrar de nuevo. Falta validarlo en banco con el sensor real (goniómetro, 10 repeticiones por lado, error ≤ 3° y conteo ≥ 95 %); si no se cumple, las desviaciones deben pasar a conteo manual.
+- **Arrastre de la tapa (Fase 1).** El sensor va dentro de la tapa verde, sobre la mesa; el paciente la trae hacia la palma doblando los dedos y la devuelve estirándolos. Como la tapa se desliza sin girar, los ángulos no sirven: el firmware envía la aceleración lineal (gravedad restada con la orientación) y `deslizamiento.js` separa cada movimiento entre dos reposos, lo integra dos veces (corrigiendo la deriva con velocidad cero en reposo) y cuenta una repetición por cada arrastre seguido de una devolución. Guarda repeticiones, desplazamiento estimado (cm, promedio y máximo), velocidad media (cm/s), duración por repetición, variabilidad entre repeticiones y la aceleración a ~25 Hz. No necesita la calibración ni el cero de postura. El desplazamiento es una estimación para comparar sesiones del mismo paciente. Los umbrales (`DESLIZAMIENTO` en `deslizamiento.js`) son iniciales: falta ajustarlos con registros del sensor real (10 repeticiones medidas con regla; conteo ≥ 95 %).
 - **Al guardar,** la sesión incluye la señal cruda, los picos detectados y el registro de la rutina (campo `rutina`), y aparece en Evolución, Detalle, Comparar e Historial. Una sesión puede guardarse aunque ningún ejercicio grabado sea medido; en ese caso sus indicadores de movimiento se muestran como "—".
 
 ### Protocolo serie (115200 baudios, texto, una línea por mensaje)
@@ -131,6 +132,7 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 |---|---|---|
 | Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<ps>` | Muestra (~50 Hz). `seq` es un contador creciente, `t_ms` el tiempo del dispositivo. Los ángulos van en grados: `fe` flexo-extensión (+flexión/−extensión), `rc` desviación (+radial/−cubital), `ps` prono-supinación (+supinación/−pronación), el giro del antebrazo alrededor de su eje. |
 | Dispositivo → PC | `D,<seq>,<t_ms>,<fe>,<rc>,<ps>,<emg1>,<emg2>,<emg3>` | Igual, con EMG: `emg1` tenar, `emg2` flexores, `emg3` extensores, enteros de 0 a 1000 ya sin el reposo. Otro número de campos o un EMG fuera de 0–1000 cuenta como línea no válida. |
+| Dispositivo → PC | `D,…,<ax>,<ay>` | Las dos formas anteriores pueden terminar con la aceleración lineal del sensor en mg (enteros de −4000 a 4000, gravedad restada con la orientación; 8 u 11 campos). La usa el arrastre de la tapa, con el sensor dentro de la tapa sobre la mesa. Se activa con `USAR_ACEL_LINEAL` en `config.h`. |
 | Dispositivo → PC | `CAL,OK,<ms>` / `CAL,ERR,<motivo>` | Resultado de la calibración. |
 | Dispositivo → PC | `CERO,OK` / `CERO,ERR,<motivo>` | Respuesta inmediata a `CERO` (`CERO,ERR,sin calibrar` si todavía no hubo un `CAL,OK`). |
 | Dispositivo → PC | `BAT,<pct>` | Batería (opcional). |
@@ -138,7 +140,7 @@ La rutina es el único lugar donde se graba una sesión. Se pasa al ejercicio si
 | PC → Dispositivo | `START` / `STOP` | Iniciar o detener la transmisión. |
 | PC → Dispositivo | `CAL` | Calibrar (posición neutra = 0°). |
 | PC → Dispositivo | `CERO` / `CERO,-` | Cero de postura: la orientación del momento pasa a ser 0° para los ángulos, al instante y sin recalibrar (el sesgo del giroscopio, el filtro y el reposo EMG siguen siendo los del `CAL`). `CERO,-` vuelve al cero de la calibración; un `CAL` correcto también lo quita. |
-| PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). En los pasos medidos con EMG, `<tipo>` es `emg-<músculo>` (`emg-tenar`, `emg-flexores`, `emg-extensores`). |
+| PC → Dispositivo | `EJ,<tipo>,<objetivo>` / `EJ,-` | Ejercicio en curso (informativo). En los pasos medidos con EMG, `<tipo>` es `emg-<músculo>` (`emg-tenar`, `emg-flexores`, `emg-extensores`); en el arrastre de la tapa, `deslizamiento`. |
 | PC → Dispositivo | `PR,<musculo>` / `PR,-` | Contracción de la prueba de fuerza EMG en curso (informativo; el simulador la usa). |
 
 [firmware/plantilla_protocolo/plantilla_protocolo.ino](firmware/plantilla_protocolo/plantilla_protocolo.ino) implementa este protocolo para Arduino y ESP32. Solo hay que reemplazar `leerAngulosCrudos()` por la lectura real de los sensores. Mientras tanto envía una señal de prueba. Cierre el monitor serie del IDE de Arduino antes de conectar desde la interfaz, porque el puerto solo admite un programa a la vez.
@@ -193,7 +195,8 @@ La calibración (`CAL`) se hace una sola vez por sesión, en "¿Listos para empe
 - `rutina.js`: ventanas de la rutina (revisión y grabación), "¿Listos para empezar?" y "Rutina terminada".
 - `login.html`, `login.js`: página de inicio de sesión y registro (maqueta).
 - `acceso.js`: validación de los formularios y sesión de demostración; funciones puras con pruebas.
-- `emg.js`: formato de la línea D con EMG, picos, línea base y medidas; funciones puras con pruebas.
+- `deslizamiento.js`: arrastre de la tapa; cuenta repeticiones y estima el desplazamiento con la aceleración del sensor. Funciones puras con pruebas.
+- `emg.js`: formato de la línea D con EMG y aceleración, picos, línea base y medidas; funciones puras con pruebas.
 - `prueba-emg.js`: ventana guiada "Prueba de activación muscular".
 - `inicio.js`: Inicio del profesional (atención, citas, sesiones recientes, nueva sesión).
 - `sonido.js`: tonos de la cuenta regresiva y de las repeticiones.

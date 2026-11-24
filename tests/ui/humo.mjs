@@ -331,9 +331,9 @@ await verificar('encabezado compacto', async (page) => {
   afirmar(await page.locator('.ring').count() === 0, 'sigue el anillo');
 });
 
-await verificar('cuatro tarjetas', async (page) => {
+await verificar('tres tarjetas (sin EMG)', async (page) => {
   const titulos = await page.$$eval('#resumen-tarjetas > *', (ts) => ts.map((t) => t.querySelector('.kpi-label').textContent.trim()));
-  afirmar(JSON.stringify(titulos) === JSON.stringify(['Movimiento', 'Dolor', 'Última sesión', 'Tenar/extensores']), `tarjetas: ${titulos}`);
+  afirmar(JSON.stringify(titulos) === JSON.stringify(['Movimiento', 'Dolor', 'Última sesión']), `tarjetas: ${titulos}`);
 });
 
 await verificar('máximo 3 observaciones', async (page) => {
@@ -446,17 +446,13 @@ await verificar('simulador sin EMG', async (page) => {
   afirmar(await page.evaluate(() => mv.conEmg) === false, 'conEmg debería ser false');
 }, { init: () => { window.SIMULADOR_SIN_EMG = true; } });
 
-await verificar('rutina guarda señal EMG', async (page) => {
-  const t0 = Date.now();
+await verificar('la rutina no guarda EMG', async (page) => {
   await grabarRutina(page, 2);
-  const segundos = (Date.now() - t0) / 1000;
-  if (await page.isVisible('#pr-omitir')) await page.click('#pr-omitir');
+  afirmar(!(await page.isVisible('#dlg-prueba')), 'apareció la prueba de fuerza');
   await page.click('#fin-guardar');
   await page.waitForTimeout(300);
   const s = await ultimaSesion(page);
-  afirmar(s.emg && s.emg.senal.tenar.length > 0 && s.emg.prueba === null, JSON.stringify(s.emg ?? null).slice(0, 120));
-  // Señal reducida a 2 Hz (máximo de cada medio segundo) para no llenar el almacenamiento.
-  afirmar(s.emg.senal.fs === 2 && s.emg.senal.tenar.length <= segundos * 2 + 2, `fs ${s.emg.senal.fs}, ${s.emg.senal.tenar.length} valores para ${segundos} s`);
+  afirmar(s.emg === undefined, JSON.stringify(s.emg ?? null).slice(0, 120));
 });
 
 await verificar('cuenta regresiva antes de grabar', async (page) => {
@@ -546,18 +542,52 @@ async function terminarYGuardar(page) {
 const pasoGuardado = (s, id) => s.rutina.pasos.find((x) => x.id === id);
 const esperarDetectadas = (page) => page.waitForFunction(() => /^Detectadas: [1-9]/.test(document.querySelector('#rt-contador').textContent), null, { timeout: 15000 });
 
-await verificar('fase 1 con EMG', async (page) => {
-  await rutinaHastaPaso(page, 1, 'tendon_recto');
-  await esperarDetectadas(page);
-  afirmar(await page.evaluate(() => mv.ej?.musculo) === 'flexores', 'el paso no mide los flexores');
-  afirmar(await page.evaluate(() => { terminarRutina(); return document.querySelector('#fin-tabla td:nth-child(3)').textContent; }) !== '—', 'la tabla final no muestra las detectadas por EMG');
-  await page.click('#fin-guardar');
-  await page.waitForTimeout(300);
-  const s = await ultimaSesion(page);
-  const r = pasoGuardado(s, 'tendon_recto');
-  afirmar(r.medicion?.fuente === 'emg' && r.emg?.musculo === 'flexores' && r.emg.repeticiones > 0 && r.repeticiones === r.emg.repeticiones, JSON.stringify(r).slice(0, 200));
-  afirmar(!s.ejercicios.length, 'un paso EMG no debe entrar en los ejercicios con ángulo');
+await verificar('fase 1: los pasos que eran EMG se cuentan a mano', async (page) => {
+  await rutinaHastaPaso(page, 1, 'puno_gancho');
+  await page.waitForTimeout(1500); // un paso necesita ≥ 1 s para guardarse
+  afirmar((await page.textContent('#rt-contador')).startsWith('Cuente las repeticiones'), await page.textContent('#rt-contador'));
+  afirmar(await page.evaluate(() => mv.ej) === null, 'se está midiendo el paso');
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'puno_gancho');
+  afirmar(r.medicion === null && r.repeticiones === null && !r.emg, JSON.stringify(r).slice(0, 200));
+  afirmar(s.rutina.pasos.every((x) => x.medicion?.fuente !== 'emg'), 'un paso quedó con EMG');
 });
+
+await verificar('simulador envía la aceleración de la tapa', async (page) => {
+  await conectarSimulador(page);
+  const r = await page.evaluate(() => ({ con: mv.conAcel, acel: mv.buffer[mv.buffer.length - 1]?.acel }));
+  afirmar(r.con === true && Number.isInteger(r.acel?.x) && Number.isInteger(r.acel?.y), JSON.stringify(r));
+});
+
+await verificar('fase 1: arrastre de la tapa medido con el sensor', async (page) => {
+  await rutinaHastaPaso(page, 1, 'arrastre_tapa');
+  await page.waitForFunction(() => /^Detectadas: [2-9]/.test(document.querySelector('#rt-contador').textContent), null, { timeout: 25000 });
+  afirmar(await page.evaluate(() => mv.ej?.deslizamiento === true), 'el paso no se mide como arrastre');
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'arrastre_tapa');
+  const d = r.deslizamiento;
+  afirmar(r.medicion?.fuente === 'deslizamiento' && r.repeticiones >= 2 && d?.repeticiones === r.repeticiones, JSON.stringify(r).slice(0, 300));
+  afirmar(d.desplazamientoCm > 4 && d.desplazamientoCm < 10, `desplazamiento ${d.desplazamientoCm}`);
+  afirmar(d.senal.x.length === d.senal.y.length && d.senal.x.length > 10 && d.senal.fs > 15 && d.senal.fs < 35, `señal: ${d.senal.fs} Hz, ${d.senal.x.length}`);
+  afirmar(!s.ejercicios.length, 'el arrastre no debe entrar en los ejercicios con ángulo');
+  // Vista de la sesión: el paso muestra sus medidas.
+  // Esc cierra el Resumen y vuelve al inicio; desde "Sesiones recientes" se abre la sesión.
+  if (await page.isVisible('#dlg-resumen')) { await page.keyboard.press('Escape'); await page.waitForSelector('#dlg-resumen', { state: 'hidden' }); }
+  await page.getByText(/simulada$/).first().click();
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  await page.waitForSelector('#tabla-rutina', { state: 'visible' });
+  const tabla = await page.textContent('#tabla-rutina');
+  afirmar(tabla.includes('Arrastre de la tapa') && tabla.includes('desplazamiento ≈'), tabla.slice(0, 200));
+});
+
+await verificar('fase 1: arrastre sin aceleración se cuenta a mano', async (page) => {
+  await rutinaHastaPaso(page, 1, 'arrastre_tapa');
+  await page.waitForTimeout(1500);
+  afirmar((await page.textContent('#rt-contador')).trim() === 'El dispositivo no envía la aceleración de la tapa (actualice el firmware): cuente a mano.', await page.textContent('#rt-contador'));
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'arrastre_tapa');
+  afirmar(r.medicion === null && r.repeticiones === null && !r.deslizamiento, JSON.stringify(r).slice(0, 200));
+}, { init: () => { window.SIMULADOR_SIN_ACEL = true; } });
 
 await verificar('fase 1 herida → oposición manual', async (page) => {
   await rutinaHastaPaso(page, 1, 'pulgar_oposicion', { herida: 'enrojecida' });
@@ -676,15 +706,6 @@ await verificar('cero y desconexión', async (page) => {
   await page.waitForSelector('#dlg-fin[open]');
   afirmar(await page.evaluate(() => mv.paso === null), 'quedó un paso abierto');
 }, { init: () => { window.SIMULADOR_SIN_CERO = true; } });
-
-await verificar('paso EMG sin electrodos', async (page) => {
-  await rutinaHastaPaso(page, 1, 'tendon_recto');
-  await page.waitForTimeout(1500); // un paso necesita ≥ 1 s para guardarse
-  afirmar((await page.textContent('#rt-contador')).trim() === 'Este ejercicio se mide con EMG: conecte los electrodos o cuente a mano.', await page.textContent('#rt-contador'));
-  const s = await terminarYGuardar(page);
-  const r = pasoGuardado(s, 'tendon_recto');
-  afirmar(r.medicion === null && r.repeticiones === null && r.senal, JSON.stringify(r).slice(0, 200));
-}, { init: () => { window.SIMULADOR_SIN_EMG = true; } });
 
 const PRUEBA_RAPIDA = () => { window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; };
 
@@ -861,78 +882,25 @@ await verificar('hoja: no se ofrece en una sesión simulada', async (page) => {
 
 /* ---------- Prueba de fuerza muscular ---------- */
 
-await verificar('prueba: fase 2 completa', async (page) => {
-  await grabarRutina(page, 2);
-  await page.waitForSelector('#dlg-prueba[open]');
-  for (let i = 0; i < 3; i++) {
-    await page.waitForSelector('#pr-siguiente:not([disabled])', { timeout: 15000 });
-    await page.click('#pr-siguiente');
-  }
-  await page.waitForSelector('#dlg-fin[open]');
-  await page.click('#fin-guardar');
-  await page.waitForTimeout(300);
-  const p = (await ultimaSesion(page)).emg?.prueba;
-  afirmar(p && p.tenar.picos.length === 3 && p.flexores.extensoresDuranteFlexores > 0, JSON.stringify(p));
-  const clase = await page.getAttribute('#dlg-resumen .pasos-sesion-lista li:nth-child(4)', 'class');
-  afirmar(clase === 'hecho', `en el Resumen, la Prueba EMG figura como "${clase}"`);
-  afirmar(p.tenar.media > 300 && p.extensores.media > 300, `medias: ${p.tenar.media}, ${p.extensores.media}`);
-}, { init: PRUEBA_RAPIDA });
-
-await verificar('prueba: sin actividad no se guarda', async (page) => {
-  await grabarRutina(page, 2);
-  await page.waitForSelector('#dlg-prueba[open]');
-  await page.waitForSelector('#pr-repetir:visible', { timeout: 15000 });
-  afirmar((await page.textContent('#pr-dudosa')).includes('No se detectó actividad'), 'sin aviso de actividad');
-  afirmar(await page.isDisabled('#pr-siguiente'), 'deja seguir sin actividad');
-  await page.click('#pr-omitir');
-  await page.click('#fin-guardar');
-  await page.waitForTimeout(300);
-  afirmar((await ultimaSesion(page)).emg?.prueba === null, 'se guardó una prueba sin actividad');
-}, { init: () => { window.SIMULADOR_EMG_PLANO = true; window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; } });
-
-await verificar('prueba: fase 1 no aparece', async (page) => {
-  await grabarRutina(page, 1);
-  await page.waitForSelector('#dlg-fin[open]');
-  afirmar(!(await page.isVisible('#dlg-prueba')), 'apareció la prueba en Fase 1');
-}, { init: PRUEBA_RAPIDA });
-
-await verificar('prueba: sin EMG no aparece', async (page) => {
-  await grabarRutina(page, 2);
-  await page.waitForSelector('#dlg-fin[open]');
-  afirmar(!(await page.isVisible('#dlg-prueba')), 'apareció la prueba sin EMG');
-}, { init: () => { window.SIMULADOR_SIN_EMG = true; window.TIEMPOS_PRUEBA_EMG = { prepara: 300, fuerza: 400, descanso: 200 }; } });
-
-await verificar('prueba: omitir', async (page) => {
-  await grabarRutina(page, 2);
-  await page.click('#pr-omitir');
-  await page.waitForSelector('#dlg-fin[open]');
-  await page.click('#fin-guardar');
-  await page.waitForTimeout(300);
-  afirmar((await ultimaSesion(page)).emg?.prueba === null, 'la prueba no es null');
-}, { init: PRUEBA_RAPIDA });
-
-await verificar('prueba: Esc omite', async (page) => {
-  await grabarRutina(page, 2);
-  await page.waitForSelector('#dlg-prueba[open]');
-  await page.keyboard.press('Escape');
-  await page.waitForSelector('#dlg-fin[open]');
-  afirmar(await page.isVisible('#fin-guardar'), 'no se puede guardar la rutina');
-}, { init: PRUEBA_RAPIDA });
-
-await verificar('prueba: desconexión', async (page) => {
-  await grabarRutina(page, 2);
-  await page.waitForSelector('#dlg-prueba[open]');
-  await page.evaluate(() => desconectar());
-  await page.waitForFunction(() => document.body.innerText.includes('Se perdió la conexión: la prueba no se completó.'));
-  await page.waitForSelector('#dlg-fin[open]', { timeout: 15000 });
-}, { init: PRUEBA_RAPIDA });
+// EMG desactivado: la prueba no aparece en ninguna fase y la barra de pasos no la muestra.
+for (const fase of [2, 3]) {
+  await verificar(`prueba: no aparece en Fase ${fase}`, async (page) => {
+    await grabarRutina(page, fase);
+    await page.waitForSelector('#dlg-fin[open]');
+    afirmar(!(await page.isVisible('#dlg-prueba')), `apareció la prueba en Fase ${fase}`);
+    await page.click('#fin-guardar');
+    await page.waitForSelector('#dlg-resumen[open]');
+    const pasos = await page.$$eval('#dlg-resumen .pasos-sesion-lista li', (ls) => ls.map((l) => l.textContent));
+    afirmar(pasos.length === 5 && !pasos.some((t) => t.includes('Prueba EMG')), `pasos: ${pasos}`);
+  }, { init: PRUEBA_RAPIDA });
+}
 
 await verificar('videos nuevos de la fase 1', async (page) => {
   await irEjercicios(page);
   await page.click('#rt-etapas [data-etapa="1"]');
   await page.click('.rt-detalle summary');
   await page.click('#rt-revisar');
-  for (const id of ['tendon_recto', 'puno_gancho', 'puno_completo', 'mesa', 'puno_recto']) {
+  for (const id of ['arrastre_tapa', 'puno_gancho', 'puno_completo', 'mesa', 'puno_recto']) {
     await page.waitForFunction((id) => document.querySelector('#rt-video').getAttribute('src') === `videos/${id}.mp4`, id);
     await page.waitForFunction(() => document.querySelector('#rt-video').readyState >= 2 || !document.querySelector('#rt-falta').hidden);
     afirmar(await page.isHidden('#rt-falta'), `${id}: "Video no adjuntado"`);
@@ -948,7 +916,7 @@ await verificar('reporte: lectura rápida', async (page) => {
   await irReporte(page);
   afirmar((await page.textContent('#lectura-general')).trim().length > 0, 'sin frase general');
   const areas = await page.$$eval('#lectura-areas .area', (as) => as.map((a) => [a.querySelector('.area-titulo').textContent.trim(), a.dataset.estado]));
-  afirmar(JSON.stringify(areas.map((a) => a[0])) === JSON.stringify(['Movimiento', 'Dolor', 'Tenar/extensores', 'Constancia']), `áreas: ${areas}`);
+  afirmar(JSON.stringify(areas.map((a) => a[0])) === JSON.stringify(['Movimiento', 'Dolor', 'Constancia']), `áreas: ${areas}`);
   afirmar(areas.every((a) => ['bien', 'atencion', 'revisar', 'sin-datos'].includes(a[1])), `estados: ${areas}`);
   afirmar((await page.textContent('section.seccion[data-seccion="reporte"]')).includes('Lectura orientativa'), 'sin aviso de lectura orientativa');
 });
@@ -989,7 +957,7 @@ await verificar('reporte: sin sesiones', async (page) => {
   await page.waitForFunction(() => estado.db.pacientes.some((p) => p.nombre === 'Paciente Nuevo' && p.id === estado.pacienteId));
   await irReporte(page);
   const estados = await page.$$eval('#lectura-areas .area', (as) => as.map((a) => a.dataset.estado));
-  afirmar(JSON.stringify(estados) === JSON.stringify(['sin-datos', 'sin-datos', 'sin-datos', 'sin-datos']), `estados: ${estados}`);
+  afirmar(JSON.stringify(estados) === JSON.stringify(['sin-datos', 'sin-datos', 'sin-datos']), `estados: ${estados}`);
   afirmar((await page.textContent('#lista-sesiones')).includes('Aún no hay sesiones.'), 'sin mensaje de vacío');
   afirmar(await page.locator('.btn-pdf').count() === 0, 'hay botones de PDF');
 });
@@ -1087,61 +1055,37 @@ async function importar(page, datos) {
   await page.setInputFiles('#file-input', { name: 'sesion.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(datos)) });
   await page.waitForTimeout(300);
 }
-const tarjetaMusculo = (page) => page.locator('#resumen-tarjetas > *').nth(3);
+// Sesión importada con una prueba EMG antigua: se guarda, pero no se muestra.
+const PRUEBA_ANTIGUA = { tenar: { picos: [400, 410, 420] }, flexores: { picos: [300, 300, 300], extensoresDuranteFlexores: 150 }, extensores: { picos: [200, 200, 200] } };
 
-await verificar('emg: tarjeta y gráfica', async (page) => {
-  afirmar((await tarjetaMusculo(page).textContent()).includes('%'), 'la tarjeta Tenar/extensores no muestra %');
-  await page.click('#mas-emg summary');
-  await page.waitForTimeout(300);
-  const alto = await page.$eval('#chart-emg', (c) => c.getBoundingClientRect().height);
-  afirmar(alto > 100, `alto de la gráfica EMG: ${alto}`);
+await verificar('emg oculto en Resumen', async (page) => {
+  afirmar(await page.isHidden('#mas-emg'), 'se ve la gráfica de activación muscular');
+  afirmar(!(await page.textContent('#resumen-tarjetas')).includes('Tenar'), 'se ve la tarjeta Tenar/extensores');
 });
 
-await verificar('emg: sin prueba', async (page) => {
-  await page.click('#btn-nuevo');
-  await page.fill('#form-paciente [name=nombre]', 'Paciente Sin EMG');
-  await page.fill('#form-paciente [name=documento]', '9');
-  await page.fill('#form-paciente [name=edad]', '40');
-  await page.fill('#form-paciente [name=fechaCirugia]', '2026-09-01');
-  await page.click('#form-paciente button[value=ok]');
-  await importar(page, sesionImportada('2026-10-01'));
-  await page.click('.nav-seccion[data-seccion="seguimiento"]');
-  await page.click('#seg-vistas [data-vista="resumen"]');
-  afirmar((await tarjetaMusculo(page).textContent()).includes('Sin prueba EMG (empieza en la Fase 2)'), 'texto de la tarjeta sin prueba');
-});
-
-await verificar('emg: sesiones sin prueba', async (page) => {
-  await importar(page, sesionImportada('2026-10-24'));
+await verificar('emg oculto en una sesión con prueba antigua', async (page) => {
+  await importar(page, sesionImportada('2026-10-24', { emg: { prueba: PRUEBA_ANTIGUA } }));
+  await importar(page, sesionImportada('2026-10-25', { emg: { prueba: { ...PRUEBA_ANTIGUA, tenar: { picos: [100, 100, 100] } } } }));
+  afirmar((await page.textContent('#lectura-areas')).includes('Tenar') === false, 'el reporte muestra Tenar/extensores');
   await page.click('.nav-seccion[data-seccion="seguimiento"]');
   await page.click('#seg-vistas [data-vista="sesion"]');
-  afirmar(await page.isHidden('#sesion-emg'), 'la tarjeta EMG aparece en una sesión sin prueba');
+  afirmar(await page.isHidden('#sesion-emg') && await page.isHidden('#sesion-emg-senal'), 'la tarjeta EMG aparece en la sesión');
   await page.click('#seg-vistas [data-vista="resumen"]');
-  await page.click('#mas-emg summary');
-  await page.waitForTimeout(300);
-  afirmar((await tarjetaMusculo(page).textContent()).includes('%'), 'la tarjeta perdió el último índice');
+  afirmar(!(await page.textContent('#observaciones')).includes('tenar/extensores'), 'aviso de la razón tenar/extensores');
+  afirmar(!(await page.textContent('#observaciones')).includes('Co-contracción'), 'aviso de co-contracción');
 });
 
-await verificar('emg: una sesión', async (page) => {
-  await page.click('#seg-vistas [data-vista="sesion"]');
-  const txt = await page.textContent('#sesion-emg');
-  for (const m of ['Pulgar (tenar)', 'Flexores', 'Extensores', 'Co-contracción']) afirmar(txt.includes(m), `falta ${m}`);
-  afirmar(await page.locator('#sesion-emg .emg-pico').count() === 9, 'no muestra los 9 picos');
-});
-
-await verificar('emg: csv', async (page) => {
+await verificar('emg: csv sin columnas EMG', async (page) => {
   await page.click('.nav-seccion[data-seccion="reporte"]');
   const [d] = await Promise.all([page.waitForEvent('download'), page.click('#btn-csv')]);
   const texto = fs.readFileSync(await d.path(), 'utf8');
-  afirmar(texto.split(/\r?\n/)[0].includes('indice_mediano_pct'), 'el CSV no tiene columnas EMG');
+  const enc = texto.split(/\r?\n/)[0];
+  afirmar(!enc.includes('emg_') && !enc.includes('indice_mediano_pct') && enc.endsWith(';origen'), `encabezado: ${enc}`);
 });
 
 await verificar('emg: importar inválido', async (page) => {
   await importar(page, sesionImportada('2026-10-02', { emg: { prueba: { tenar: { picos: [1] } } } }));
   afirmar(page.dialogos.some((m) => m.includes('No se pudo importar')), `diálogos: ${page.dialogos}`);
-});
-
-await verificar('emg: avisos', async (page) => {
-  afirmar((await page.textContent('#observaciones')).includes('tenar/extensores'), 'sin aviso de la razón tenar/extensores');
 });
 
 await verificar('importar: dolor no numérico rechazado', async (page) => {

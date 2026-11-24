@@ -23,15 +23,19 @@ function recortarObservaciones(obs, max = 3) {
   return { visibles: orden.slice(0, max), ocultas: orden.slice(max) };
 }
 
-/* Pasos de la sesión guiada: Chequeo → Dispositivo → Rutina → Prueba EMG → Cierre → Resumen. */
+/* Pasos de la sesión guiada: Chequeo → Dispositivo → Rutina → Prueba EMG → Cierre → Resumen.
+ * Los índices (0–5) no cambian; con el EMG desactivado la Prueba EMG (3) no se muestra. */
 const PASOS_SESION = ['Chequeo', 'Dispositivo', 'Rutina', 'Prueba EMG', 'Cierre', 'Resumen'];
+const PASO_PRUEBA_EMG = 3;
+const emgHabilitadoNav = () => (typeof EMG_HABILITADO !== 'undefined' ? EMG_HABILITADO : require('./data.js').EMG_HABILITADO);
 
 // actual: índice del paso en curso (0–5). Los anteriores salen "hecho"; la prueba EMG, "omitido" si no aplica.
 function htmlPasosSesion(actual, { pruebaOmitida = false } = {}) {
-  return `<ol class="pasos-sesion-lista">${PASOS_SESION.map((nombre, i) => {
-    const omitido = pruebaOmitida && i === 3 && i !== actual;
+  const visibles = PASOS_SESION.map((nombre, i) => ({ nombre, i })).filter(({ i }) => emgHabilitadoNav() || i !== PASO_PRUEBA_EMG);
+  return `<ol class="pasos-sesion-lista">${visibles.map(({ nombre, i }, pos) => {
+    const omitido = pruebaOmitida && i === PASO_PRUEBA_EMG && i !== actual;
     const clase = i === actual ? 'actual' : omitido ? 'omitido' : i < actual ? 'hecho' : '';
-    const marca = clase === 'hecho' ? '✓' : clase === 'omitido' ? '–' : i + 1;
+    const marca = clase === 'hecho' ? '✓' : clase === 'omitido' ? '–' : pos + 1;
     return `<li class="${clase}"${i === actual ? ' aria-current="step"' : ''}><span class="paso-marca">${marca}</span>${nombre}${omitido ? ' (omitida)' : ''}</li>`;
   }).join('')}</ol>`;
 }

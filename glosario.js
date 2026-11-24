@@ -22,15 +22,18 @@ const GLOSARIO = {
     lectura: 'Bien: menos de 4. Atención: de 4 a 6. Revisar: 7 o más, o si subió 2 o más frente a la sesión anterior.',
   },
   activacion: {
+    emg: true,
     titulo: 'Activación muscular (EMG)',
     texto: 'Amplitud de la señal EMG durante una contracción máxima, en unidades del equipo y en % de la primera prueba del paciente. No es una medida de fuerza en kilos ni en newtons.',
   },
   razon: {
+    emg: true,
     titulo: 'Razón tenar/extensores',
     texto: 'Activación del tenar dividida por la de los extensores, en % de esa misma razón en la primera prueba (100 %). Los extensores sirven de control, porque no dependen del nervio mediano. No es una prueba de conducción nerviosa ni mide el nervio directamente.',
     lectura: 'Bien: 105 % o más. Revisar: bajó más de 15 % frente a la prueba anterior.',
   },
   cocontraccion: {
+    emg: true,
     titulo: 'Co-contracción',
     texto: 'Activación de los extensores mientras el paciente aprieta con los flexores, en % de la activación de los flexores.',
     lectura: 'Se avisa por encima de 30 %. Es un umbral del prototipo, no un rango clínico validado.',
@@ -47,8 +50,10 @@ function botonTermino(id) {
   return `<button type="button" class="termino" data-termino="${id}" aria-label="Qué significa: ${GLOSARIO[id].titulo}" title="Qué significa"><svg class="ic" aria-hidden="true"><use href="#i-ayuda"/></svg></button>`;
 }
 
+// Los términos EMG (`emg: true`) no se muestran con el EMG desactivado.
 function htmlGlosario() {
-  return Object.entries(GLOSARIO).map(([id, g]) => `<section class="glo-termino" id="glo-${id}" tabindex="-1">
+  const conEmg = typeof EMG_HABILITADO !== 'undefined' ? EMG_HABILITADO : require('./data.js').EMG_HABILITADO;
+  return Object.entries(GLOSARIO).filter(([, g]) => conEmg || !g.emg).map(([id, g]) => `<section class="glo-termino" id="glo-${id}" tabindex="-1">
       <h3>${g.titulo}</h3>
       <p>${g.texto}</p>
       ${g.lectura ? `<p class="glo-lectura">${g.lectura}</p>` : ''}

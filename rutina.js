@@ -89,7 +89,7 @@ function renderTarjetaRutina() {
   $('#rt-etapa-sug').textContent = textoSugerida(diasDesdeCirugia(p), sugerida);
   $('#rt-pasos').innerHTML = e.pasos.map((x) => `
     <li><span class="rt-paso-nombre">${esc(x.nombre)}</span>
-      <span class="rt-paso-meta"><span>${esc(textoReps(x))}</span>${x.medicion ? `<span class="rt-medido">Medido con ${x.medicion.fuente === 'emg' ? 'EMG' : 'el sensor de movimiento'}</span>` : ''}</span></li>`).join('');
+      <span class="rt-paso-meta"><span>${esc(textoReps(x))}</span>${x.medicion ? `<span class="rt-medido">Medido con ${{ emg: 'EMG', deslizamiento: 'el sensor en la tapa' }[x.medicion.fuente] ?? 'el sensor de movimiento'}</span>` : ''}</span></li>`).join('');
   $('#rt-cuidado-gral').innerHTML = listaHTML(e.cuidado);
 }
 
@@ -162,7 +162,7 @@ function actualizarContador() {
   const el = $('#rt-contador');
   const modo = medicionEnCurso();
   el.classList.toggle('medido', modo === 'medido');
-  el.classList.toggle('aviso', modo === 'sin-emg');
+  el.classList.toggle('aviso', modo === 'sin-emg' || modo === 'sin-acel');
   const reps = repeticionesEnCurso();
   el.classList.toggle('completo', modo === 'medido' && reps >= paso.reps);
   if (modo === 'medido') {
@@ -172,6 +172,7 @@ function actualizarContador() {
     if ($('#rt-contador b')?.textContent !== texto) el.innerHTML = `Detectadas: <b>${texto}</b>`;
   }
   else if (modo === 'sin-emg') el.textContent = TEXTO_PASO_SIN_EMG;
+  else if (modo === 'sin-acel') el.textContent = TEXTO_PASO_SIN_ACEL;
   else if (!mv.conectado) el.textContent = 'Sin conexión: cuente las repeticiones y anótelas al final.';
   else el.textContent = 'Cuente las repeticiones; las anotará al final.';
 }

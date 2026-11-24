@@ -53,6 +53,19 @@ PRUEBA(muestra_con_emg) {
   formatearMuestraEmg(b, sizeof b, 7, 140, 12.345f, -3.26f, 0.0f, emg);
   TEXTO_IGUAL(b, "D,7,140,12.3,-3.3,0.0,410,96,30");
 }
+PRUEBA(muestra_con_aceleracion) {
+  char b[80];
+  int n = formatearMuestra(b, sizeof b, 7, 140, 12.345f, -3.26f, 0.0f);
+  int total = anexarAcel(b, sizeof b, n, 0.0123f, -0.0456f);
+  TEXTO_IGUAL(b, "D,7,140,12.3,-3.3,0.0,12,-46");
+  VERIFICAR(total == (int)strlen(b));
+  anexarAcel(b, sizeof b, n, 9.0f, -9.0f);  // fuera de rango: se recorta a ±4000 mg
+  TEXTO_IGUAL(b, "D,7,140,12.3,-3.3,0.0,4000,-4000");
+  const uint16_t emg[3] = {410, 96, 30};
+  n = formatearMuestraEmg(b, sizeof b, 7, 140, 12.345f, -3.26f, 0.0f, emg);
+  anexarAcel(b, sizeof b, n, 0.0f, 0.0015f);
+  TEXTO_IGUAL(b, "D,7,140,12.3,-3.3,0.0,410,96,30,0,2");
+}
 PRUEBA(comando_prueba_emg) {
   VERIFICAR(parsearComando("PR,tenar") == TipoComando::Prueba);
   VERIFICAR(parsearComando("PR,-") == TipoComando::Prueba);

@@ -17,7 +17,8 @@ test('botonTermino nombra el término para lectores de pantalla', () => {
   assert.ok(b.includes('aria-label="Qué significa: Co-contracción"'), b);
 });
 
-test('htmlGlosario incluye todos los términos', () => {
+test('htmlGlosario incluye todos los términos menos los del EMG (desactivado)', () => {
   const h = htmlGlosario();
-  for (const id of Object.keys(GLOSARIO)) assert.ok(h.includes(`id="glo-${id}"`), id);
+  for (const [id, g] of Object.entries(GLOSARIO)) assert.strictEqual(h.includes(`id="glo-${id}"`), !g.emg, id);
+  assert.deepStrictEqual(Object.keys(GLOSARIO).filter((id) => GLOSARIO[id].emg), ['activacion', 'razon', 'cocontraccion']);
 });

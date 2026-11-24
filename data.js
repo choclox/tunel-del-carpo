@@ -8,6 +8,10 @@
 const esSimulada = (s) => s.origen === 'simulador';
 const sesionesClinicas = (ses) => ses.filter((s) => !esSimulada(s));
 
+/* EMG desactivado: no se mide, no se guarda y no se muestra (ni la prueba de fuerza muscular).
+ * El código queda para poder reactivarlo; los datos EMG de sesiones antiguas se conservan sin mostrarse. */
+const EMG_HABILITADO = false;
+
 /* canal/signo: qué canal del dispositivo mide el ejercicio y en qué sentido
  * (ver protocolo en monitoreo.js). fe = flexo-extensión, rc = desviación
  * radio-cubital, ps = prono-supinación. `puno` (canal mcf, nunca medido) queda solo para leer
@@ -115,7 +119,7 @@ function generarDemo() {
         // nervio mediano; los extensores (control) casi no cambian; la co-contracción baja.
         // Paciente con estancamiento: el tenar cae en la última sesión (dispara el aviso del índice).
         let emg;
-        if (dias(p.fechaCirugia, fecha) >= 14) {
+        if (EMG_HABILITADO && dias(p.fechaCirugia, fecha) >= 14) {
           const picos = (media) => [0, 1, 2].map(() => Math.round(media * (0.97 + rand() * 0.06)));
           const bloque = (media) => { const pk = picos(media); return { picos: pk, media: Math.round(pk.reduce((a, b) => a + b, 0) / 3) }; };
           const tenarF = p.meseta && i === p.n - 1 ? 0.72 : 1;
@@ -201,4 +205,4 @@ function detectarPicos(angulos, fs, umbralFrac = 0.6) {
   return picos;
 }
 
-if (typeof module !== 'undefined') module.exports = { EJERCICIOS, ORDEN_EJERCICIOS, esSimulada, sesionesClinicas };
+if (typeof module !== 'undefined') module.exports = { EJERCICIOS, ORDEN_EJERCICIOS, esSimulada, sesionesClinicas, EMG_HABILITADO };

@@ -6,19 +6,27 @@ const NOMBRES_MUSCULO = { tenar: 'Pulgar (tenar)', flexores: 'Flexores', extenso
 
 const enRangoEmg = (v) => Number.isInteger(v) && v >= 0 && v <= 1000;
 
-// "D,seq,t_ms,fe,rc,ps" (6 campos) o con ",emg1,emg2,emg3" (9 campos, enteros 0–1000).
+const enRangoAcel = (v) => Number.isInteger(v) && v >= -4000 && v <= 4000;
+
+// "D,seq,t_ms,fe,rc,ps" (6 campos), con ",emg1,emg2,emg3" (9 campos, enteros 0–1000) y, en ambos
+// casos, con ",ax,ay" al final (8 u 11 campos): aceleración lineal del sensor en mg (enteros ±4000).
 function parsearMuestra(partes) {
-  if (partes.length !== 6 && partes.length !== 9) return null;
+  if (![6, 8, 9, 11].includes(partes.length)) return null;
   const n = partes.slice(1).map((x) => (x.trim() === '' ? NaN : Number(x)));
   const [seq, tms, fe, rc, ps] = n;
   if ([seq, tms, fe, rc, ps].some((x) => !isFinite(x))) return null;
-  let emg = null;
-  if (partes.length === 9) {
-    const [tenar, flexores, extensores] = n.slice(5);
+  let emg = null, acel = null;
+  if (partes.length >= 9) {
+    const [tenar, flexores, extensores] = n.slice(5, 8);
     if (![tenar, flexores, extensores].every(enRangoEmg)) return null;
     emg = { tenar, flexores, extensores };
   }
-  return { seq, t: tms / 1000, fe, rc, ps, emg };
+  if (partes.length === 8 || partes.length === 11) {
+    const [x, y] = n.slice(-2);
+    if (![x, y].every(enRangoAcel)) return null;
+    acel = { x, y };
+  }
+  return { seq, t: tms / 1000, fe, rc, ps, emg, acel };
 }
 
 function picoContraccion(valores) {

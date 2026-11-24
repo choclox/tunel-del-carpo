@@ -32,7 +32,11 @@ test('recortarObservaciones ordena por gravedad y corta', () => {
 test('pasos de la sesión', () => {
   assert.deepStrictEqual(PASOS_SESION, ['Chequeo', 'Dispositivo', 'Rutina', 'Prueba EMG', 'Cierre', 'Resumen']);
   const clases = (html) => [...html.matchAll(/<li class="([^"]*)"/g)].map((m) => m[1]);
-  assert.deepStrictEqual(clases(htmlPasosSesion(2)), ['hecho', 'hecho', 'actual', '', '', '']);
-  assert.deepStrictEqual(clases(htmlPasosSesion(4, { pruebaOmitida: true })), ['hecho', 'hecho', 'hecho', 'omitido', 'actual', '']);
+  // Con el EMG desactivado la barra no muestra la Prueba EMG; los índices (0–5) no cambian.
+  assert.deepStrictEqual(clases(htmlPasosSesion(2)), ['hecho', 'hecho', 'actual', '', '']);
+  assert.deepStrictEqual(clases(htmlPasosSesion(4, { pruebaOmitida: true })), ['hecho', 'hecho', 'hecho', 'actual', '']);
+  assert.ok(!htmlPasosSesion(4).includes('Prueba EMG'));
+  const marcas = [...htmlPasosSesion(0).matchAll(/paso-marca">([^<]*)</g)].map((m) => m[1]);
+  assert.deepStrictEqual(marcas, ['1', '2', '3', '4', '5']);
   assert.ok(htmlPasosSesion(0).includes('aria-current="step"'));
 });

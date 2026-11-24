@@ -35,4 +35,24 @@ PRUEBA(acel_cero_sin_nan) {
   VERIFICAR(isfinite(q.w) && isfinite(q.x) && isfinite(q.y) && isfinite(q.z));
 }
 
+PRUEBA(aceleracion_lineal_en_reposo_es_cero) {
+  // Con cualquier inclinación, en reposo el acel es solo gravedad: la aceleración lineal es 0.
+  for (float grados : {0.0f, 5.0f, 30.0f}) {
+    Cuaternion q = desdeEjeAngulo({1,1,0}, grados * GRAD);
+    Vec3 acel = rotar(conjugado(q), {0,0,1});
+    Vec3 l = aceleracionLineal(q, acel);
+    CERCA(l.x, 0, 1e-4f); CERCA(l.y, 0, 1e-4f); CERCA(l.z, 0, 1e-4f);
+  }
+}
+PRUEBA(aceleracion_lineal_recupera_el_arrastre) {
+  // Tapa plana arrastrada en +x a 0,03 g: x = 0,03, y = 0.
+  Vec3 l = aceleracionLineal({}, {0.03f, 0, 1});
+  CERCA(l.x, 0.03f, 1e-5f); CERCA(l.y, 0, 1e-5f); CERCA(l.z, 0, 1e-5f);
+  // Tapa inclinada 10° en Y: la gravedad inclinada no aparece como aceleración.
+  Cuaternion q = desdeEjeAngulo({0,1,0}, 10 * GRAD);
+  Vec3 acel = rotar(conjugado(q), {0,0,1});
+  Vec3 l2 = aceleracionLineal(q, {acel.x + 0.02f, acel.y - 0.01f, acel.z});
+  CERCA(l2.x, 0.02f, 1e-4f); CERCA(l2.y, -0.01f, 1e-4f);
+}
+
 int main() { return correrPruebas(); }

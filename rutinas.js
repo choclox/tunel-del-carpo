@@ -7,13 +7,15 @@
  * Rutina orientativa. El profesional debe ajustarla a cada paciente.
  *
  * `medicion` dice cómo se cuenta cada paso: `{ fuente: 'imu', tipo }` (ángulo, tipo de EJERCICIOS),
- * `{ fuente: 'emg', musculo }` (activación del músculo) o `null` (conteo manual). `tipo` repite el
+ * `{ fuente: 'deslizamiento' }` (sensor dentro de la tapa: aceleración del arrastre, deslizamiento.js)
+ * o `null` (conteo manual). Con el EMG desactivado ningún paso usa `{ fuente: 'emg', musculo }`; los
+ * pasos que antes lo usaban se cuentan a mano. Las sesiones guardadas pueden traerlo. `tipo` repite el
  * tipo IMU (o `null`) para las sesiones guardadas. `ceroDePostura`: el paso empieza en otra postura y
  * toma un cero instantáneo (CERO) al terminar la cuenta; la calibración es solo la del inicio.
  */
 
 const IMU = (tipo) => ({ fuente: 'imu', tipo });
-const EMG = (musculo) => ({ fuente: 'emg', musculo });
+const DESLIZAMIENTO_TAPA = { fuente: 'deslizamiento' };
 const INDICACION_DESVIACION = 'Codo apoyado en la mesa, antebrazo vertical, dedos hacia arriba y la palma hacia usted. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
 
 const ETAPAS = [
@@ -29,17 +31,19 @@ const ETAPAS = [
       'Entre ejercicios, mantenga la mano elevada para reducir la hinchazón.',
     ],
     pasos: [
-      { id: 'tendon_recto', nombre: 'Deslizamiento tendinoso: mano recta', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
-        indicacion: 'Dedos extendidos y juntos, muñeca neutra.', cuidado: [] },
-      { id: 'puno_gancho', nombre: 'Deslizamiento tendinoso: puño en gancho', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
+      // Reemplaza a "Deslizamiento tendinoso: mano recta": el sensor va dentro de la tapa verde.
+      { id: 'arrastre_tapa', nombre: 'Arrastre de la tapa con los dedos', tipo: null, medicion: DESLIZAMIENTO_TAPA, reps: 10, sostenerS: 0,
+        indicacion: 'Antebrazo apoyado y palma hacia abajo, con la punta de los dedos sobre la tapa (el sensor). Doble los dedos para traer la tapa hacia la palma y estírelos para devolverla.',
+        cuidado: ['Movimiento suave, sin apretar la tapa contra la mesa.'] },
+      { id: 'puno_gancho', nombre: 'Deslizamiento tendinoso: puño en gancho', tipo: null, medicion: null, reps: 10, sostenerS: 5,
         indicacion: 'Doble las articulaciones medias y finales; los nudillos quedan rectos.', cuidado: [] },
-      { id: 'puno_completo', nombre: 'Deslizamiento tendinoso: puño completo', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
+      { id: 'puno_completo', nombre: 'Deslizamiento tendinoso: puño completo', tipo: null, medicion: null, reps: 10, sostenerS: 5,
         indicacion: 'Cierre la mano por completo sin apretar.', cuidado: ['No apriete el puño.'] },
-      { id: 'mesa', nombre: 'Deslizamiento tendinoso: posición de mesa', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
+      { id: 'mesa', nombre: 'Deslizamiento tendinoso: posición de mesa', tipo: null, medicion: null, reps: 10, sostenerS: 5,
         indicacion: 'Doble solo los nudillos con los dedos rectos.', cuidado: [] },
-      { id: 'puno_recto', nombre: 'Deslizamiento tendinoso: puño recto', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 5,
+      { id: 'puno_recto', nombre: 'Deslizamiento tendinoso: puño recto', tipo: null, medicion: null, reps: 10, sostenerS: 5,
         indicacion: 'Doble nudillos y articulaciones medias; las puntas tocan la palma.', cuidado: [] },
-      { id: 'pulgar_oposicion', nombre: 'Oposición del pulgar', tipo: null, medicion: { ...EMG('tenar'), manualSiHerida: true }, reps: 10, sostenerS: 2,
+      { id: 'pulgar_oposicion', nombre: 'Oposición del pulgar', tipo: null, medicion: null, reps: 10, sostenerS: 2,
         indicacion: 'Toque con el pulgar la punta de cada dedo.', cuidado: [] },
       { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, medicion: null, reps: 5, sostenerS: 3,
         indicacion: 'Siga la secuencia indicada por el profesional, sin forzar.',
@@ -70,9 +74,9 @@ const ETAPAS = [
         indicacion: 'Codo pegado al cuerpo a 90° y pulgar hacia arriba; gire la palma hacia abajo.', cuidado: [] },
       { id: 'supinacion', nombre: 'Supinación de antebrazo', tipo: 'supinacion', medicion: IMU('supinacion'), ceroDePostura: true, reps: 10, sostenerS: 3,
         indicacion: 'Codo pegado al cuerpo a 90° y pulgar hacia arriba; gire la palma hacia arriba.', cuidado: [] },
-      { id: 'puno_completo', nombre: 'Puño completo', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 3,
+      { id: 'puno_completo', nombre: 'Puño completo', tipo: null, medicion: null, reps: 10, sostenerS: 3,
         indicacion: 'Cierre la mano por completo y ábrala del todo.', cuidado: ['No apriete el puño.'] },
-      { id: 'pulgar_abduccion', nombre: 'Abducción del pulgar', tipo: null, medicion: EMG('tenar'), reps: 10, sostenerS: 3,
+      { id: 'pulgar_abduccion', nombre: 'Abducción del pulgar', tipo: null, medicion: null, reps: 10, sostenerS: 3,
         indicacion: 'Separe el pulgar de la palma hacia arriba.', cuidado: [] },
     ],
   },
@@ -88,10 +92,10 @@ const ETAPAS = [
       'Deténgase si aparece hormigueo o adormecimiento en los dedos.',
     ],
     pasos: [
-      { id: 'pelota', nombre: 'Apretar pelota terapéutica', tipo: null, medicion: EMG('flexores'), reps: 10, sostenerS: 3,
+      { id: 'pelota', nombre: 'Apretar pelota terapéutica', tipo: null, medicion: null, reps: 10, sostenerS: 3,
         indicacion: 'Apriete la pelota con toda la mano y suelte despacio.',
         cuidado: ['Apriete sin llegar al dolor.'] },
-      { id: 'pinza', nombre: 'Pinza pulgar-índice', tipo: null, medicion: EMG('tenar'), reps: 10, sostenerS: 3,
+      { id: 'pinza', nombre: 'Pinza pulgar-índice', tipo: null, medicion: null, reps: 10, sostenerS: 3,
         indicacion: 'Apriete masilla o una pinza de ropa entre pulgar e índice.', cuidado: [] },
       { id: 'extension_carga', nombre: 'Extensión de muñeca con peso ligero', tipo: 'extension', medicion: IMU('extension'), reps: 10, sostenerS: 2,
         indicacion: 'Antebrazo apoyado, palma hacia abajo; suba el peso despacio.',

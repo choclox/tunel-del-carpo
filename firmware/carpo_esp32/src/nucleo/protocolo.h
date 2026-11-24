@@ -35,6 +35,9 @@ int formatearMuestra(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float fe
 // Igual que formatearMuestra con ",<emg1>,<emg2>,<emg3>" (tenar, flexores, extensores; 0..1000).
 int formatearMuestraEmg(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float fe, float rc,
                         float mcf, const uint16_t emg[3]);
+// Agrega ",<ax>,<ay>" (aceleración lineal en mg, enteros recortados a ±4000) a una línea D de
+// `largo` caracteres ya escrita en buf. Devuelve la longitud total (como snprintf).
+int anexarAcel(char* buf, size_t tam, int largo, float axG, float ayG);
 int formatearCalOk(char* buf, size_t tam, uint32_t ms);
 int formatearCalErr(char* buf, size_t tam, const char* motivo);
 int formatearCeroOk(char* buf, size_t tam);                       // "CERO,OK"

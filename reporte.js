@@ -3,7 +3,7 @@
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsReporte = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, lineaBase, medidasEmg, comparacionConAnterior, esSimulada, sesionesClinicas }
+  ? { EJERCICIOS, lineaBase, medidasEmg, comparacionConAnterior, esSimulada, sesionesClinicas, EMG_HABILITADO }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./resumen-sesion.js') });
 
 const ESTADOS = ['bien', 'atencion', 'revisar', 'sin-datos'];
@@ -34,12 +34,13 @@ function ejerciciosQueBajaron(s, prev) {
 }
 const bajoMovimiento = (s, prev) => ejerciciosQueBajaron(s, prev).length > 0;
 
-// Cómo se contó un paso de la rutina: 'IMU', 'EMG (<músculo>)' o 'Manual'. Las sesiones guardadas
+// Cómo se contó un paso de la rutina: 'IMU', 'IMU (tapa)', 'EMG (<músculo>)' o 'Manual'. Las sesiones guardadas
 // antes de `medicion` se midieron con el IMU si tenían `tipo` y no guardaron la señal cruda.
 function medidoCon(paso) {
   const m = paso.medicion;
   if (m === undefined) return paso.tipo && !paso.senal ? 'IMU' : 'Manual';
   if (m?.fuente === 'emg') return `EMG (${m.musculo})`;
+  if (m?.fuente === 'deslizamiento') return 'IMU (tapa)';
   return m?.fuente === 'imu' ? 'IMU' : 'Manual';
 }
 
@@ -49,6 +50,20 @@ function resumenMedicion(s) {
   for (const x of s.rutina?.pasos ?? []) n[medidoCon(x).split(' ')[0]]++;
   const partes = Object.entries(n).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`);
   return partes.length ? `Medido con: ${partes.join(' · ')}` : '';
+}
+
+// Medidas del arrastre de la tapa en una frase ('' si el paso no las tiene). El desplazamiento es
+// estimado (doble integración de la aceleración).
+function textoDeslizamiento(d) {
+  if (!d || !d.repeticiones) return '';
+  const n = (v, u) => (v == null ? null : `${String(v).replace('.', ',')}${u}`);
+  const partes = [
+    d.desplazamientoCm != null && `desplazamiento ≈ ${n(d.desplazamientoCm, ' cm')}${d.desplazamientoMaxCm != null ? ` (máx. ${n(d.desplazamientoMaxCm, ' cm')})` : ''}`,
+    d.velocidadMediaCms != null && `velocidad ${n(d.velocidadMediaCms, ' cm/s')}`,
+    d.duracionRepS != null && `${n(d.duracionRepS, ' s')} por repetición`,
+    d.variabilidadPct != null && `variabilidad ${n(d.variabilidadPct, ' %')}`,
+  ].filter(Boolean);
+  return partes.join(' · ');
 }
 
 const estadoDolor = (d, antes) => (d >= 7 || (antes != null && d - antes >= 2) ? 'revisar' : d >= 4 ? 'atencion' : 'bien');
@@ -107,14 +122,16 @@ function lecturaPaciente(p, hoy) {
     areas.push({ id: 'dolor', estado: estadoDolor(d, dPrev), frase: fraseDolor(d, dPrev, conDolor[0].dolorEVA) });
   }
 
-  // Razón tenar/extensores (EMG)
-  const indices = indicesEmg(ses);
-  const ultimo = indices[indices.length - 1];
-  if (!ultimo || ultimo.indice == null) {
-    areas.push({ id: 'musculo', estado: 'sin-datos', frase: 'Sin prueba EMG (empieza en la Fase 2).' });
-  } else {
-    const previo = indices[indices.length - 2]?.indice;
-    areas.push({ id: 'musculo', estado: estadoIndice(ultimo.indice, previo), frase: fraseIndice(ultimo.indice, previo) });
+  // Razón tenar/extensores (EMG): solo con el EMG habilitado.
+  if (depsReporte().EMG_HABILITADO) {
+    const indices = indicesEmg(ses);
+    const ultimo = indices[indices.length - 1];
+    if (!ultimo || ultimo.indice == null) {
+      areas.push({ id: 'musculo', estado: 'sin-datos', frase: 'Sin prueba EMG (empieza en la Fase 2).' });
+    } else {
+      const previo = indices[indices.length - 2]?.indice;
+      areas.push({ id: 'musculo', estado: estadoIndice(ultimo.indice, previo), frase: fraseIndice(ultimo.indice, previo) });
+    }
   }
 
   // Constancia
@@ -158,7 +175,7 @@ function lecturaSesion(p, s) {
     chips.push({ id: 'dolor', titulo: 'Dolor', estado: 'sin-datos', texto: '—' });
   }
 
-  if (s.emg?.prueba) {
+  if (depsReporte().EMG_HABILITADO && s.emg?.prueba) {
     const indices = indicesEmg(ses.slice(0, i + 1));
     const actual = indices[indices.length - 1]?.indice;
     if (actual != null) chips.push({ id: 'musculo', titulo: 'Tenar/extensores', estado: estadoIndice(actual, indices[indices.length - 2]?.indice), texto: `${Math.round(actual)} %` });
@@ -220,4 +237,4 @@ function renderReporte(p) {
   $('#lista-sesiones').innerHTML = items.sort((a, b) => a.fecha.localeCompare(b.fecha)).reverse().map((x) => x.html).join('') || '<li class="muted">Aún no hay sesiones.</li>';
 }
 
-if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal, medidoCon, resumenMedicion };
+if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal, medidoCon, resumenMedicion, textoDeslizamiento };
