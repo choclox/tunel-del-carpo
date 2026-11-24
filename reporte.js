@@ -34,12 +34,13 @@ function ejerciciosQueBajaron(s, prev) {
 }
 const bajoMovimiento = (s, prev) => ejerciciosQueBajaron(s, prev).length > 0;
 
-// Cómo se contó un paso de la rutina: 'IMU', 'EMG (<músculo>)' o 'Manual'. Las sesiones guardadas
+// Cómo se contó un paso de la rutina: 'IMU', 'IMU (tapa)', 'EMG (<músculo>)' o 'Manual'. Las sesiones guardadas
 // antes de `medicion` se midieron con el IMU si tenían `tipo` y no guardaron la señal cruda.
 function medidoCon(paso) {
   const m = paso.medicion;
   if (m === undefined) return paso.tipo && !paso.senal ? 'IMU' : 'Manual';
   if (m?.fuente === 'emg') return `EMG (${m.musculo})`;
+  if (m?.fuente === 'deslizamiento') return 'IMU (tapa)';
   return m?.fuente === 'imu' ? 'IMU' : 'Manual';
 }
 
@@ -49,6 +50,20 @@ function resumenMedicion(s) {
   for (const x of s.rutina?.pasos ?? []) n[medidoCon(x).split(' ')[0]]++;
   const partes = Object.entries(n).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`);
   return partes.length ? `Medido con: ${partes.join(' · ')}` : '';
+}
+
+// Medidas del arrastre de la tapa en una frase ('' si el paso no las tiene). El desplazamiento es
+// estimado (doble integración de la aceleración).
+function textoDeslizamiento(d) {
+  if (!d || !d.repeticiones) return '';
+  const n = (v, u) => (v == null ? null : `${String(v).replace('.', ',')}${u}`);
+  const partes = [
+    d.desplazamientoCm != null && `desplazamiento ≈ ${n(d.desplazamientoCm, ' cm')}${d.desplazamientoMaxCm != null ? ` (máx. ${n(d.desplazamientoMaxCm, ' cm')})` : ''}`,
+    d.velocidadMediaCms != null && `velocidad ${n(d.velocidadMediaCms, ' cm/s')}`,
+    d.duracionRepS != null && `${n(d.duracionRepS, ' s')} por repetición`,
+    d.variabilidadPct != null && `variabilidad ${n(d.variabilidadPct, ' %')}`,
+  ].filter(Boolean);
+  return partes.join(' · ');
 }
 
 const estadoDolor = (d, antes) => (d >= 7 || (antes != null && d - antes >= 2) ? 'revisar' : d >= 4 ? 'atencion' : 'bien');
@@ -222,4 +237,4 @@ function renderReporte(p) {
   $('#lista-sesiones').innerHTML = items.sort((a, b) => a.fecha.localeCompare(b.fecha)).reverse().map((x) => x.html).join('') || '<li class="muted">Aún no hay sesiones.</li>';
 }
 
-if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal, medidoCon, resumenMedicion };
+if (typeof module !== 'undefined') module.exports = { ESTADOS, lecturaPaciente, lecturaSesion, porcentajeNormal, medidoCon, resumenMedicion, textoDeslizamiento };

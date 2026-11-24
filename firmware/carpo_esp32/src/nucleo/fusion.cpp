@@ -32,6 +32,11 @@ Vec3 rotar(const Cuaternion& q, const Vec3& v) {
   return Vec3{r.x, r.y, r.z};
 }
 
+Vec3 aceleracionLineal(const Cuaternion& q, const Vec3& acel) {
+  Vec3 g = rotar(conjugado(q), Vec3{0, 0, 1});
+  return Vec3{acel.x - g.x, acel.y - g.y, acel.z - g.z};
+}
+
 Cuaternion orientacionDesdeAcelMag(const Vec3& acel, const Vec3& mag) {
   if (esCero(acel)) return Cuaternion{};
   // Inclinación: acel = R^T (0,0,1) con R = Ry(cabeceo) Rx(alabeo) (rumbo 0).

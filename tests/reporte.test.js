@@ -102,3 +102,13 @@ test('resumenMedicion: cuántos pasos se midieron con cada fuente', () => {
   assert.strictEqual(resumenMedicion({ rutina: { pasos: [{ medicion: null }] } }), 'Medido con: Manual 1');
   assert.strictEqual(resumenMedicion({ ejercicios: [] }), '');
 });
+
+test('arrastre de la tapa: medido con IMU (tapa) y frase de medidas', () => {
+  const { medidoCon, resumenMedicion, textoDeslizamiento } = require('../reporte.js');
+  const paso = { medicion: { fuente: 'deslizamiento' }, deslizamiento: { repeticiones: 9, desplazamientoCm: 7.1, desplazamientoMaxCm: 8.4, velocidadMediaCms: 6.2, duracionRepS: 2.6, variabilidadPct: 5.3 } };
+  assert.strictEqual(medidoCon(paso), 'IMU (tapa)');
+  assert.strictEqual(resumenMedicion({ rutina: { pasos: [paso, { medicion: null }] } }), 'Medido con: IMU 1 · Manual 1');
+  assert.strictEqual(textoDeslizamiento(paso.deslizamiento), 'desplazamiento ≈ 7,1 cm (máx. 8,4 cm) · velocidad 6,2 cm/s · 2,6 s por repetición · variabilidad 5,3 %');
+  assert.strictEqual(textoDeslizamiento({ repeticiones: 0 }), '');
+  assert.strictEqual(textoDeslizamiento(undefined), '');
+});

@@ -38,6 +38,11 @@ constexpr bool USAR_MAGNETOMETRO = true;
 // poner en true para transmitir desde el arranque.
 constexpr bool TRANSMITIR_AL_ARRANCAR = false;
 
+// Aceleración lineal (gravedad restada con la orientación) en x e y del sensor, en mg: la línea D
+// agrega ",ax,ay" al final (después del EMG si lo hay). La usa el ejercicio de arrastre de la tapa,
+// con el sensor dentro de la tapa sobre la mesa. Con false la línea D queda como antes.
+constexpr bool USAR_ACEL_LINEAL = true;
+
 // EMG de 3 canales: EMG 1 tenar, EMG 2 flexores, EMG 3 extensores. Con USAR_EMG = false el
 // firmware envía la línea D de 6 campos, como siempre. Con true agrega ",emg1,emg2,emg3" (0–1000).
 constexpr bool USAR_EMG = false;

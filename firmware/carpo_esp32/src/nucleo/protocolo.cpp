@@ -1,6 +1,7 @@
 #include "protocolo.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -78,6 +79,18 @@ int formatearMuestraEmg(char* buf, size_t tam, uint32_t seq, uint32_t tMs, float
   return snprintf(buf, tam, "D,%lu,%lu,%.1f,%.1f,%.1f,%u,%u,%u", (unsigned long)seq,
                   (unsigned long)tMs, (double)fe, (double)rc, (double)mcf, (unsigned)emg[0],
                   (unsigned)emg[1], (unsigned)emg[2]);
+}
+
+static int aMg(float g) {
+  float mg = g * 1000.0f;
+  if (mg > 4000.0f) mg = 4000.0f;
+  if (mg < -4000.0f) mg = -4000.0f;
+  return (int)lroundf(mg);
+}
+
+int anexarAcel(char* buf, size_t tam, int largo, float axG, float ayG) {
+  if (largo < 0 || (size_t)largo >= tam) return largo;
+  return largo + snprintf(buf + largo, tam - largo, ",%d,%d", aMg(axG), aMg(ayG));
 }
 
 int formatearCalOk(char* buf, size_t tam, uint32_t ms) {

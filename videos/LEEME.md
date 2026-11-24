@@ -6,7 +6,8 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 
 | Archivo | Ejercicio | Fase | Video |
 |---|---|---|---|
-| `tendon_recto.mp4` | Deslizamiento tendinoso: mano recta | 1 | Adjunto |
+| `arrastre_tapa.mp4` | Arrastre de la tapa con los dedos (reemplaza a "mano recta"; la tapa verde es el sensor) | 1 | Adjunto |
+| `tendon_recto.mp4` | Deslizamiento tendinoso: mano recta (ya no está en la rutina) | — | Adjunto |
 | `puno_gancho.mp4` | Deslizamiento tendinoso: puño en gancho | 1 | Adjunto |
 | `puno_completo.mp4` | Deslizamiento tendinoso: puño completo (Fase 2: Puño completo) | 1, 2 | Adjunto |
 | `mesa.mp4` | Deslizamiento tendinoso: posición de mesa | 1 | Adjunto |
@@ -28,7 +29,7 @@ El video de cada ejercicio es `videos/<id>.mp4`, donde `<id>` es el identificado
 
 **Formato:** `.mp4` (H.264), sin audio. Conviene que empiece y termine en la misma posición para que el bucle no se note. Cualquier proporción sirve: el video se ajusta a la ventana sin recortarse.
 
-**Dónde está el contenido de las rutinas:** las etapas, sus ejercicios, repeticiones, tiempos de sostén, indicaciones y mensajes de cuidado están en `ETAPAS`, en [rutinas.js](../rutinas.js). Para adjuntar un video basta con copiarlo aquí con el nombre `<id>.mp4` de la tabla. Para agregar un ejercicio, añada un paso a la etapa en `rutinas.js` con un `id` sin espacios ni tildes y, si existe, copie su video aquí. El campo `medicion` de cada paso dice cómo se cuenta: con el sensor de movimiento (`{ fuente: 'imu', tipo }`, una clave de `EJERCICIOS` en `data.js`), con EMG (`{ fuente: 'emg', musculo }`) o a mano (`null`); dentro de una misma etapa cada `tipo` IMU aparece como máximo una vez.
+**Dónde está el contenido de las rutinas:** las etapas, sus ejercicios, repeticiones, tiempos de sostén, indicaciones y mensajes de cuidado están en `ETAPAS`, en [rutinas.js](../rutinas.js). Para adjuntar un video basta con copiarlo aquí con el nombre `<id>.mp4` de la tabla. Para agregar un ejercicio, añada un paso a la etapa en `rutinas.js` con un `id` sin espacios ni tildes y, si existe, copie su video aquí. El campo `medicion` de cada paso dice cómo se cuenta: con el sensor de movimiento (`{ fuente: 'imu', tipo }`, una clave de `EJERCICIOS` en `data.js`), con el sensor dentro de la tapa (`{ fuente: 'deslizamiento' }`), con EMG (`{ fuente: 'emg', musculo }`, desactivado) o a mano (`null`); dentro de una misma etapa cada `tipo` IMU aparece como máximo una vez.
 
 **Postura de las desviaciones:** `desv_radial.mp4` y `desv_cubital.mp4` muestran el antebrazo vertical, que es la postura que usa la rutina para medirlas. Los prompts están en [prompts-videos-ejercicios.md](../prompts-videos-ejercicios.md).
 

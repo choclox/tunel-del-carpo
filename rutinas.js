@@ -6,7 +6,8 @@
  * desde la 6.ª. El profesional debe validar el contenido.
  * Rutina orientativa. El profesional debe ajustarla a cada paciente.
  *
- * `medicion` dice cómo se cuenta cada paso: `{ fuente: 'imu', tipo }` (ángulo, tipo de EJERCICIOS)
+ * `medicion` dice cómo se cuenta cada paso: `{ fuente: 'imu', tipo }` (ángulo, tipo de EJERCICIOS),
+ * `{ fuente: 'deslizamiento' }` (sensor dentro de la tapa: aceleración del arrastre, deslizamiento.js)
  * o `null` (conteo manual). Con el EMG desactivado ningún paso usa `{ fuente: 'emg', musculo }`; los
  * pasos que antes lo usaban se cuentan a mano. Las sesiones guardadas pueden traerlo. `tipo` repite el
  * tipo IMU (o `null`) para las sesiones guardadas. `ceroDePostura`: el paso empieza en otra postura y
@@ -14,6 +15,7 @@
  */
 
 const IMU = (tipo) => ({ fuente: 'imu', tipo });
+const DESLIZAMIENTO_TAPA = { fuente: 'deslizamiento' };
 const INDICACION_DESVIACION = 'Codo apoyado en la mesa, antebrazo vertical, dedos hacia arriba y la palma hacia usted. Desvíe la mano hacia el pulgar (radial) o hacia el meñique (cubital).';
 
 const ETAPAS = [
@@ -29,9 +31,10 @@ const ETAPAS = [
       'Entre ejercicios, mantenga la mano elevada para reducir la hinchazón.',
     ],
     pasos: [
-      // Pendiente: pasará a medirse con la IMU cuando se definan el ejercicio nuevo y sus parámetros.
-      { id: 'tendon_recto', nombre: 'Deslizamiento tendinoso: mano recta', tipo: null, medicion: null, reps: 10, sostenerS: 5,
-        indicacion: 'Dedos extendidos y juntos, muñeca neutra.', cuidado: [] },
+      // Reemplaza a "Deslizamiento tendinoso: mano recta": el sensor va dentro de la tapa verde.
+      { id: 'arrastre_tapa', nombre: 'Arrastre de la tapa con los dedos', tipo: null, medicion: DESLIZAMIENTO_TAPA, reps: 10, sostenerS: 0,
+        indicacion: 'Antebrazo apoyado y palma hacia abajo, con la punta de los dedos sobre la tapa (el sensor). Doble los dedos para traer la tapa hacia la palma y estírelos para devolverla.',
+        cuidado: ['Movimiento suave, sin apretar la tapa contra la mesa.'] },
       { id: 'puno_gancho', nombre: 'Deslizamiento tendinoso: puño en gancho', tipo: null, medicion: null, reps: 10, sostenerS: 5,
         indicacion: 'Doble las articulaciones medias y finales; los nudillos quedan rectos.', cuidado: [] },
       { id: 'puno_completo', nombre: 'Deslizamiento tendinoso: puño completo', tipo: null, medicion: null, reps: 10, sostenerS: 5,

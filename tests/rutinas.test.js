@@ -25,9 +25,10 @@ test('tipos válidos y sin repetir por etapa', () => {
 
 const IMU = (tipo) => ({ fuente: 'imu', tipo });
 const EMG = (musculo) => ({ fuente: 'emg', musculo });
-// EMG desactivado: los pasos que se medían con EMG se cuentan a mano (tendon_recto pasará a IMU).
+// EMG desactivado: los pasos que se medían con EMG se cuentan a mano; el arrastre de la tapa
+// (antes "mano recta") se mide con el sensor dentro de la tapa.
 const MEDICION_ESPERADA = {
-  1: { tendon_recto: null, puno_gancho: null, puno_completo: null, mesa: null,
+  1: { arrastre_tapa: { fuente: 'deslizamiento' }, puno_gancho: null, puno_completo: null, mesa: null,
     puno_recto: null, pulgar_oposicion: null, nervio_mediano: null },
   2: { flexion: IMU('flexion'), extension: IMU('extension'), desv_radial: IMU('desv_radial'), desv_cubital: IMU('desv_cubital'),
     pronacion: IMU('pronacion'), supinacion: IMU('supinacion'), puno_completo: null, pulgar_abduccion: null },

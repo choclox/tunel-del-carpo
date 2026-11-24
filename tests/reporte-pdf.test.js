@@ -83,3 +83,16 @@ test('datosReporteSesion: la rutina dice con qué se midió cada paso', () => {
   const d = datosReporteSesion({ ...pac, sesiones: [s1, s2, f1] }, f1, '2026-10-28', avisosDe);
   assert.deepStrictEqual(d.rutina.map((r) => r.medidoCon), ['EMG (flexores)', 'Manual', 'IMU', 'IMU', 'Manual']);
 });
+
+test('rutina con arrastre de la tapa: medidas en el PDF', () => {
+  const s = { id: 'A', fecha: '2026-10-27', ejercicios: [], rutina: { etapa: 1, pasos: [
+    { id: 'arrastre_tapa', nombre: 'Arrastre de la tapa con los dedos', tipo: null, medicion: { fuente: 'deslizamiento' }, repeticionesObjetivo: 10, repeticiones: 9, repeticionesManual: null,
+      deslizamiento: { repeticiones: 9, desplazamientoCm: 7.1, desplazamientoMaxCm: 8.4, velocidadMediaCms: 6.2, duracionRepS: 2.6, variabilidadPct: 5.3 } },
+    { id: 'nervio_mediano', nombre: 'Deslizamiento del nervio mediano', tipo: null, medicion: null, repeticionesObjetivo: 5, repeticiones: null, repeticionesManual: 5 },
+  ] } };
+  const d = datosReporteSesion({ id: 'P', nombre: 'X', sesiones: [s] }, s, '2026-10-27', () => []);
+  assert.deepStrictEqual(d.rutina.map((r) => r.medidoCon), ['IMU (tapa)', 'Manual']);
+  assert.ok(d.rutina[0].medidas.startsWith('desplazamiento ≈ 7,1 cm'), d.rutina[0].medidas);
+  assert.strictEqual(d.rutina[1].medidas, '');
+  assert.strictEqual(textoPdf('≈ 7 cm'), '~ 7 cm');
+});

@@ -16,12 +16,20 @@ test('músculos', () => {
 });
 
 test('parsearMuestra sin y con EMG', () => {
-  assert.deepStrictEqual(p('D,7,140,1.5,-2,8'), { seq: 7, t: 0.14, fe: 1.5, rc: -2, ps: 8, emg: null });
+  assert.deepStrictEqual(p('D,7,140,1.5,-2,8'), { seq: 7, t: 0.14, fe: 1.5, rc: -2, ps: 8, emg: null, acel: null });
   assert.deepStrictEqual(p('D,7,140,1.5,-2,8,410,96,30').emg, { tenar: 410, flexores: 96, extensores: 30 });
+  assert.strictEqual(p('D,7,140,1.5,-2,8,410,96,30').acel, null);
+});
+
+test('parsearMuestra con aceleración lineal (con y sin EMG)', () => {
+  assert.deepStrictEqual(p('D,7,140,1.5,-2,8,12,-46'), { seq: 7, t: 0.14, fe: 1.5, rc: -2, ps: 8, emg: null, acel: { x: 12, y: -46 } });
+  const d = p('D,7,140,1.5,-2,8,410,96,30,0,4000');
+  assert.deepStrictEqual([d.emg, d.acel], [{ tenar: 410, flexores: 96, extensores: 30 }, { x: 0, y: 4000 }]);
+  for (const l of ['D,7,140,1,2,3,4,4001', 'D,7,140,1,2,3,1.5,2', 'D,7,140,1,2,3,x,2', 'D,7,140,1,2,3,410,96,30,0,-4001']) assert.strictEqual(p(l), null, l);
 });
 
 test('parsearMuestra rechaza líneas no válidas', () => {
-  for (const l of ['D,7,140,1,2', 'D,7,140,1,2,3,4,5', 'D,1,20,0,0,0,12,x,5', 'D,1,20,0,0,0,12,1001,5', 'D,1,20,0,0,0,-1,0,0', 'D,1,x,0,0,0']) {
+  for (const l of ['D,7,140,1,2', 'D,7,140,1,2,3,4', 'D,7,140,1,2,3,4,5,6,7', 'D,1,20,0,0,0,12,x,5', 'D,1,20,0,0,0,12,1001,5', 'D,1,20,0,0,0,-1,0,0', 'D,1,x,0,0,0']) {
     assert.strictEqual(p(l), null, l);
   }
 });

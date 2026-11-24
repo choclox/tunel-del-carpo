@@ -6,10 +6,10 @@ const TEXTO_SIN_JSPDF = 'No se pudo generar el PDF: revise la conexión a intern
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsPdf = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon, esSimulada, sesionesClinicas, EMG_HABILITADO }
+  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon, textoDeslizamiento, esSimulada, sesionesClinicas, EMG_HABILITADO }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./reporte.js'), ...require('./resumen-sesion.js') });
 
-const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≤', '<='], ['–', '-'], ['—', '-'], ['−', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!'],
+const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≈', '~'], ['≤', '<='], ['–', '-'], ['—', '-'], ['−', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!'],
   ['“', '"'], ['”', '"'], ['‘', "'"], ['’', "'"]];
 
 // Helvetica solo tiene Latin-1: lo demás se cambia por '?' (si no, jsPDF borra el carácter o
@@ -35,7 +35,7 @@ const RECOMENDACION = { ok: 'Todo bien', precaucion: 'Precaución', detener: 'No
 
 // avisosDe(p, sesionesHastaS) -> [{ nivel, texto(HTML) }]; en el navegador es calcularObservaciones.
 function datosReporteSesion(p, s, hoy, avisosDe) {
-  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido, esSimulada: esSim, sesionesClinicas: clinicas, EMG_HABILITADO: conEmg } = depsPdf();
+  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido, textoDeslizamiento: textoDesl, esSimulada: esSim, sesionesClinicas: clinicas, EMG_HABILITADO: conEmg } = depsPdf();
   const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
   const i = ses.indexOf(s);
   const simulada = esSim(s);
@@ -77,7 +77,7 @@ function datosReporteSesion(p, s, hoy, avisosDe) {
     lectura: { chips: ls.chips, frases: comparar(p, s) },
     chequeo: s.chequeo ? { ...s.chequeo, recomendacion: RECOMENDACION[s.chequeo.nivel] ?? '—' } : null,
     ejercicios,
-    rutina: s.rutina?.pasos?.length ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, medidoCon: medido(x), objetivo: num(x.repeticionesObjetivo), detectadas: num(x.repeticiones), manual: num(x.repeticionesManual) })) : null,
+    rutina: s.rutina?.pasos?.length ? s.rutina.pasos.map((x) => ({ nombre: x.nombre, medidoCon: medido(x), objetivo: num(x.repeticionesObjetivo), detectadas: num(x.repeticiones), manual: num(x.repeticionesManual), medidas: textoDesl(x.deslizamiento) })) : null,
     emg,
     avisos: (simulada ? [] : avisosDe(p, ses.slice(0, i + 1)) ?? []).map((o) => sinHtml(o.accion ? `${o.texto} Sugerencia: ${o.accion}` : o.texto)),
     notas: s.notas ?? '',
@@ -200,6 +200,7 @@ function construirPdf(JsPDF, d, imagen) {
   if (d.rutina) {
     titulo('Rutina grabada');
     tabla(['Ejercicio', 'Medido con', 'Objetivo', 'Detectadas', 'Manual'], d.rutina.map((r) => [r.nombre, r.medidoCon, r.objetivo, r.detectadas, r.manual]), [72, 36, 24, 24, 24]);
+    for (const r of d.rutina) if (r.medidas) parrafo(`${r.nombre}: ${r.medidas}. El desplazamiento es estimado.`, { tam: 9 });
   }
 
   if (d.emg) {

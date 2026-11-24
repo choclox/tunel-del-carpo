@@ -543,15 +543,51 @@ const pasoGuardado = (s, id) => s.rutina.pasos.find((x) => x.id === id);
 const esperarDetectadas = (page) => page.waitForFunction(() => /^Detectadas: [1-9]/.test(document.querySelector('#rt-contador').textContent), null, { timeout: 15000 });
 
 await verificar('fase 1: los pasos que eran EMG se cuentan a mano', async (page) => {
-  await rutinaHastaPaso(page, 1, 'tendon_recto');
+  await rutinaHastaPaso(page, 1, 'puno_gancho');
   await page.waitForTimeout(1500); // un paso necesita ≥ 1 s para guardarse
   afirmar((await page.textContent('#rt-contador')).startsWith('Cuente las repeticiones'), await page.textContent('#rt-contador'));
   afirmar(await page.evaluate(() => mv.ej) === null, 'se está midiendo el paso');
   const s = await terminarYGuardar(page);
-  const r = pasoGuardado(s, 'tendon_recto');
+  const r = pasoGuardado(s, 'puno_gancho');
   afirmar(r.medicion === null && r.repeticiones === null && !r.emg, JSON.stringify(r).slice(0, 200));
   afirmar(s.rutina.pasos.every((x) => x.medicion?.fuente !== 'emg'), 'un paso quedó con EMG');
 });
+
+await verificar('simulador envía la aceleración de la tapa', async (page) => {
+  await conectarSimulador(page);
+  const r = await page.evaluate(() => ({ con: mv.conAcel, acel: mv.buffer[mv.buffer.length - 1]?.acel }));
+  afirmar(r.con === true && Number.isInteger(r.acel?.x) && Number.isInteger(r.acel?.y), JSON.stringify(r));
+});
+
+await verificar('fase 1: arrastre de la tapa medido con el sensor', async (page) => {
+  await rutinaHastaPaso(page, 1, 'arrastre_tapa');
+  await page.waitForFunction(() => /^Detectadas: [2-9]/.test(document.querySelector('#rt-contador').textContent), null, { timeout: 25000 });
+  afirmar(await page.evaluate(() => mv.ej?.deslizamiento === true), 'el paso no se mide como arrastre');
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'arrastre_tapa');
+  const d = r.deslizamiento;
+  afirmar(r.medicion?.fuente === 'deslizamiento' && r.repeticiones >= 2 && d?.repeticiones === r.repeticiones, JSON.stringify(r).slice(0, 300));
+  afirmar(d.desplazamientoCm > 4 && d.desplazamientoCm < 10, `desplazamiento ${d.desplazamientoCm}`);
+  afirmar(d.senal.x.length === d.senal.y.length && d.senal.x.length > 10 && d.senal.fs > 15 && d.senal.fs < 35, `señal: ${d.senal.fs} Hz, ${d.senal.x.length}`);
+  afirmar(!s.ejercicios.length, 'el arrastre no debe entrar en los ejercicios con ángulo');
+  // Vista de la sesión: el paso muestra sus medidas.
+  // Esc cierra el Resumen y vuelve al inicio; desde "Sesiones recientes" se abre la sesión.
+  if (await page.isVisible('#dlg-resumen')) { await page.keyboard.press('Escape'); await page.waitForSelector('#dlg-resumen', { state: 'hidden' }); }
+  await page.getByText(/simulada$/).first().click();
+  await page.click('#seg-vistas [data-vista="sesion"]');
+  await page.waitForSelector('#tabla-rutina', { state: 'visible' });
+  const tabla = await page.textContent('#tabla-rutina');
+  afirmar(tabla.includes('Arrastre de la tapa') && tabla.includes('desplazamiento ≈'), tabla.slice(0, 200));
+});
+
+await verificar('fase 1: arrastre sin aceleración se cuenta a mano', async (page) => {
+  await rutinaHastaPaso(page, 1, 'arrastre_tapa');
+  await page.waitForTimeout(1500);
+  afirmar((await page.textContent('#rt-contador')).trim() === 'El dispositivo no envía la aceleración de la tapa (actualice el firmware): cuente a mano.', await page.textContent('#rt-contador'));
+  const s = await terminarYGuardar(page);
+  const r = pasoGuardado(s, 'arrastre_tapa');
+  afirmar(r.medicion === null && r.repeticiones === null && !r.deslizamiento, JSON.stringify(r).slice(0, 200));
+}, { init: () => { window.SIMULADOR_SIN_ACEL = true; } });
 
 await verificar('fase 1 herida → oposición manual', async (page) => {
   await rutinaHastaPaso(page, 1, 'pulgar_oposicion', { herida: 'enrojecida' });
@@ -864,7 +900,7 @@ await verificar('videos nuevos de la fase 1', async (page) => {
   await page.click('#rt-etapas [data-etapa="1"]');
   await page.click('.rt-detalle summary');
   await page.click('#rt-revisar');
-  for (const id of ['tendon_recto', 'puno_gancho', 'puno_completo', 'mesa', 'puno_recto']) {
+  for (const id of ['arrastre_tapa', 'puno_gancho', 'puno_completo', 'mesa', 'puno_recto']) {
     await page.waitForFunction((id) => document.querySelector('#rt-video').getAttribute('src') === `videos/${id}.mp4`, id);
     await page.waitForFunction(() => document.querySelector('#rt-video').readyState >= 2 || !document.querySelector('#rt-falta').hidden);
     afirmar(await page.isHidden('#rt-falta'), `${id}: "Video no adjuntado"`);

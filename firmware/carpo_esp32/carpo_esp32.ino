@@ -1,4 +1,5 @@
 // Firmware del carpo: GY-85 en el dorso de la mano -> ángulos de muñeca por USB serie.
+// En el arrastre de la tapa el GY-85 va dentro de la tapa: la línea D lleva su aceleración lineal.
 // Protocolo: ver interfaz-medico/monitoreo.js. Toda salida no protocolaria empieza con '#'.
 #include <Preferences.h>
 #include <Wire.h>
@@ -62,6 +63,10 @@ static uint32_t proximaBateria = 0;
 static uint32_t proximoRaw = 0;
 static uint32_t finMag = 0;
 static uint32_t ultimoMicros = 0;
+
+// Aceleración lineal acumulada entre dos envíos (se envía el promedio de los ciclos de fusión).
+static Vec3 sumaAcelLineal{0, 0, 0};
+static uint8_t nAcelLineal = 0;
 
 // Última lectura montada (para RAW).
 static Vec3 ultAcel{0, 0, 0}, ultGiro{0, 0, 0}, ultMag{0, 0, 0};
@@ -434,14 +439,19 @@ static void muestrearEmgCrudo(uint32_t ahora) {
 
 static void enviarMuestra(uint32_t ahora) {
   AngulosMuneca a = referencia.angulos(orientacionActual(), manoIzquierda);
-  char buf[80];
+  char buf[96];
+  int n;
   if (USAR_EMG) {
     uint16_t emg[3];
     leerEmg(emg);
     reposoEmg.restar(emg);
-    formatearMuestraEmg(buf, sizeof(buf), seq, ahora, a.fe, a.rc, a.ps, emg);
+    n = formatearMuestraEmg(buf, sizeof(buf), seq, ahora, a.fe, a.rc, a.ps, emg);
   } else {
-    formatearMuestra(buf, sizeof(buf), seq, ahora, a.fe, a.rc, a.ps);
+    n = formatearMuestra(buf, sizeof(buf), seq, ahora, a.fe, a.rc, a.ps);
+  }
+  if (USAR_ACEL_LINEAL) {
+    float k = nAcelLineal ? 1.0f / nAcelLineal : 0.0f;
+    anexarAcel(buf, sizeof(buf), n, sumaAcelLineal.x * k, sumaAcelLineal.y * k);
   }
   Serial.println(buf);
 }
@@ -525,6 +535,11 @@ static void cicloFusion(uint32_t ahora) {
     ultAcel = acel; ultGiro = giro; ultMag = mag;
     if (usaGiro() && !calibrando) estimadorSesgo.agregar(giro, acel, ahora);
     actualizarFiltro(giro, acel, mag, dt);
+    if (USAR_ACEL_LINEAL) {
+      Vec3 l = aceleracionLineal(orientacionActual(), acel);
+      sumaAcelLineal.x += l.x; sumaAcelLineal.y += l.y; sumaAcelLineal.z += l.z;
+      nAcelLineal++;
+    }
   }
 
   if (USAR_EMG && calibrando) {
@@ -542,6 +557,8 @@ static void cicloFusion(uint32_t ahora) {
       ++seq;  // un hueco en seq señala la muestra perdida
       if (ok) enviarMuestra(ahora);
     }
+    sumaAcelLineal = Vec3{0, 0, 0};
+    nAcelLineal = 0;
   }
 }
 

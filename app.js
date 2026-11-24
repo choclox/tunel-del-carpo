@@ -711,7 +711,7 @@ function renderRutinaSesion(s) {
   const num = (v, d = 0) => ((typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v)) ? fmt(Number(v), d) : '—');
   $('#sesion-rutina-titulo').textContent = conocida ? `Rutina: Fase ${r.etapa} — ${etapa.nombre}` : 'Rutina: Fase —';
   const filas = pasos.map((x) => `<tr>
-      <td>${esc(x.nombre)}${x.tipo ? ' <span class="rt-medido">Medido</span>' : ''}</td>
+      <td>${esc(x.nombre)}${x.tipo || x.deslizamiento ? ' <span class="rt-medido">Medido</span>' : ''}${x.deslizamiento?.repeticiones ? `<br><small class="muted">${esc(textoDeslizamiento(x.deslizamiento))}</small>` : ''}</td>
       <td class="num">${num(x.repeticionesObjetivo)}</td>
       <td class="num">${num(x.repeticiones)}</td>
       <td class="num">${num(x.repeticionesManual)}</td>

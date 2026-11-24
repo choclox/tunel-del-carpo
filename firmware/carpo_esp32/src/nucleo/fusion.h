@@ -14,6 +14,11 @@ Vec3 rotar(const Cuaternion& q, const Vec3& v);
 // compensado por inclinación. Con mag = {0,0,0} devuelve solo la inclinación (rumbo 0).
 Cuaternion orientacionDesdeAcelMag(const Vec3& acel, const Vec3& mag);
 
+// Aceleración lineal en el marco del sensor (g): acel menos la gravedad vista con la orientación
+// q (sensor -> tierra, gravedad en +Z). Con el sensor plano sobre la mesa, x e y son el
+// desplazamiento horizontal (ejercicio de arrastre de la tapa).
+Vec3 aceleracionLineal(const Cuaternion& q, const Vec3& acel);
+
 // Ángulo entre dos vectores en grados [0; 180]; 0 si alguno es cero.
 float anguloEntreGrados(const Vec3& a, const Vec3& b);
 
