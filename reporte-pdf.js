@@ -6,7 +6,7 @@ const TEXTO_SIN_JSPDF = 'No se pudo generar el PDF: revise la conexión a intern
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsPdf = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon, esSimulada, sesionesClinicas }
+  ? { EJERCICIOS, lineaBase, medidasEmg, NOMBRES_MUSCULO, MUSCULOS, lecturaSesion, comparacionConAnterior, medidoCon, esSimulada, sesionesClinicas, EMG_HABILITADO }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./reporte.js'), ...require('./resumen-sesion.js') });
 
 const REEMPLAZOS_PDF = [['→', '->'], ['≥', '>='], ['≤', '<='], ['–', '-'], ['—', '-'], ['−', '-'], ['…', '...'], ['✓', 'OK'], ['⚠', '!'],
@@ -35,7 +35,7 @@ const RECOMENDACION = { ok: 'Todo bien', precaucion: 'Precaución', detener: 'No
 
 // avisosDe(p, sesionesHastaS) -> [{ nivel, texto(HTML) }]; en el navegador es calcularObservaciones.
 function datosReporteSesion(p, s, hoy, avisosDe) {
-  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido, esSimulada: esSim, sesionesClinicas: clinicas } = depsPdf();
+  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, NOMBRES_MUSCULO: NOMBRES, MUSCULOS: MUS, lecturaSesion: lectura, comparacionConAnterior: comparar, medidoCon: medido, esSimulada: esSim, sesionesClinicas: clinicas, EMG_HABILITADO: conEmg } = depsPdf();
   const ses = [...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha));
   const i = ses.indexOf(s);
   const simulada = esSim(s);
@@ -56,7 +56,7 @@ function datosReporteSesion(p, s, hoy, avisosDe) {
   });
 
   let emg = null;
-  if (s.emg?.prueba) {
+  if (conEmg && s.emg?.prueba) {
     const m = medidas(s.emg.prueba, base(ses));
     const pct = { tenar: m.tenarPct, flexores: m.flexoresPct, extensores: m.extensoresPct };
     emg = {

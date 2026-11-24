@@ -46,8 +46,8 @@ test('datos de una sesión completa', () => {
   assert.strictEqual(d.chequeo.recomendacion, 'Precaución');
   assert.deepStrictEqual(d.ejercicios.map((e) => [e.nombre, e.anguloMax, e.cambio, e.pctNormal]), [['Flexión de muñeca', '48°', '+8°', '60 %']]);
   assert.strictEqual(d.rutina.length, 1);
-  assert.deepStrictEqual(d.emg.musculos.map((m) => m.nombre), ['Pulgar (tenar)', 'Flexores', 'Extensores']);
-  assert.strictEqual(d.emg.cocontraccion, '20 %');
+  // EMG desactivado: el PDF no trae la prueba aunque la sesión guardada la tenga.
+  assert.strictEqual(d.emg, null);
   assert.deepStrictEqual(d.avisos, ['Dolor: subió de 3 a 5.']);
   assert.strictEqual(d.notas, 'Buena tolerancia.');
   assert.notStrictEqual(d.proximaCita, 'Por definir');

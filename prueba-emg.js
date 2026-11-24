@@ -13,8 +13,10 @@ const TEXTO_SIN_CONEXION_PRUEBA = 'Se perdió la conexión: la prueba no se comp
 const TEXTO_SIN_ACTIVIDAD = 'No se detectó actividad; revise el electrodo.';
 const EMG_MINIMO_ACTIVIDAD = 20; // promedio por debajo de esto: el electrodo no está midiendo
 
+// Con el EMG desactivado (EMG_HABILITADO en data.js) la prueba no se hace nunca.
 function debeHacerPrueba(etapa, conEmg) {
-  return etapa >= 2 && !!conEmg;
+  const habilitado = typeof EMG_HABILITADO !== 'undefined' ? EMG_HABILITADO : require('./data.js').EMG_HABILITADO;
+  return habilitado && etapa >= 2 && !!conEmg;
 }
 
 let pr = null; // { indice, resultados, alTerminar, turno, recoger }

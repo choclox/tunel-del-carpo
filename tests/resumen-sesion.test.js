@@ -31,7 +31,8 @@ test('comparación con la sesión anterior', () => {
   const c = comparacionConAnterior(pac, s2);
   assert.ok(c.includes('Flexión de muñeca: 52° (+6° que la sesión anterior)'), c.join(' | '));
   assert.ok(c.includes('Dolor: 5 → 3 durante la sesión'), c.join(' | '));
-  assert.ok(c.some((x) => x.startsWith('Razón tenar/extensores')), c.join(' | '));
+  // EMG desactivado: la razón tenar/extensores no se compara aunque las sesiones traigan la prueba.
+  assert.ok(!c.some((x) => x.startsWith('Razón tenar/extensores')), c.join(' | '));
   assert.ok(c.length <= 3);
 });
 

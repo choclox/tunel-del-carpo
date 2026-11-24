@@ -67,7 +67,7 @@ test('sin sesiones o mucho tiempo sin sesión', () => {
   assert.deepStrictEqual(motivosAtencion(pac('A', { sesiones: [ses('2026-10-16')] }), '2026-10-26'), []);
 });
 
-test('movimiento, EMG y chequeo', () => {
+test('movimiento y chequeo; el EMG desactivado no genera avisos', () => {
   const ej = (a) => [{ tipo: 'flexion', anguloMax: a }];
   const prueba = (t) => ({ tenar: { picos: [t, t, t], media: t }, flexores: { picos: [1, 1, 1], media: 1 }, extensores: { picos: [100, 100, 100], media: 100 } });
   const m = motivosAtencion(pac('A', { sesiones: [
@@ -77,7 +77,7 @@ test('movimiento, EMG y chequeo', () => {
   const t = textos(m);
   assert.ok(t.includes('critical:Se hizo la sesión aunque el chequeo recomendó no hacerla'), t.join(' | '));
   assert.ok(t.some((x) => x.startsWith('warning:Bajó el movimiento en')), t.join(' | '));
-  assert.ok(t.includes('warning:Bajó la razón tenar/extensores'), t.join(' | '));
+  assert.ok(!t.includes('warning:Bajó la razón tenar/extensores'), t.join(' | '));
 });
 
 test('pacientesConAtencion ordena por gravedad y nombre; recientes por fecha', () => {

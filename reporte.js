@@ -3,7 +3,7 @@
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsReporte = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, lineaBase, medidasEmg, comparacionConAnterior, esSimulada, sesionesClinicas }
+  ? { EJERCICIOS, lineaBase, medidasEmg, comparacionConAnterior, esSimulada, sesionesClinicas, EMG_HABILITADO }
   : { ...require('./data.js'), ...require('./emg.js'), ...require('./resumen-sesion.js') });
 
 const ESTADOS = ['bien', 'atencion', 'revisar', 'sin-datos'];
@@ -107,14 +107,16 @@ function lecturaPaciente(p, hoy) {
     areas.push({ id: 'dolor', estado: estadoDolor(d, dPrev), frase: fraseDolor(d, dPrev, conDolor[0].dolorEVA) });
   }
 
-  // Razón tenar/extensores (EMG)
-  const indices = indicesEmg(ses);
-  const ultimo = indices[indices.length - 1];
-  if (!ultimo || ultimo.indice == null) {
-    areas.push({ id: 'musculo', estado: 'sin-datos', frase: 'Sin prueba EMG (empieza en la Fase 2).' });
-  } else {
-    const previo = indices[indices.length - 2]?.indice;
-    areas.push({ id: 'musculo', estado: estadoIndice(ultimo.indice, previo), frase: fraseIndice(ultimo.indice, previo) });
+  // Razón tenar/extensores (EMG): solo con el EMG habilitado.
+  if (depsReporte().EMG_HABILITADO) {
+    const indices = indicesEmg(ses);
+    const ultimo = indices[indices.length - 1];
+    if (!ultimo || ultimo.indice == null) {
+      areas.push({ id: 'musculo', estado: 'sin-datos', frase: 'Sin prueba EMG (empieza en la Fase 2).' });
+    } else {
+      const previo = indices[indices.length - 2]?.indice;
+      areas.push({ id: 'musculo', estado: estadoIndice(ultimo.indice, previo), frase: fraseIndice(ultimo.indice, previo) });
+    }
   }
 
   // Constancia
@@ -158,7 +160,7 @@ function lecturaSesion(p, s) {
     chips.push({ id: 'dolor', titulo: 'Dolor', estado: 'sin-datos', texto: '—' });
   }
 
-  if (s.emg?.prueba) {
+  if (depsReporte().EMG_HABILITADO && s.emg?.prueba) {
     const indices = indicesEmg(ses.slice(0, i + 1));
     const actual = indices[indices.length - 1]?.indice;
     if (actual != null) chips.push({ id: 'musculo', titulo: 'Tenar/extensores', estado: estadoIndice(actual, indices[indices.length - 2]?.indice), texto: `${Math.round(actual)} %` });

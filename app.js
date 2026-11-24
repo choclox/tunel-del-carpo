@@ -280,6 +280,7 @@ const conPruebaEmg = (ses) => ses.filter((s) => s.emg?.prueba);
 
 // Razón tenar/extensores de la última sesión con prueba EMG.
 function tarjetaMusculo(ses, tarjeta) {
+  if (!EMG_HABILITADO) return '';
   const pruebas = conPruebaEmg(ses);
   const titulo = `Tenar/extensores${botonTermino('razon')}`;
   if (!pruebas.length) return tarjeta('activity', titulo, '—', '<span class="muted">Sin prueba EMG (empieza en la Fase 2)</span>');
@@ -320,6 +321,7 @@ function renderEmg(p) {
 
 // Tarjeta "Prueba de activación muscular" y señal EMG de la sesión elegida.
 function renderEmgSesion(s, p) {
+  if (!EMG_HABILITADO) { $('#sesion-emg').hidden = true; $('#sesion-emg-senal').hidden = true; return; }
   const prueba = s.emg?.prueba;
   $('#sesion-emg').hidden = !prueba;
   if (prueba) {
@@ -447,7 +449,7 @@ function renderEvolucion(p) {
   });
 
   if ($('#mas-indicadores').open) renderIndicador(p);
-  if ($('#mas-emg').open) renderEmg(p);
+  if (EMG_HABILITADO && $('#mas-emg').open) renderEmg(p);
   renderObservaciones(p, ses);
 }
 
@@ -551,7 +553,7 @@ function calcularObservaciones(p, sesiones) {
   }
 
   // EMG: razón tenar/extensores frente a la prueba anterior y co-contracción de la última prueba.
-  const pruebas = conPruebaEmg(ses);
+  const pruebas = EMG_HABILITADO ? conPruebaEmg(ses) : [];
   if (pruebas.length) {
     const base = lineaBase(ses);
     const mUlt = medidasEmg(pruebas[pruebas.length - 1].emg.prueba, base);
@@ -863,11 +865,12 @@ function importarJSON(texto) {
 function exportarCSV(p) {
   const enc = ['paciente_id', 'sesion_id', 'fecha', 'dias_postop', 'duracion_min', 'dolor_eva', 'perdida_datos_pct', 'calibracion_s',
     'ejercicio', 'repeticiones', 'repeticiones_objetivo', 'angulo_max', 'angulo_min', 'velocidad_media', 'variabilidad_pct', 'duracion_s',
-    'emg_tenar', 'emg_flexores', 'emg_extensores', 'emg_tenar_pct', 'emg_flexores_pct', 'emg_extensores_pct', 'indice_mediano_pct', 'cocontraccion_pct', 'origen'];
+    ...(EMG_HABILITADO ? ['emg_tenar', 'emg_flexores', 'emg_extensores', 'emg_tenar_pct', 'emg_flexores_pct', 'emg_extensores_pct', 'indice_mediano_pct', 'cocontraccion_pct'] : []), 'origen'];
   const filas = [enc.join(';')];
   const base = lineaBase(p.sesiones);
-  // Columnas EMG por sesión (vacías si la sesión no tiene prueba de fuerza).
+  // Columnas EMG por sesión (vacías si la sesión no tiene prueba de fuerza; ninguna con el EMG desactivado).
   const columnasEmg = (s) => {
+    if (!EMG_HABILITADO) return [];
     const pr = s.emg?.prueba;
     if (!pr) return Array(8).fill('');
     const m = medidasEmg(pr, base);
@@ -923,6 +926,7 @@ function renderUsuario() {
 function init() {
   estado.db = cargarDB();
   renderUsuario();
+  $('#mas-emg').hidden = !EMG_HABILITADO; // EMG desactivado: sin la gráfica de activación muscular
   $('#btn-salir').addEventListener('click', () => { cerrarSesion(); location.replace('login.html'); });
   aplicarTemaCharts();
 

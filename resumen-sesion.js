@@ -3,7 +3,7 @@
 
 // Dependencias globales en el navegador; require en Node (pruebas).
 const depsResumen = () => (typeof EJERCICIOS !== 'undefined'
-  ? { EJERCICIOS, etapaPorNumero, etapaSugerida, lineaBase, medidasEmg, esSimulada, sesionesClinicas }
+  ? { EJERCICIOS, etapaPorNumero, etapaSugerida, lineaBase, medidasEmg, esSimulada, sesionesClinicas, EMG_HABILITADO }
   : { ...require('./data.js'), ...require('./rutinas.js'), ...require('./emg.js') });
 
 const TEXTO_PRIMERA_SESION = 'Primera sesión: será la referencia para comparar.';
@@ -21,7 +21,7 @@ function sumarDiasISO(iso, n) {
 // Hasta 3 frases sencillas: primero lo que empeoró (lo peor antes) y luego lo que mejoró. Incluye el
 // ejercicio que más cambió, el dolor antes → después y la razón tenar/extensores; si sobra espacio, otros ejercicios.
 function comparacionConAnterior(p, s) {
-  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, esSimulada: simulada, sesionesClinicas: clinicas } = depsResumen();
+  const { EJERCICIOS: EJ, lineaBase: base, medidasEmg: medidas, esSimulada: simulada, sesionesClinicas: clinicas, EMG_HABILITADO: conEmg } = depsResumen();
   if (simulada(s)) return [TEXTO_SIMULADA];
   const ses = clinicas([...p.sesiones].sort((a, b) => a.fecha.localeCompare(b.fecha)));
   const prev = ses.filter((x) => x.fecha < s.fecha || (x.fecha === s.fecha && ses.indexOf(x) < ses.indexOf(s))).pop();
@@ -39,7 +39,7 @@ function comparacionConAnterior(p, s) {
   if (antes != null && s.dolorEVA != null) otras.push({ puntaje: (antes - s.dolorEVA) / 10, texto: `Dolor: ${antes} → ${s.dolorEVA} durante la sesión` });
 
   const pruebas = ses.filter((x) => x.emg?.prueba && ses.indexOf(x) <= ses.indexOf(s));
-  if (s.emg?.prueba && pruebas.length > 1) {
+  if (conEmg && s.emg?.prueba && pruebas.length > 1) {
     const b = base(ses);
     const ahora = medidas(s.emg.prueba, b).indiceMediano;
     const antesIdx = medidas(pruebas[pruebas.length - 2].emg.prueba, b).indiceMediano;

@@ -25,12 +25,13 @@ test('porcentaje de lo normal', () => {
 
 test('todo bien', () => {
   const l = lecturaPaciente(base(), HOY);
-  assert.deepStrictEqual(l.areas.map((a) => a.titulo), ['Movimiento', 'Dolor', 'Tenar/extensores', 'Constancia']);
-  assert.deepStrictEqual(estados(l), ['bien', 'bien', 'bien', 'bien']);
+  // EMG desactivado: sin el área Tenar/extensores aunque las sesiones guardadas traigan la prueba.
+  assert.deepStrictEqual(l.areas.map((a) => a.titulo), ['Movimiento', 'Dolor', 'Constancia']);
+  assert.deepStrictEqual(estados(l), ['bien', 'bien', 'bien']);
   assert.strictEqual(l.general, 'Va bien.');
   assert.strictEqual(area(l, 'movimiento').frase, 'Mueve la muñeca al 70 % de lo normal (+20 puntos desde la primera sesión).');
   assert.strictEqual(area(l, 'dolor').frase, 'Dolor 3/10 en la última sesión (al inicio: 7/10).');
-  assert.strictEqual(area(l, 'musculo').frase, 'Razón tenar/extensores: 124 % de la primera prueba.');
+  assert.strictEqual(area(l, 'musculo'), undefined);
   assert.ok(area(l, 'constancia').frase.startsWith('2 sesiones; la última hace 3 días. Próxima cita: '), area(l, 'constancia').frase);
 });
 
@@ -70,7 +71,7 @@ test('una sesión simulada no cambia la lectura ni se compara', () => {
 
 test('sin sesiones', () => {
   const l = lecturaPaciente({ id: 'X', nombre: 'X', sesiones: [] }, HOY);
-  assert.deepStrictEqual(estados(l), ['sin-datos', 'sin-datos', 'sin-datos', 'sin-datos']);
+  assert.deepStrictEqual(estados(l), ['sin-datos', 'sin-datos', 'sin-datos']);
   assert.strictEqual(area(l, 'constancia').frase, 'Aún no hay sesiones.');
   assert.strictEqual(l.general, 'Aún no hay datos para una lectura.');
 });
@@ -78,18 +79,17 @@ test('sin sesiones', () => {
 test('datos mínimos (sesión importada)', () => {
   const p = { id: 'X', nombre: 'X', sesiones: [{ fecha: '2026-10-25', ejercicios: [] }] };
   const l = lecturaPaciente(p, HOY);
-  assert.deepStrictEqual(estados(l).slice(0, 3), ['sin-datos', 'sin-datos', 'sin-datos']);
+  assert.deepStrictEqual(estados(l).slice(0, 2), ['sin-datos', 'sin-datos']);
   assert.doesNotThrow(() => lecturaSesion(p, p.sesiones[0]));
 });
 
 test('lectura de una sesión', () => {
   const p = base();
   const l = lecturaSesion(p, p.sesiones[1]);
-  assert.deepStrictEqual(l.chips.map((c) => [c.id, c.estado, c.texto]), [['movimiento', 'bien', 'Sube'], ['dolor', 'bien', '7 → 3'], ['musculo', 'bien', '124 %']]);
+  // EMG desactivado: sin chip de tenar/extensores aunque la sesión traiga la prueba.
+  assert.deepStrictEqual(l.chips.map((c) => [c.id, c.estado, c.texto]), [['movimiento', 'bien', 'Sube'], ['dolor', 'bien', '7 → 3']]);
   assert.ok(l.frase.length > 0);
   assert.deepStrictEqual(lecturaSesion(p, p.sesiones[0]).chips[0], { id: 'movimiento', titulo: 'Movimiento', estado: 'sin-datos', texto: '—' });
-  delete p.sesiones[1].emg;
-  assert.ok(!lecturaSesion(p, p.sesiones[1]).chips.some((c) => c.id === 'musculo'));
 });
 
 test('resumenMedicion: cuántos pasos se midieron con cada fuente', () => {

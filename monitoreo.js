@@ -244,7 +244,7 @@ function procesarLinea(linea) {
       if (emg) {
         mv.conEmg = true;
         if (mv.sesion) mv.sesion.conEmg = true;
-        if (mv.paso && !mv.paso.enEspera && mv.sesion) acumularSenalEmg(mv.sesion, emg);
+        if (EMG_HABILITADO && mv.paso && !mv.paso.enEspera && mv.sesion) acumularSenalEmg(mv.sesion, emg);
         if (typeof pruebaRecibirMuestra === 'function') pruebaRecibirMuestra(emg);
       }
       const ult = mv.buffer[mv.buffer.length - 1];
@@ -608,7 +608,7 @@ function guardarSesionRutina({ dolor = null, notas = '', manuales = {}, proximaC
     ejercicios,
   };
   if (mv.sesion.rutina) s.rutina = { etapa: mv.sesion.rutina.etapa, pasos };
-  if (mv.sesion.conEmg) s.emg = { prueba: mv.sesion.emgPrueba ?? null, senal: mv.sesion.emgSenal };
+  if (EMG_HABILITADO && mv.sesion.conEmg) s.emg = { prueba: mv.sesion.emgPrueba ?? null, senal: mv.sesion.emgSenal };
   const chequeo = typeof tomarChequeo === 'function' ? tomarChequeo(p.id) : null;
   if (chequeo) s.chequeo = chequeo;
   const citaAnterior = p.proximaCita;

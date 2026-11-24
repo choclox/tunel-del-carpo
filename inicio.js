@@ -2,7 +2,7 @@
  * sesiones recientes) y "Nueva sesión". Las funciones de cálculo son puras y reciben `hoy` (ISO). */
 
 // Funciones de emg.js: globales en el navegador, require en Node (pruebas).
-const emgDeInicio = () => (typeof medidasEmg === 'function' ? { medidasEmg, lineaBase, sesionesClinicas } : { ...require('./emg.js'), ...require('./data.js') });
+const emgDeInicio = () => (typeof medidasEmg === 'function' ? { medidasEmg, lineaBase, sesionesClinicas, EMG_HABILITADO } : { ...require('./emg.js'), ...require('./data.js') });
 
 const NIVEL_ATENCION = { critical: 0, warning: 1, info: 2 };
 const diasEntre = (desde, hasta) => Math.round((new Date(hasta + 'T12:00:00') - new Date(desde + 'T12:00:00')) / 86400000);
@@ -76,7 +76,7 @@ function motivosAtencion(p, hoy) {
     if (bajaron.length) m.push({ nivel: 'warning', texto: `Bajó el movimiento en ${bajaron.join(', ')}` });
   }
   const pruebas = ses.filter((s) => s.emg?.prueba);
-  if (pruebas.length > 1) {
+  if (emgDeInicio().EMG_HABILITADO && pruebas.length > 1) {
     const { medidasEmg: medidas, lineaBase: base } = emgDeInicio();
     const b = base(ses);
     const a = medidas(pruebas[pruebas.length - 2].emg.prueba, b).indiceMediano;
